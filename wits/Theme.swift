@@ -89,25 +89,7 @@ extension View {
     }
 }
 
-// MARK: - Blob logo
-
-struct BlobShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        let w = rect.width, h = rect.height
-        var p = Path()
-        let top = CGPoint(x: 0.53 * w, y: 0.02 * h)
-        let right = CGPoint(x: 0.98 * w, y: 0.55 * h)
-        let bottom = CGPoint(x: 0.46 * w, y: 0.98 * h)
-        let left = CGPoint(x: 0.02 * w, y: 0.48 * h)
-        p.move(to: top)
-        p.addCurve(to: right, control1: CGPoint(x: 0.84 * w, y: 0.0), control2: CGPoint(x: w, y: 0.26 * h))
-        p.addCurve(to: bottom, control1: CGPoint(x: 0.97 * w, y: 0.86 * h), control2: CGPoint(x: 0.74 * w, y: h))
-        p.addCurve(to: left, control1: CGPoint(x: 0.17 * w, y: 0.95 * h), control2: CGPoint(x: 0.0, y: 0.76 * h))
-        p.addCurve(to: top, control1: CGPoint(x: 0.04 * w, y: 0.16 * h), control2: CGPoint(x: 0.27 * w, y: 0.05 * h))
-        p.closeSubpath()
-        return p
-    }
-}
+// MARK: - Logo mark
 
 struct LogoBlob: View {
     var size: CGFloat
@@ -115,8 +97,9 @@ struct LogoBlob: View {
     @State private var animating = false
 
     var body: some View {
-        BlobShape()
-            .fill(Color.witsAccent)
+        Image("WitsMark")
+            .resizable()
+            .scaledToFit()
             .frame(width: size, height: size)
             .rotationEffect(.degrees(breathe && animating ? 4 : breathe ? -4 : 0))
             .scaleEffect(breathe && animating ? 1.04 : 1)
@@ -131,12 +114,9 @@ struct LogoBlob: View {
 
 struct Wordmark: View {
     var body: some View {
-        HStack(spacing: 9) {
-            LogoBlob(size: 22)
-            Text("wits")
-                .font(.system(size: 21, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsInk)
-        }
+        Text("wits")
+            .font(.system(size: 21, weight: .heavy, design: .rounded))
+            .foregroundStyle(Color.witsInk)
     }
 }
 

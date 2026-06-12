@@ -71,7 +71,7 @@ struct ExplainScreen: View {
                     .font(.system(size: 26, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsAccent)
                     .frame(width: 88, height: 88)
-                    .background(BlobShape().fill(Color.witsAccent.opacity(0.14)))
+                    .background(Circle().fill(Color.witsAccent.opacity(0.14)))
                     .rise()
                 Text(test)
                     .font(.witsDisplay(32))
