@@ -120,7 +120,7 @@ struct ResultScreen: View {
             .padding(.bottom, 20)
             VStack(spacing: 12) {
                 HStack {
-                    Text("more cooked than")
+                    Text("outwitted by")
                         .font(.witsBody(14))
                         .foregroundStyle(Color.witsMuted)
                     Spacer()

@@ -21,11 +21,11 @@ struct HookScreen: View {
             VStack(alignment: .leading, spacing: 16) {
                 LogoBlob(size: 72, breathe: true)
                     .rise()
-                Text("your attention span is \(Text("cooked").foregroundStyle(Color.witsAccent))")
+                Text("you're losing your \(Text("wits").foregroundStyle(Color.witsAccent))")
                     .font(.witsDisplay(42))
                     .foregroundStyle(Color.witsInk)
                     .rise(0.1)
-                Text("let's measure exactly how cooked.")
+                Text("let's measure exactly how many you've got left.")
                     .font(.witsBody(17))
                     .foregroundStyle(Color.witsMuted)
                     .rise(0.19)
