@@ -2,12 +2,12 @@
 //  OnboardingGames.swift
 //  wits
 //
-//  Part two of the flow — the gauntlet. Three Lumosity-style tests, each with
-//  an intro, a guided tutorial, a "let's play" interstitial, and a real
-//  scored run:
-//    Test 1: color match   (response inhibition / focus)
-//    Test 2: train of thought (divided attention / multitasking)
-//    Test 3: memory matrix (spatial recall / working memory)
+//  Part two of the flow — the gauntlet. Three tests built on classic
+//  cognitive-psychology paradigms, each with an intro, a guided tutorial,
+//  a "let's play" interstitial, and a real scored run:
+//    Test 1: arrow storm   (Eriksen flanker task — interference control)
+//    Test 2: crowd control (multiple object tracking — divided attention)
+//    Test 3: echo grid     (backward spatial span — working memory)
 //
 
 import SwiftUI
@@ -18,9 +18,9 @@ struct GauntletScreen: View {
     var onNext: () -> Void
 
     private let tests = [
-        (1, "color match", "say no to the answer your brain shouts first."),
-        (2, "train of thought", "route every train home. they keep coming."),
-        (3, "memory matrix", "tiles flash, then vanish. hold the picture."),
+        (1, "arrow storm", "ignore the crowd. answer only to the middle arrow."),
+        (2, "crowd control", "mark the dots, watch them scatter. don't lose them."),
+        (3, "echo grid", "a path lights up. play it back — backwards."),
     ]
 
     var body: some View {
@@ -189,52 +189,47 @@ private struct TutorialHint: View {
     }
 }
 
-private let gameInks: [(name: String, color: Color)] = [
-    ("green", Color(light: 0x2FAE6E, dark: 0x2FAE6E)),
-    ("blue", Color(light: 0x4E7CF6, dark: 0x4E7CF6)),
-    ("orange", Color(light: 0xF0853F, dark: 0xF0853F)),
-    ("pink", Color(light: 0xE0569E, dark: 0xE0569E)),
-]
+// MARK: - Test 1: arrow storm (flanker task)
+// Five arrows. Only the middle one matters; the flankers usually disagree.
+// An adaptive response deadline tightens as you streak — too slow counts
+// as a miss. Based on the Eriksen flanker paradigm (1974).
 
-// MARK: - Test 1: color match
-// Top card shows a word (its MEANING matters). Bottom card shows a word
-// printed in a color (its INK matters). Match = top word's meaning equals
-// the bottom word's ink color. 45 seconds, streak multiplier scoring.
-
-struct ColorMatchScreen: View {
-    var onComplete: (ColorMatchStats) -> Void
+struct FlankerScreen: View {
+    var onComplete: (FlankerStats) -> Void
 
     private static let gameSeconds = 45.0
+    private static let maxWindow = 1.4
+    private static let minWindow = 0.75
 
     private struct Trial: Identifiable {
         let id = UUID()
-        let topWord: String
-        let bottomWord: String
-        let inkName: String
-        let ink: Color
-        var match: Bool { topWord == inkName }
+        let right: Bool       // center arrow direction
+        let congruent: Bool
+        let yShift: CGFloat
     }
 
     private static func makeTrial() -> Trial {
-        let top = gameInks.randomElement()!
-        let bottomWord = gameInks.randomElement()!.name
-        let ink = Bool.random() ? top : gameInks.filter { $0.name != top.name }.randomElement()!
-        return Trial(topWord: top.name, bottomWord: bottomWord, inkName: ink.name, ink: ink.color)
+        Trial(right: Bool.random(),
+              congruent: Double.random(in: 0..<1) < 0.35,
+              yShift: CGFloat.random(in: -34...34))
     }
 
-    // Fixed tutorial trials: (top, bottomWord, inkIndex, hint)
-    private static let tutorialTrials: [(top: String, bottom: String, ink: Int, hint: String)] = [
-        ("blue", "blue", 1, "the top word means blue. the bottom text is printed in blue. that's a match — tap yes."),
-        ("orange", "pink", 0, "ignore what the bottom word says. it's printed in green, and the top word means orange. no match."),
-        ("pink", "green", 3, "the word says green, but it's printed in pink — and the top word means pink. match."),
+    // Fixed tutorial trials: (right, congruent, hint)
+    private static let tutorialTrials: [(right: Bool, congruent: Bool, hint: String)] = [
+        (true, true, "five arrows. you answer for the middle one only. they all agree here — tap right."),
+        (false, false, "now the crowd points right, but the middle arrow points left. tap left."),
+        (true, false, "the flankers exist to fool you. middle arrow says right."),
     ]
 
     @State private var phase = GamePhase.intro
     @State private var tutorialIndex = 0
     @State private var tutorialError = false
-    @State private var stats = ColorMatchStats()
+    @State private var stats = FlankerStats()
     @State private var streak = 0
     @State private var trial: Trial?
+    @State private var trialStart = Date()
+    @State private var window = maxWindow
+    @State private var windowFrac = 1.0
     @State private var timeLeft = gameSeconds
     @State private var feedback: Bool?
     @State private var finished = false
@@ -246,14 +241,16 @@ struct ColorMatchScreen: View {
         case .intro:
             GameIntro(
                 tag: "test 1 of 3",
-                title: "color match",
-                skillLine: "does the top word's meaning match the color the bottom word is printed in? your brain will lie to you. answer fast anyway.",
+                title: "arrow storm",
+                skillLine: "five arrows flash. answer for the middle one and ignore the rest. the clock per arrow shrinks as you get better.",
                 onStart: { phase = .tutorial }
             ) {
                 VStack(alignment: .leading, spacing: 10) {
-                    wordCard(text: "blue", color: Color.witsInk, label: "meaning", labelAbove: true, compact: true)
-                    wordCard(text: "green", color: gameInks[1].color, label: "text color", labelAbove: false, compact: true)
-                    Text("this one's a \(Text("yes").foregroundStyle(Color.witsAccent)) — it says green, but it's printed in blue")
+                    arrowRow(right: false, congruent: false, size: 24)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 14)
+                        .cardSurface()
+                    Text("this one's a \(Text("left").foregroundStyle(Color.witsAccent)) — four arrows are lying to you")
                         .font(.witsBody(12.5))
                         .foregroundStyle(Color.witsFaint)
                 }
@@ -262,9 +259,11 @@ struct ColorMatchScreen: View {
             tutorialView
         case .ready:
             GameReady {
-                stats = ColorMatchStats()
+                stats = FlankerStats()
                 streak = 0
+                window = Self.maxWindow
                 trial = Self.makeTrial()
+                trialStart = Date()
                 phase = .playing
             }
         case .playing:
@@ -272,26 +271,30 @@ struct ColorMatchScreen: View {
         }
     }
 
-    private func wordCard(text: String, color: Color, label: String, labelAbove: Bool, compact: Bool = false) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            if labelAbove { cardLabel(label) }
-            Text(text)
-                .font(.system(size: compact ? 26 : 38, weight: .heavy, design: .rounded))
-                .foregroundStyle(color)
-                .frame(maxWidth: compact ? nil : .infinity)
-                .padding(.horizontal, compact ? 26 : 20)
-                .padding(.vertical, compact ? 12 : 22)
-                .cardSurface()
-            if !labelAbove { cardLabel(label) }
+    private func arrowRow(right: Bool, congruent: Bool, size: CGFloat = 32) -> some View {
+        HStack(spacing: 12) {
+            ForEach(0..<5, id: \.self) { i in
+                let isCenter = i == 2
+                let pointsRight = isCenter ? right : (congruent ? right : !right)
+                Image(systemName: pointsRight ? "arrowtriangle.right.fill" : "arrowtriangle.left.fill")
+                    .font(.system(size: size, weight: .heavy))
+                    .foregroundStyle(Color.witsInk)
+            }
         }
     }
 
-    private func cardLabel(_ text: String) -> some View {
-        Text(text.uppercased())
-            .font(.system(size: 11, weight: .bold, design: .rounded))
-            .kerning(0.7)
-            .foregroundStyle(Color.witsFaint)
-            .padding(.leading, 4)
+    private func trialCard(_ t: Trial) -> some View {
+        VStack(spacing: 6) {
+            arrowRow(right: t.right, congruent: t.congruent)
+                .offset(y: t.yShift)
+                .frame(maxWidth: .infinity)
+                .frame(height: 150)
+                .cardSurface()
+            Text("THE MIDDLE ONE")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .kerning(0.7)
+                .foregroundStyle(Color.witsFaint)
+        }
     }
 
     private var tutorialView: some View {
@@ -299,13 +302,21 @@ struct ColorMatchScreen: View {
         return VStack(spacing: 0) {
             GameTopTag(text: "tutorial · \(tutorialIndex + 1) of \(Self.tutorialTrials.count)")
             Spacer()
-            trialCards(top: t.top, bottom: t.bottom, ink: gameInks[t.ink].color)
+            VStack(spacing: 6) {
+                arrowRow(right: t.right, congruent: t.congruent)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 150)
+                    .cardSurface()
+                Text("THE MIDDLE ONE")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .kerning(0.7)
+                    .foregroundStyle(Color.witsFaint)
+            }
             Spacer()
             VStack(spacing: 14) {
                 TutorialHint(text: tutorialError ? "not quite. \(t.hint)" : t.hint)
-                answerButtons { saysMatch in
-                    let isMatch = t.top == gameInks[t.ink].name
-                    if saysMatch == isMatch {
+                answerButtons { saysRight in
+                    if saysRight == t.right {
                         tutorialError = false
                         if tutorialIndex < Self.tutorialTrials.count - 1 {
                             tutorialIndex += 1
@@ -349,7 +360,7 @@ struct ColorMatchScreen: View {
             ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             Spacer()
             if let trial {
-                trialCards(top: trial.topWord, bottom: trial.bottomWord, ink: trial.ink)
+                trialCard(trial)
                     .id(trial.id)
                     .transition(.scale(scale: 0.92).combined(with: .opacity))
                     .overlay(
@@ -360,10 +371,21 @@ struct ColorMatchScreen: View {
                             )
                             .padding(-14)
                     )
+                // per-trial deadline
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.witsLine)
+                    GeometryReader { geo in
+                        Capsule()
+                            .fill(windowFrac < 0.35 ? Color.witsWarm : Color.witsMuted)
+                            .frame(width: max(0, geo.size.width * windowFrac))
+                    }
+                }
+                .frame(width: 130, height: 4)
+                .padding(.top, 18)
             }
             Spacer()
-            answerButtons { saysMatch in
-                answer(saysMatch)
+            answerButtons { saysRight in
+                answer(saysRight)
             }
             .padding(.top, 16)
         }
@@ -373,34 +395,11 @@ struct ColorMatchScreen: View {
         .task { await run() }
     }
 
-    private func trialCards(top: String, bottom: String, ink: Color) -> some View {
-        VStack(spacing: 14) {
-            VStack(spacing: 6) {
-                cardLabel("meaning")
-                Text(top)
-                    .font(.system(size: 40, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                    .cardSurface()
-            }
-            VStack(spacing: 6) {
-                Text(bottom)
-                    .font(.system(size: 40, weight: .heavy, design: .rounded))
-                    .foregroundStyle(ink)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 24)
-                    .cardSurface()
-                cardLabel("text color")
-            }
-        }
-    }
-
     private func answerButtons(_ act: @escaping (Bool) -> Void) -> some View {
         HStack(spacing: 10) {
             Button { act(false) } label: {
-                Text("no")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                Image(systemName: "arrowtriangle.left.fill")
+                    .font(.system(size: 18, weight: .heavy))
                     .foregroundStyle(Color.witsInk)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 17)
@@ -408,8 +407,8 @@ struct ColorMatchScreen: View {
             }
             .buttonStyle(.plain)
             Button { act(true) } label: {
-                Text("yes")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                Image(systemName: "arrowtriangle.right.fill")
+                    .font(.system(size: 18, weight: .heavy))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 17)
@@ -419,30 +418,51 @@ struct ColorMatchScreen: View {
         }
     }
 
-    private func answer(_ saysMatch: Bool) {
+    private func answer(_ saysRight: Bool) {
         guard let current = trial, !finished else { return }
-        let ok = saysMatch == current.match
+        let ok = saysRight == current.right
         if ok {
             stats.right += 1
             streak += 1
             stats.bestStreak = max(stats.bestStreak, streak)
             stats.score += 100 * multiplier
+            window = max(Self.minWindow, window - 0.025)
         } else {
             stats.wrong += 1
             streak = 0
+            window = min(Self.maxWindow, window + 0.12)
         }
         feedback = ok
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
+        nextTrial()
+    }
+
+    private func timeout() {
+        guard !finished else { return }
+        stats.wrong += 1
+        streak = 0
+        window = min(Self.maxWindow, window + 0.12)
+        feedback = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
+        nextTrial()
+    }
+
+    private func nextTrial() {
         withAnimation(.easeOut(duration: 0.13)) {
             trial = Self.makeTrial()
         }
+        trialStart = Date()
+        windowFrac = 1
     }
 
     private func run() async {
         let start = Date()
         while !Task.isCancelled {
-            try? await Task.sleep(for: .milliseconds(50))
+            try? await Task.sleep(for: .milliseconds(30))
             timeLeft = max(0, Self.gameSeconds - Date().timeIntervalSince(start))
+            let elapsed = Date().timeIntervalSince(trialStart)
+            windowFrac = max(0, 1 - elapsed / window)
+            if elapsed > window { timeout() }
             if timeLeft <= 0 {
                 guard !finished else { return }
                 finished = true
@@ -454,129 +474,109 @@ struct ColorMatchScreen: View {
     }
 }
 
-// MARK: - Test 2: train of thought
-// Colored trains leave the depot and roll through junctions toward colored
-// stations. Tapping a junction flips which branch it sends trains down.
-// Route each train to the station of its color.
+// MARK: - Test 2: crowd control (multiple object tracking)
+// A few dots flash, then turn identical to the rest and everything starts
+// drifting. Track the marked ones through the chaos and point them out when
+// the dots freeze. Based on the multiple-object-tracking paradigm (1988).
 
-struct TrainGameScreen: View {
-    var onComplete: (TrainStats) -> Void
+struct TrackerScreen: View {
+    var onComplete: (TrackStats) -> Void
 
-    private static let totalTrains = 14
+    // (targets, dots, unit speed) per scored round
+    private static let rounds: [(targets: Int, dots: Int, speed: Double)] = [
+        (3, 9, 0.22), (4, 9, 0.26), (4, 9, 0.30), (5, 9, 0.34),
+    ]
+    private static let tutorialRound = (targets: 2, dots: 6, speed: 0.13)
+    private static let markSeconds = 1.5
+    private static let moveSeconds = 6.5
+    private static let margin = 0.08
 
-    // ── track graph (unit coordinates) ──
-    fileprivate struct Edge {
-        let p0: CGPoint, c0: CGPoint, c1: CGPoint, p1: CGPoint
-        let endJunction: Int?
-        let endStation: Int?
-
-        func point(_ t: Double) -> CGPoint {
-            let u = 1 - t
-            let x = u*u*u*p0.x + 3*u*u*t*c0.x + 3*u*t*t*c1.x + t*t*t*p1.x
-            let y = u*u*u*p0.y + 3*u*u*t*c0.y + 3*u*t*t*c1.y + t*t*t*p1.y
-            return CGPoint(x: x, y: y)
-        }
+    private enum RoundPhase {
+        case mark, move, pick, reveal
     }
 
-    fileprivate enum Track {
-        static let src = CGPoint(x: 0.5, y: 0.05)
-        static let j = [CGPoint(x: 0.5, y: 0.3), CGPoint(x: 0.26, y: 0.56), CGPoint(x: 0.74, y: 0.56)]
-        static let stations = [
-            CGPoint(x: 0.13, y: 0.88), CGPoint(x: 0.385, y: 0.88),
-            CGPoint(x: 0.615, y: 0.88), CGPoint(x: 0.87, y: 0.88),
-        ]
-        static let edges: [Edge] = [
-            // 0: depot → J0
-            Edge(p0: src, c0: CGPoint(x: 0.5, y: 0.14), c1: CGPoint(x: 0.5, y: 0.21), p1: j[0], endJunction: 0, endStation: nil),
-            // 1: J0 → J1 (left), 2: J0 → J2 (right)
-            Edge(p0: j[0], c0: CGPoint(x: 0.5, y: 0.43), c1: CGPoint(x: 0.26, y: 0.43), p1: j[1], endJunction: 1, endStation: nil),
-            Edge(p0: j[0], c0: CGPoint(x: 0.5, y: 0.43), c1: CGPoint(x: 0.74, y: 0.43), p1: j[2], endJunction: 2, endStation: nil),
-            // 3: J1 → station 0, 4: J1 → station 1
-            Edge(p0: j[1], c0: CGPoint(x: 0.26, y: 0.7), c1: CGPoint(x: 0.13, y: 0.72), p1: stations[0], endJunction: nil, endStation: 0),
-            Edge(p0: j[1], c0: CGPoint(x: 0.26, y: 0.7), c1: CGPoint(x: 0.385, y: 0.72), p1: stations[1], endJunction: nil, endStation: 1),
-            // 5: J2 → station 2, 6: J2 → station 3
-            Edge(p0: j[2], c0: CGPoint(x: 0.74, y: 0.7), c1: CGPoint(x: 0.615, y: 0.72), p1: stations[2], endJunction: nil, endStation: 2),
-            Edge(p0: j[2], c0: CGPoint(x: 0.74, y: 0.7), c1: CGPoint(x: 0.87, y: 0.72), p1: stations[3], endJunction: nil, endStation: 3),
-        ]
-        /// Outgoing edge indices per junction: [first branch, second branch].
-        static let branches = [[1, 2], [3, 4], [5, 6]]
-    }
-
-    fileprivate struct TrainRun: Identifiable {
-        let id = UUID()
-        let target: Int
-        var edge = 0
-        var progress = 0.0
-        var arrived = false
-        var correct = false
+    private struct Dot: Identifiable {
+        let id: Int
+        var pos: CGPoint
+        var vel: CGVector
+        var isTarget: Bool
+        var picked = false
     }
 
     @State private var phase = GamePhase.intro
-    @State private var switches = [true, true, true]   // true = first branch
-    @State private var trains: [TrainRun] = []
-    @State private var stats = TrainStats()
-    @State private var spawned = 0
-    @State private var stationFlash: [Int: Bool] = [:]  // station -> correct?
-    @State private var tutorialDone = false
-    @State private var tutorialMessage = "tap a switch to bend the track. get the train to the station that matches its color."
-    @State private var finished = false
+    @State private var roundPhase = RoundPhase.mark
+    @State private var dots: [Dot] = []
+    @State private var round = 0
+    @State private var stats = TrackStats()
+    @State private var pulse = false
+    @State private var generation = 0
+
+    private var config: (targets: Int, dots: Int, speed: Double) {
+        phase == .tutorial ? Self.tutorialRound : Self.rounds[min(round, Self.rounds.count - 1)]
+    }
 
     var body: some View {
         switch phase {
         case .intro:
             GameIntro(
                 tag: "test 2 of 3",
-                title: "train of thought",
-                skillLine: "trains roll out one after another. flip the switches so every train reaches the station of its color. they will not wait for you.",
-                onStart: { phase = .tutorial }
+                title: "crowd control",
+                skillLine: "a few dots glow, then go dark and scatter into the crowd. keep your eyes on them — every round adds more to hold.",
+                onStart: {
+                    phase = .tutorial
+                    startRound()
+                }
             ) {
                 HStack(spacing: 10) {
-                    ForEach(0..<4, id: \.self) { i in
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(gameInks[i].color)
-                            .frame(width: 40, height: 34)
-                            .overlay(alignment: .bottom) {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(.white.opacity(0.85))
-                                    .frame(width: 10, height: 12)
-                                    .padding(.bottom, 3)
-                            }
+                    ForEach(0..<6, id: \.self) { i in
+                        Circle()
+                            .fill([0, 3].contains(i) ? Color.witsAccent : Color.witsTint)
+                            .frame(width: 26, height: 26)
                     }
                 }
             }
-        case .tutorial:
-            boardView(isTutorial: true)
+        case .tutorial, .playing:
+            board
         case .ready:
             GameReady {
-                trains = []
-                stats = TrainStats()
-                spawned = 0
-                finished = false
+                round = 0
+                stats = TrackStats()
                 phase = .playing
+                startRound()
             }
-        case .playing:
-            boardView(isTutorial: false)
         }
     }
 
-    private func boardView(isTutorial: Bool) -> some View {
+    private var statusLine: String {
+        switch roundPhase {
+        case .mark: return "memorize the glowing dots"
+        case .move: return "don't lose them"
+        case .pick: return "tap the \(config.targets) you were tracking"
+        case .reveal: return dots.filter { $0.picked && $0.isTarget }.count == config.targets
+            ? "all of them. nice." : "the rings show where they really went."
+        }
+    }
+
+    private var board: some View {
         VStack(spacing: 12) {
-            if isTutorial {
+            if phase == .tutorial {
                 GameTopTag(text: "tutorial")
-                TutorialHint(text: tutorialMessage)
+                TutorialHint(text: roundPhase == .pick
+                    ? "the dots froze. tap the \(config.targets) that were glowing at the start."
+                    : "two dots glow, then blend in and wander. follow them with your eyes.")
             } else {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("\(Text("\(stats.correct)").foregroundStyle(Color.witsAccent)) of \(Self.totalTrains) routed")
+                    Text("round \(Text("\(min(round + 1, Self.rounds.count))").foregroundStyle(Color.witsAccent)) of \(Self.rounds.count)")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsInk)
                         .monospacedDigit()
                     Spacer()
-                    Text("\(stats.total) done")
+                    Text("\(stats.correctPicks) of \(stats.totalTargets) held")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.witsMuted)
                         .monospacedDigit()
                 }
-                ProgressTrack(fraction: Double(stats.total) / Double(Self.totalTrains), animated: true)
+                ProgressTrack(fraction: Double(round) / Double(Self.rounds.count), animated: true)
             }
             GeometryReader { geo in
                 let size = geo.size
@@ -584,77 +584,17 @@ struct TrainGameScreen: View {
                     RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
                         .fill(Color.witsCard)
                         .shadow(color: .witsShadow, radius: 10, y: 6)
-
-                    // tracks
-                    ForEach(0..<TrainGameScreen.Track.edges.count, id: \.self) { i in
-                        trackPath(TrainGameScreen.Track.edges[i], in: size)
-                            .stroke(
-                                Color.witsLine.opacity(isActiveEdge(i) ? 1 : 0.45),
-                                style: StrokeStyle(lineWidth: isActiveEdge(i) ? 7 : 5, lineCap: .round)
-                            )
-                    }
-
-                    // depot
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(Color.witsInk.opacity(0.75))
-                        .frame(width: 44, height: 26)
-                        .position(scaled(TrainGameScreen.Track.src, size))
-
-                    // stations
-                    ForEach(0..<4, id: \.self) { s in
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill(gameInks[s].color)
-                            .frame(width: 46, height: 38)
-                            .overlay(alignment: .bottom) {
-                                RoundedRectangle(cornerRadius: 2)
-                                    .fill(.white.opacity(0.85))
-                                    .frame(width: 11, height: 14)
-                                    .padding(.bottom, 3)
-                            }
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                    .strokeBorder(
-                                        stationFlash[s] == true ? Color.witsAccent
-                                            : stationFlash[s] == false ? Color.witsWarm : .clear,
-                                        lineWidth: 3
-                                    )
-                                    .padding(-5)
-                            )
-                            .position(scaled(TrainGameScreen.Track.stations[s], size))
-                    }
-
-                    // junction switches
-                    ForEach(0..<3, id: \.self) { jIdx in
-                        Button {
-                            switches[jIdx].toggle()
-                        } label: {
-                            Image(systemName: switches[jIdx] ? "arrow.turn.down.left" : "arrow.turn.down.right")
-                                .font(.system(size: 15, weight: .heavy))
-                                .foregroundStyle(.white)
-                                .frame(width: 40, height: 40)
-                                .background(Color.witsAccent, in: Circle())
-                                .shadow(color: .witsAccent.opacity(0.4), radius: 6, y: 3)
-                        }
-                        .buttonStyle(.plain)
-                        .position(scaled(TrainGameScreen.Track.j[jIdx], size))
-                        .animation(.easeOut(duration: 0.12), value: switches[jIdx])
-                    }
-
-                    // trains
-                    ForEach(trains) { train in
-                        if !train.arrived {
-                            let edge = TrainGameScreen.Track.edges[train.edge]
-                            Circle()
-                                .fill(gameInks[train.target].color)
-                                .frame(width: 24, height: 24)
-                                .overlay(Circle().strokeBorder(.white, lineWidth: 3))
-                                .shadow(color: .witsShadow, radius: 4, y: 2)
-                                .position(scaled(edge.point(train.progress), size))
-                        }
+                    ForEach(dots) { dot in
+                        dotView(dot)
+                            .position(x: dot.pos.x * size.width, y: dot.pos.y * size.height)
                     }
                 }
+                .contentShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+                .onTapGesture { location in
+                    tapBoard(location, in: size)
+                }
             }
-            Text(isTutorial ? "trains check the switch when they reach it" : "every train to its own color")
+            Text(statusLine)
                 .font(.witsBody(12.5))
                 .foregroundStyle(Color.witsFaint)
                 .frame(maxWidth: .infinity)
@@ -662,156 +602,195 @@ struct TrainGameScreen: View {
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.top, 24)
         .padding(.bottom, 12)
-        .task(id: phase == .tutorial) { await run(isTutorial: isTutorial) }
     }
 
-    private func scaled(_ p: CGPoint, _ size: CGSize) -> CGPoint {
-        CGPoint(x: p.x * size.width, y: p.y * size.height)
+    private func dotView(_ dot: Dot) -> some View {
+        let showTarget = roundPhase == .mark && dot.isTarget
+        let missed = roundPhase == .reveal && dot.isTarget && !dot.picked
+        let fill: Color = showTarget ? .witsAccent
+            : dot.picked ? (roundPhase == .reveal && !dot.isTarget ? Color.witsWarm : Color.witsAccent.opacity(0.85))
+            : Color.witsInk.opacity(0.32)
+        return Circle()
+            .fill(fill)
+            .frame(width: 30, height: 30)
+            .scaleEffect(showTarget && pulse ? 1.18 : 1)
+            .overlay(
+                Circle()
+                    .strokeBorder(missed ? Color.witsAccent : .clear, lineWidth: 3)
+                    .padding(-5)
+            )
+            .animation(.easeInOut(duration: 0.45), value: pulse)
+            .animation(.easeOut(duration: 0.15), value: dot.picked)
     }
 
-    private func trackPath(_ edge: TrainGameScreen.Edge, in size: CGSize) -> Path {
-        Path { p in
-            p.move(to: scaled(edge.p0, size))
-            p.addCurve(to: scaled(edge.p1, size),
-                       control1: scaled(edge.c0, size),
-                       control2: scaled(edge.c1, size))
+    private func tapBoard(_ location: CGPoint, in size: CGSize) {
+        guard roundPhase == .pick else { return }
+        let unit = CGPoint(x: location.x / size.width, y: location.y / size.height)
+        // nearest dot within ~22pt
+        let hit = dots.indices.min { a, b in
+            dist(dots[a].pos, unit, size) < dist(dots[b].pos, unit, size)
         }
+        guard let hit, dist(dots[hit].pos, unit, size) < 26, !dots[hit].picked else { return }
+        dots[hit].picked = true
+        if dots.filter(\.picked).count == config.targets { finishPicks() }
     }
 
-    /// Edge 0 is always active; branch edges are active when their junction points at them.
-    private func isActiveEdge(_ i: Int) -> Bool {
-        switch i {
-        case 0: return true
-        case 1: return switches[0]
-        case 2: return !switches[0]
-        case 3: return switches[1]
-        case 4: return !switches[1]
-        case 5: return switches[2]
-        default: return !switches[2]
+    private func dist(_ a: CGPoint, _ b: CGPoint, _ size: CGSize) -> Double {
+        let dx = (a.x - b.x) * size.width, dy = (a.y - b.y) * size.height
+        return (dx * dx + dy * dy).squareRoot()
+    }
+
+    private func finishPicks() {
+        let correct = dots.filter { $0.picked && $0.isTarget }.count
+        let isTutorial = phase == .tutorial
+        if !isTutorial {
+            stats.correctPicks += correct
+            stats.totalTargets += config.targets
+            stats.rounds += 1
+            if correct == config.targets { stats.perfectRounds += 1 }
         }
-    }
-
-    private func spawnTrain() {
-        trains.append(TrainRun(target: Int.random(in: 0..<4)))
-        spawned += 1
-    }
-
-    private func arrival(_ index: Int, station: Int) {
-        trains[index].arrived = true
-        let correct = trains[index].target == station
-        trains[index].correct = correct
-        stationFlash[station] = correct
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
-            stationFlash[station] = nil
-        }
-    }
-
-    private func run(isTutorial: Bool) async {
-        let tick = 0.016
-        var sinceSpawn = 10.0
-        var elapsed = 0.0
-
-        if isTutorial {
-            tutorialDone = false
-            trains = []
-        }
-
-        while !Task.isCancelled {
-            try? await Task.sleep(for: .milliseconds(16))
-            elapsed += tick
-            sinceSpawn += tick
-
-            // spawning
+        roundPhase = .reveal
+        let gen = generation
+        Task {
+            try? await Task.sleep(for: .milliseconds(1400))
+            guard gen == generation else { return }
             if isTutorial {
-                if trains.allSatisfy(\.arrived) && sinceSpawn > 1.0 && !tutorialDone {
-                    spawnTrain()
-                    sinceSpawn = 0
-                }
-            } else if spawned < Self.totalTrains && sinceSpawn >= 2.3 {
-                spawnTrain()
-                sinceSpawn = 0
-            }
-
-            // movement
-            let edgeDuration = isTutorial ? 2.2 : max(1.1, 1.6 - elapsed * 0.012)
-            for i in trains.indices where !trains[i].arrived {
-                trains[i].progress += tick / edgeDuration
-                while trains[i].progress >= 1, !trains[i].arrived {
-                    let edge = TrainGameScreen.Track.edges[trains[i].edge]
-                    if let jIdx = edge.endJunction {
-                        let nextEdge = TrainGameScreen.Track.branches[jIdx][switches[jIdx] ? 0 : 1]
-                        trains[i].edge = nextEdge
-                        trains[i].progress -= 1
-                    } else if let station = edge.endStation {
-                        let wasCorrectTarget = trains[i].target == station
-                        arrival(i, station: station)
-                        if isTutorial {
-                            if wasCorrectTarget {
-                                tutorialDone = true
-                                tutorialMessage = "that's it. now they come faster, and they don't stop."
-                            } else {
-                                tutorialMessage = "missed it — flip the switches before the train reaches them. here comes another."
-                            }
-                        } else {
-                            stats.total += 1
-                            if wasCorrectTarget { stats.correct += 1 }
-                        }
-                    }
-                }
-            }
-
-            // end conditions
-            if isTutorial {
-                if tutorialDone, trains.allSatisfy(\.arrived) {
-                    try? await Task.sleep(for: .milliseconds(900))
-                    phase = .ready
-                    return
-                }
-            } else if stats.total >= Self.totalTrains {
-                guard !finished else { return }
-                finished = true
-                try? await Task.sleep(for: .milliseconds(400))
+                phase = .ready
+            } else if round + 1 >= Self.rounds.count {
                 onComplete(stats)
-                return
+            } else {
+                round += 1
+                startRound()
+            }
+        }
+    }
+
+    private func startRound() {
+        generation += 1
+        let gen = generation
+        let c = config
+        var rng = SystemRandomNumberGenerator()
+        var seeded: [Dot] = []
+        for i in 0..<c.dots {
+            // keep spawn points spread out
+            var pos: CGPoint
+            var attempts = 0
+            repeat {
+                pos = CGPoint(x: Double.random(in: Self.margin...(1 - Self.margin), using: &rng),
+                              y: Double.random(in: Self.margin...(1 - Self.margin), using: &rng))
+                attempts += 1
+            } while attempts < 40 && seeded.contains(where: { hypot($0.pos.x - pos.x, $0.pos.y - pos.y) < 0.16 })
+            let angle = Double.random(in: 0..<(2 * .pi), using: &rng)
+            seeded.append(Dot(
+                id: i,
+                pos: pos,
+                vel: CGVector(dx: Darwin.cos(angle) * c.speed, dy: Darwin.sin(angle) * c.speed),
+                isTarget: i < c.targets
+            ))
+        }
+        dots = seeded.shuffled()
+        roundPhase = .mark
+        pulse = false
+
+        Task {
+            // mark: pulse the targets
+            var markLeft = Self.markSeconds
+            while markLeft > 0 {
+                pulse.toggle()
+                try? await Task.sleep(for: .milliseconds(450))
+                guard gen == generation else { return }
+                markLeft -= 0.45
+            }
+            roundPhase = .move
+            // move: drift, bounce, jitter
+            var moveLeft = Self.moveSeconds
+            let dt = 0.016
+            while moveLeft > 0 {
+                try? await Task.sleep(for: .milliseconds(16))
+                guard gen == generation else { return }
+                step(dt)
+                moveLeft -= dt
+            }
+            roundPhase = .pick
+        }
+    }
+
+    private func step(_ dt: Double) {
+        for i in dots.indices {
+            var d = dots[i]
+            // occasional heading change so paths can't be extrapolated
+            if Double.random(in: 0..<1) < 0.012 {
+                let turn = Double.random(in: -0.9...0.9)
+                let speed = hypot(d.vel.dx, d.vel.dy)
+                let heading = atan2(d.vel.dy, d.vel.dx) + turn
+                d.vel = CGVector(dx: Darwin.cos(heading) * speed, dy: Darwin.sin(heading) * speed)
+            }
+            d.pos.x += d.vel.dx * dt
+            d.pos.y += d.vel.dy * dt
+            if d.pos.x < Self.margin { d.pos.x = Self.margin; d.vel.dx = abs(d.vel.dx) }
+            if d.pos.x > 1 - Self.margin { d.pos.x = 1 - Self.margin; d.vel.dx = -abs(d.vel.dx) }
+            if d.pos.y < Self.margin { d.pos.y = Self.margin; d.vel.dy = abs(d.vel.dy) }
+            if d.pos.y > 1 - Self.margin { d.pos.y = 1 - Self.margin; d.vel.dy = -abs(d.vel.dy) }
+            dots[i] = d
+        }
+        // soft repulsion so dots stay distinguishable
+        for i in dots.indices {
+            for j in dots.indices where j > i {
+                let dx = dots[j].pos.x - dots[i].pos.x
+                let dy = dots[j].pos.y - dots[i].pos.y
+                let d = hypot(dx, dy)
+                if d < 0.075, d > 0 {
+                    let push = (0.075 - d) / 2
+                    let ux = dx / d, uy = dy / d
+                    dots[i].pos.x = min(1 - Self.margin, max(Self.margin, dots[i].pos.x - ux * push))
+                    dots[i].pos.y = min(1 - Self.margin, max(Self.margin, dots[i].pos.y - uy * push))
+                    dots[j].pos.x = min(1 - Self.margin, max(Self.margin, dots[j].pos.x + ux * push))
+                    dots[j].pos.y = min(1 - Self.margin, max(Self.margin, dots[j].pos.y + uy * push))
+                }
             }
         }
     }
 }
 
-// MARK: - Test 3: memory matrix
-// Tiles flash, then vanish; tap where they were. Difficulty adapts —
-// perfect recall adds a tile, a miss removes one. 10 trials.
+// MARK: - Test 3: echo grid (backward spatial span)
+// Tiles light up one at a time. Tap them back in REVERSE order. Perfect
+// recall lengthens the path, a slip shortens it. Based on the backward
+// Corsi block-tapping task.
 
-struct MemoryMatrixScreen: View {
-    var onComplete: (MatrixStats) -> Void
+struct SpanScreen: View {
+    var onComplete: (SpanStats) -> Void
 
-    private static let totalTrials = 10
+    private static let totalTrials = 8
     private static let columns = 4
+    private static let rows = 4
 
-    private enum MatrixPhase {
+    private enum TrialPhase {
         case interstitial, show, recall, reveal
     }
 
     @State private var phase = GamePhase.intro
-    @State private var trialPhase = MatrixPhase.interstitial
+    @State private var trialPhase = TrialPhase.interstitial
     @State private var inTutorial = false
     @State private var trial = 0
-    @State private var tiles = 3
-    @State private var lit: Set<Int> = []
-    @State private var taps: [Int] = []
-    @State private var stats = MatrixStats()
+    @State private var span = 3
+    @State private var seq: [Int] = []
+    @State private var litIndex: Int?
+    @State private var tapIndex = 0
+    @State private var rightTaps: Set<Int> = []
+    @State private var wrongTap: Int?
+    @State private var failed = false
+    @State private var stats = SpanStats()
     @State private var generation = 0
 
-    private var rows: Int { tiles <= 3 ? 3 : tiles <= 5 ? 4 : 5 }
-    private var cellCount: Int { rows * Self.columns }
+    private var cellCount: Int { Self.rows * Self.columns }
 
     var body: some View {
         switch phase {
         case .intro:
             GameIntro(
                 tag: "test 3 of 3",
-                title: "memory matrix",
-                skillLine: "tiles light up, then vanish. tap where they were. get them all and the board grows. miss and it shrinks. ten rounds.",
+                title: "echo grid",
+                skillLine: "tiles light up in order, then go dark. tap them back in reverse — last one first. nail it and the path gets longer.",
                 onStart: {
                     inTutorial = true
                     startTrial(reset: true)
@@ -821,8 +800,15 @@ struct MemoryMatrixScreen: View {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 6), count: 4), spacing: 6) {
                     ForEach(0..<12, id: \.self) { i in
                         RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill([1, 4, 6, 11].contains(i) ? Color.witsAccent : Color.witsTint)
+                            .fill([1, 6, 8].contains(i) ? Color.witsAccent : Color.witsTint)
                             .frame(width: 40, height: 40)
+                            .overlay {
+                                if let n = [1, 6, 8].firstIndex(of: i) {
+                                    Text("\(n + 1)")
+                                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                                        .foregroundStyle(.white)
+                                }
+                            }
                     }
                 }
             }
@@ -842,8 +828,8 @@ struct MemoryMatrixScreen: View {
             if inTutorial {
                 GameTopTag(text: "tutorial")
                 TutorialHint(text: trialPhase == .recall
-                    ? "now tap the \(lit.count) tiles that were lit."
-                    : "watch closely — the tiles only flash once.")
+                    ? "now play it back in reverse — tap the \(ordinal(seq.count)) tile first, the first tile last."
+                    : "watch the order. you'll answer backwards.")
             } else {
                 HStack(alignment: .firstTextBaseline) {
                     Text("trial \(Text("\(min(trial, Self.totalTrials))").foregroundStyle(Color.witsAccent)) of \(Self.totalTrials)")
@@ -863,11 +849,11 @@ struct MemoryMatrixScreen: View {
                     .opacity(trialPhase == .interstitial ? 0.25 : 1)
                 if trialPhase == .interstitial {
                     VStack(spacing: 2) {
-                        Text("TILES")
+                        Text("STEPS")
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .kerning(1.5)
                             .foregroundStyle(Color.witsMuted)
-                        Text("\(tiles)")
+                        Text("\(span)")
                             .font(.system(size: 54, weight: .heavy, design: .rounded))
                             .foregroundStyle(Color.witsInk)
                     }
@@ -888,12 +874,21 @@ struct MemoryMatrixScreen: View {
         .padding(.bottom, 12)
     }
 
+    private func ordinal(_ n: Int) -> String {
+        switch n {
+        case 1: return "1st"
+        case 2: return "2nd"
+        case 3: return "3rd"
+        default: return "\(n)th"
+        }
+    }
+
     private var statusLine: String {
         switch trialPhase {
         case .interstitial: return "get ready"
-        case .show: return "\(tiles) tiles. watch."
-        case .recall: return "tap \(lit.count) tiles from memory"
-        case .reveal: return taps.filter { lit.contains($0) }.count == lit.count ? "perfect. board grows." : "missed some. board shrinks."
+        case .show: return "\(span) steps. memorize the order."
+        case .recall: return "tap them in reverse — \(seq.count - tapIndex) to go"
+        case .reveal: return failed ? "the numbers show the reverse order. path shrinks." : "perfect echo. path grows."
         }
     }
 
@@ -901,10 +896,10 @@ struct MemoryMatrixScreen: View {
         GeometryReader { geo in
             let gap: CGFloat = 8
             let cellW = (geo.size.width - 28 - gap * CGFloat(Self.columns - 1)) / CGFloat(Self.columns)
-            let cellH = (geo.size.height - 28 - gap * CGFloat(rows - 1)) / CGFloat(rows)
+            let cellH = (geo.size.height - 28 - gap * CGFloat(Self.rows - 1)) / CGFloat(Self.rows)
             let side = min(cellW, cellH)
             VStack(spacing: gap) {
-                ForEach(0..<rows, id: \.self) { r in
+                ForEach(0..<Self.rows, id: \.self) { r in
                     HStack(spacing: gap) {
                         ForEach(0..<Self.columns, id: \.self) { c in
                             cell(r * Self.columns + c)
@@ -919,77 +914,113 @@ struct MemoryMatrixScreen: View {
     }
 
     private func cell(_ i: Int) -> some View {
-        let isLitShown = trialPhase == .show && lit.contains(i)
-        let tapped = taps.contains(i)
-        let wasRight = tapped && lit.contains(i)
-        let missed = trialPhase == .reveal && lit.contains(i) && !taps.contains(i)
-        let fill: Color = isLitShown ? .witsAccent
-            : tapped ? (wasRight ? Color.witsAccent.opacity(0.85) : Color.witsWarm.opacity(0.7))
+        let isLit = trialPhase == .show && litIndex.map { seq[$0] == i } ?? false
+        let isRight = rightTaps.contains(i)
+        let isWrong = wrongTap == i
+        let revealStep: Int? = trialPhase == .reveal && failed
+            ? seq.lastIndex(of: i).map { seq.count - $0 } : nil
+        let fill: Color = isLit ? .witsAccent
+            : isRight ? Color.witsAccent.opacity(0.85)
+            : isWrong ? Color.witsWarm.opacity(0.7)
+            : revealStep != nil ? Color.witsAccent.opacity(0.30)
             : .witsTint
         return Button {
             tapCell(i)
         } label: {
             RoundedRectangle(cornerRadius: 11, style: .continuous)
                 .fill(fill)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 11, style: .continuous)
-                        .strokeBorder(missed ? Color.witsAccent : .clear, lineWidth: 2.5)
-                )
+                .overlay {
+                    if let revealStep {
+                        Text("\(revealStep)")
+                            .font(.system(size: 20, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsInk)
+                    } else if isLit, inTutorial, let litIndex {
+                        Text("\(litIndex + 1)")
+                            .font(.system(size: 20, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
+                }
         }
         .buttonStyle(.plain)
-        .animation(.easeOut(duration: 0.13), value: isLitShown)
-        .animation(.easeOut(duration: 0.13), value: tapped)
-        .animation(.easeOut(duration: 0.13), value: missed)
+        .animation(.easeOut(duration: 0.13), value: isLit)
+        .animation(.easeOut(duration: 0.13), value: isRight)
+        .animation(.easeOut(duration: 0.13), value: isWrong)
     }
 
     private func startTrial(reset: Bool) {
         if reset {
-            stats = MatrixStats()
-            tiles = 3
+            stats = SpanStats()
+            span = inTutorial ? 2 : 3
             trial = 1
         }
         generation += 1
         let gen = generation
         var cells: Set<Int> = []
-        while cells.count < tiles {
+        while cells.count < span {
             cells.insert(Int.random(in: 0..<cellCount))
         }
-        lit = cells
-        taps = []
+        seq = Array(cells).shuffled()
+        litIndex = nil
+        tapIndex = 0
+        rightTaps = []
+        wrongTap = nil
+        failed = false
         trialPhase = .interstitial
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            guard generation == gen else { return }
+
+        Task {
+            try? await Task.sleep(for: .milliseconds(800))
+            guard gen == generation else { return }
             trialPhase = .show
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.15) {
-                guard generation == gen else { return }
-                trialPhase = .recall
+            for i in seq.indices {
+                litIndex = i
+                try? await Task.sleep(for: .milliseconds(inTutorial ? 750 : 550))
+                guard gen == generation else { return }
+                litIndex = nil
+                try? await Task.sleep(for: .milliseconds(140))
+                guard gen == generation else { return }
             }
+            trialPhase = .recall
         }
     }
 
     private func tapCell(_ i: Int) {
-        guard trialPhase == .recall, !taps.contains(i) else { return }
-        taps.append(i)
-        guard taps.count == lit.count else { return }
+        guard trialPhase == .recall else { return }
+        let expected = seq[seq.count - 1 - tapIndex]
+        if i == expected {
+            rightTaps.insert(i)
+            tapIndex += 1
+            if !inTutorial {
+                stats.correctTaps += 1
+                stats.score += 120
+            }
+            if tapIndex == seq.count { endTrial(perfect: true) }
+        } else {
+            wrongTap = i
+            endTrial(perfect: false)
+        }
+    }
 
-        let correct = taps.filter { lit.contains($0) }.count
-        let perfect = correct == lit.count
+    private func endTrial(perfect: Bool) {
+        failed = !perfect
         if !inTutorial {
-            stats.correctTiles += correct
-            stats.totalTiles += lit.count
+            stats.totalTaps += seq.count
             stats.trials += 1
-            if perfect { stats.perfectTrials += 1 }
-            stats.maxTiles = max(stats.maxTiles, tiles)
-            stats.score += correct * 150 + (perfect ? 450 : 0)
+            if perfect {
+                stats.perfectTrials += 1
+                stats.maxSpan = max(stats.maxSpan, seq.count)
+                stats.score += 360
+            }
         }
         trialPhase = .reveal
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+        let gen = generation
+        Task {
+            try? await Task.sleep(for: .milliseconds(perfect ? 900 : 1700))
+            guard gen == generation else { return }
             if inTutorial {
                 phase = .ready
                 return
             }
-            tiles = perfect ? min(7, tiles + 1) : max(2, tiles - 1)
+            span = perfect ? min(7, span + 1) : max(2, span - 1)
             if trial >= Self.totalTrials {
                 onComplete(stats)
             } else {

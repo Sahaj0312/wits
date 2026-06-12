@@ -12,9 +12,9 @@ enum OnboardingStep: Hashable {
     case likert(Int)
     case stat, age, screenTime
     case gauntlet
-    case colorMatch, explainColorMatch
-    case trains, explainTrains
-    case matrix, explainMatrix
+    case flanker, explainFlanker
+    case tracker, explainTracker
+    case span, explainSpan
     case calc, result, breakdown
     case streak, reminder, coach, planBuild, projection, paywall
 
@@ -23,32 +23,34 @@ enum OnboardingStep: Hashable {
         .likert(0), .likert(1), .stat, .likert(2), .likert(3),
         .age, .screenTime,
         .gauntlet,
-        .colorMatch, .explainColorMatch,
-        .trains, .explainTrains,
-        .matrix, .explainMatrix,
+        .flanker, .explainFlanker,
+        .tracker, .explainTracker,
+        .span, .explainSpan,
         .calc, .result, .breakdown,
         .streak, .reminder, .coach, .planBuild, .projection, .paywall,
     ]
 }
 
-struct ColorMatchStats {
+struct FlankerStats {
     var right = 0
     var wrong = 0
     var bestStreak = 0
     var score = 0
 }
 
-struct TrainStats {
-    var correct = 0
-    var total = 0
+struct TrackStats {
+    var correctPicks = 0
+    var totalTargets = 0
+    var perfectRounds = 0
+    var rounds = 0
 }
 
-struct MatrixStats {
-    var correctTiles = 0
-    var totalTiles = 0
+struct SpanStats {
+    var correctTaps = 0
+    var totalTaps = 0
     var perfectTrials = 0
     var trials = 0
-    var maxTiles = 0
+    var maxSpan = 0
     var score = 0
 }
 
@@ -57,9 +59,9 @@ struct OnboardingData {
     var likert = 0          // 0–12 across four statements
     var ageMid = 21
     var screenTime = 1      // 0–3
-    var colorMatch: ColorMatchStats?
-    var trains: TrainStats?
-    var matrix: MatrixStats?
+    var flanker: FlankerStats?
+    var tracker: TrackStats?
+    var span: SpanStats?
 }
 
 struct TestScore {
@@ -77,17 +79,17 @@ struct AttentionResult {
 }
 
 func computeResult(_ d: OnboardingData) -> AttentionResult {
-    let cmTotal = (d.colorMatch?.right ?? 0) + (d.colorMatch?.wrong ?? 0)
-    let cmAcc = cmTotal > 0 ? Double(d.colorMatch!.right) / Double(cmTotal) : 0.5
-    let trainAcc = d.trains.map { Double($0.correct) / Double(max(1, $0.total)) } ?? 0.5
-    let mmAcc = d.matrix.map { Double($0.correctTiles) / Double(max(1, $0.totalTiles)) } ?? 0.5
+    let flankerTotal = (d.flanker?.right ?? 0) + (d.flanker?.wrong ?? 0)
+    let flankerAcc = flankerTotal > 0 ? Double(d.flanker!.right) / Double(flankerTotal) : 0.5
+    let trackAcc = d.tracker.map { Double($0.correctPicks) / Double(max(1, $0.totalTargets)) } ?? 0.5
+    let spanAcc = d.span.map { Double($0.correctTaps) / Double(max(1, $0.totalTaps)) } ?? 0.5
 
     var age = Double(d.ageMid)
         + Double(d.likert) * 2.2
         + Double(d.screenTime) * 3
-        + (1 - cmAcc) * 12
-        + (1 - trainAcc) * 14
-        + (1 - mmAcc) * 12
+        + (1 - flankerAcc) * 12
+        + (1 - trackAcc) * 14
+        + (1 - spanAcc) * 12
         - 6
     age = min(94, max((Double(d.ageMid) * 0.8).rounded(), age)).rounded()
 
@@ -96,12 +98,12 @@ func computeResult(_ d: OnboardingData) -> AttentionResult {
 
     let clamp = { (p: Int) in min(99, max(4, p)) }
     let tests = [
-        TestScore(name: "color match", skill: "focus",
-                  pct: clamp(Int((cmAcc * 100).rounded()))),
-        TestScore(name: "train of thought", skill: "multitasking",
-                  pct: clamp(Int((trainAcc * 100).rounded()))),
-        TestScore(name: "memory matrix", skill: "memory",
-                  pct: clamp(Int((mmAcc * 100).rounded()))),
+        TestScore(name: "arrow storm", skill: "focus",
+                  pct: clamp(Int((flankerAcc * 100).rounded()))),
+        TestScore(name: "crowd control", skill: "multitasking",
+                  pct: clamp(Int((trackAcc * 100).rounded()))),
+        TestScore(name: "echo grid", skill: "memory",
+                  pct: clamp(Int((spanAcc * 100).rounded()))),
     ]
     let best = tests.max { $0.pct < $1.pct } ?? tests[0]
     return AttentionResult(age: Int(age), gap: gap, percentile: percentile, tests: tests, best: best)
@@ -121,19 +123,19 @@ struct OnboardingView: View {
         stepIndex = min(stepIndex + 1, OnboardingStep.flow.count - 1)
     }
 
-    private var colorMatchPct: Int {
-        guard let s = data.colorMatch, s.right + s.wrong > 0 else { return 0 }
+    private var flankerPct: Int {
+        guard let s = data.flanker, s.right + s.wrong > 0 else { return 0 }
         return min(99, max(4, Int((Double(s.right) / Double(s.right + s.wrong) * 100).rounded())))
     }
 
-    private var trainPct: Int {
-        guard let s = data.trains, s.total > 0 else { return 0 }
-        return min(99, max(4, Int((Double(s.correct) / Double(s.total) * 100).rounded())))
+    private var trackerPct: Int {
+        guard let s = data.tracker, s.totalTargets > 0 else { return 0 }
+        return min(99, max(4, Int((Double(s.correctPicks) / Double(s.totalTargets) * 100).rounded())))
     }
 
-    private var matrixPct: Int {
-        guard let s = data.matrix, s.totalTiles > 0 else { return 0 }
-        return min(99, max(4, Int((Double(s.correctTiles) / Double(s.totalTiles) * 100).rounded())))
+    private var spanPct: Int {
+        guard let s = data.span, s.totalTaps > 0 else { return 0 }
+        return min(99, max(4, Int((Double(s.correctTaps) / Double(s.totalTaps) * 100).rounded())))
     }
 
     var body: some View {
@@ -182,40 +184,40 @@ struct OnboardingView: View {
             }
         case .gauntlet:
             GauntletScreen(onNext: next)
-        case .colorMatch:
-            ColorMatchScreen { stats in
-                data.colorMatch = stats
+        case .flanker:
+            FlankerScreen { stats in
+                data.flanker = stats
                 next()
             }
-        case .explainColorMatch:
+        case .explainFlanker:
             ExplainScreen(
-                test: "color match",
-                score: "\(colorMatchPct)%",
-                blurb: "that measured response inhibition — overriding the answer your brain shouts first. it's the same muscle that decides whether you open the app or finish the sentence.",
+                test: "arrow storm",
+                score: "\(flankerPct)%",
+                blurb: "that was the flanker task — the lab standard for interference control since 1974. acting on the signal while the noise screams is the exact muscle a feed full of thumbnails grinds down.",
                 onNext: next
             )
-        case .trains:
-            TrainGameScreen { stats in
-                data.trains = stats
+        case .tracker:
+            TrackerScreen { stats in
+                data.tracker = stats
                 next()
             }
-        case .explainTrains:
+        case .explainTracker:
             ExplainScreen(
-                test: "train of thought",
-                score: "\(trainPct)%",
-                blurb: "that measured divided attention — tracking several moving things at once without dropping one. it's the skill your seventeen open tabs have been quietly taxing.",
+                test: "crowd control",
+                score: "\(trackerPct)%",
+                blurb: "that was multiple object tracking — how labs have measured divided attention since the 80s. your tabs, your chats, your second screen: same juggling act, fewer dots.",
                 onNext: next
             )
-        case .matrix:
-            MemoryMatrixScreen { stats in
-                data.matrix = stats
+        case .span:
+            SpanScreen { stats in
+                data.span = stats
                 next()
             }
-        case .explainMatrix:
+        case .explainSpan:
             ExplainScreen(
-                test: "memory matrix",
-                score: "\(matrixPct)%",
-                blurb: "that measured working memory — holding a picture in your head after it's gone. it's what melts first when everything is a 15-second clip.",
+                test: "echo grid",
+                score: "\(spanPct)%",
+                blurb: "that was a backward spatial span — the reverse corsi test neuropsychologists use for working memory. holding a sequence and flipping it is what deep work feels like.",
                 last: true,
                 onNext: next
             )

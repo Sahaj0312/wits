@@ -18,7 +18,7 @@ struct CalcScreen: View {
         "cross-referencing your screen time confession",
         "comparing you to a goldfish",
         "the goldfish won",
-        "factoring in the trains you derailed",
+        "factoring in the dots you lost track of",
         "compiling the diagnosis",
     ]
 
