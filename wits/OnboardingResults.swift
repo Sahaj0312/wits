@@ -20,11 +20,11 @@ struct CalcScreen: View {
     }
 
     private static let steps: [Step] = [
-        Step(label: "scoring your reflexes", at: 0.16),
-        Step(label: "cross-referencing your screen time confession", at: 0.34),
-        Step(label: "comparing you to a goldfish", doneLabel: "the goldfish won", at: 0.52),
-        Step(label: "factoring in the dots you lost track of", at: 0.72),
-        Step(label: "compiling the diagnosis", at: 0.94),
+        Step(label: "scoring your focus", at: 0.16),
+        Step(label: "factoring in your daily habits", at: 0.34),
+        Step(label: "measuring your attention", at: 0.52),
+        Step(label: "reviewing your working memory", at: 0.72),
+        Step(label: "preparing your results", at: 0.94),
     ]
 
     @State private var t = 0.0
@@ -91,7 +91,7 @@ struct CalcScreen: View {
             .cardSurface()
             .rise(0.12)
 
-            Text("this takes a few seconds. unlike your attention, it will finish.")
+            Text("this will only take a few seconds.")
                 .font(.witsBody(12.5))
                 .foregroundStyle(Color.witsFaint)
                 .multilineTextAlignment(.center)
@@ -168,20 +168,20 @@ struct ResultScreen: View {
             .padding(.bottom, 20)
             VStack(spacing: 12) {
                 HStack {
-                    Text("outwitted by")
+                    Text("you scored higher than")
                         .font(.witsBody(14))
                         .foregroundStyle(Color.witsMuted)
                     Spacer()
-                    Text("\(result.percentile)% of users")
+                    Text("\(min(97, max(3, 100 - result.percentile)))% of people")
                         .font(.system(size: 14.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsWarm)
+                        .foregroundStyle(Color.witsAccent)
                 }
                 HStack {
-                    Text("gap vs your real age")
+                    Text("vs your actual age")
                         .font(.witsBody(14))
                         .foregroundStyle(Color.witsMuted)
                     Spacer()
-                    Text(result.gap > 0 ? "+\(result.gap) years" : "you're fine. suspicious.")
+                    Text(result.gap > 0 ? "+\(result.gap) years to gain" : "right on track!")
                         .font(.system(size: 14.5, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsInk)
                 }
@@ -194,7 +194,7 @@ struct ResultScreen: View {
                         .foregroundStyle(Color.witsAccent)
                         .frame(width: 20, height: 20)
                         .background(Color.witsAccent.opacity(0.16), in: Circle())
-                    Text("bright spot: \(result.best.skill). you beat \(result.best.pct)% of the curve on \(result.best.name).")
+                    Text("your strongest area: \(result.best.skill). you scored higher than \(result.best.pct)% of people on \(result.best.name).")
                         .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.witsMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -279,11 +279,11 @@ struct BreakdownScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
                 .padding(.bottom, 30)
-            Text("the breakdown")
+            Text("your results")
                 .font(.witsDisplay(32))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("where you sit on the curve. the teal part is everyone behind you.")
+            Text("here's how you scored on each game compared to other people.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
@@ -309,14 +309,14 @@ struct BreakdownScreen: View {
                                     value: curvesShown
                                 )
                             VStack(alignment: .leading, spacing: 1) {
-                                Text("sharper than")
+                                Text("higher than")
                                     .font(.witsBody(12.5))
                                     .foregroundStyle(Color.witsMuted)
                                 Text("\(test.pct)%")
                                     .font(.system(size: 30, weight: .heavy, design: .rounded))
                                     .foregroundStyle(Color.witsAccent)
                                     .monospacedDigit()
-                                Text("of users")
+                                Text("of people")
                                     .font(.witsBody(12.5))
                                     .foregroundStyle(Color.witsMuted)
                             }
@@ -330,7 +330,7 @@ struct BreakdownScreen: View {
                 }
             }
             Spacer()
-            Cta(title: "fix it", action: onNext)
+            Cta(title: "start training", action: onNext)
                 .rise(0.56)
                 .padding(.top, 16)
         }
@@ -357,7 +357,7 @@ struct StreakScreen: View {
                     .font(.system(size: 56, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsAccent)
                     .rise()
-                Text("congrats. you just did the longest focused stretch of your day.")
+                Text("you've started a daily streak. nice work!")
                     .font(.system(size: 19, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.witsInk)
                     .rise(0.1)
@@ -383,7 +383,7 @@ struct StreakScreen: View {
                     }
                 }
                 .rise(0.2)
-                Text("one test a day keeps the streak alive.")
+                Text("train a little every day to keep it going.")
                     .font(.witsBody(15))
                     .foregroundStyle(Color.witsMuted)
                     .rise(0.3)
@@ -404,9 +404,9 @@ struct ReminderScreen: View {
     var onNext: () -> Void
 
     private static let times: [(label: String, time: String, sub: String)] = [
-        ("morning", "8:00", "before the scroll starts"),
-        ("lunch", "12:30", "a break with a purpose"),
-        ("night", "21:00", "instead of episode four"),
+        ("morning", "8:00", "start your day sharp"),
+        ("lunch", "12:30", "a midday brain break"),
+        ("night", "21:00", "wind down with a quick session"),
     ]
 
     @State private var picked = 0
@@ -415,11 +415,11 @@ struct ReminderScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
                 .padding(.bottom, 30)
-            Text("when should we check on you")
+            Text("set up a daily reminder")
                 .font(.witsDisplay(32))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("one reminder a day. that's the whole notification strategy.")
+            Text("a gentle nudge to help you build a healthy training habit.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
@@ -492,9 +492,8 @@ struct CoachScreen: View {
     var onNext: () -> Void
 
     private static let styles: [(label: String, sub: String)] = [
-        ("gentle encouragement", "soft praise. we'll be nice about it."),
-        ("tough love", "we'll say what your friends won't."),
-        ("full roast", "you've seen the app. you know what this means."),
+        ("high fives", "celebrate my progress and my wins."),
+        ("tough love", "push me to stay on track and keep improving."),
     ]
 
     @State private var picked: Int?
@@ -503,11 +502,11 @@ struct CoachScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
                 .padding(.bottom, 30)
-            Text("how should we talk to you")
+            Text("what keeps you motivated?")
                 .font(.witsDisplay(32))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("this only changes the tone. the math stays brutal.")
+            Text("this just sets the tone of your encouragement.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
@@ -552,7 +551,7 @@ struct PlanBuildScreen: View {
                 .frame(width: 54, height: 54)
                 .rotationEffect(.degrees(spinning ? 360 : 0))
                 .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: spinning)
-            Text("building your 30-day recovery arc")
+            Text("creating your personalized 30-day plan")
                 .font(.witsBody(16, weight: .semibold))
                 .foregroundStyle(Color.witsMuted)
         }
@@ -593,11 +592,11 @@ struct ProjectionScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
                 .padding(.bottom, 30)
-            Text("your 30-day arc")
+            Text("your 30-day plan")
                 .font(.witsDisplay(32))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("5 minutes a day. attention age \(Text("\(result.age)").foregroundStyle(Color.witsWarm).bold()) → \(Text("\(futureAge)").foregroundStyle(Color.witsAccent).bold()) by day 30.")
+            Text("with just 5 minutes a day, your attention age could improve from \(Text("\(result.age)").foregroundStyle(Color.witsWarm).bold()) to \(Text("\(futureAge)").foregroundStyle(Color.witsAccent).bold()) in 30 days.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
@@ -651,12 +650,12 @@ struct ProjectionScreen: View {
             .cardSurface()
             .padding(.bottom, 14)
             .rise(0.18)
-            Text("projection based on members who trained 5 days a week. results vary. effort doesn't.")
+            Text("based on members who train 5 days a week. individual results vary.")
                 .font(.witsBody(12.5))
                 .foregroundStyle(Color.witsFaint)
                 .rise(0.3)
             Spacer()
-            Cta(title: "start the arc", action: onNext)
+            Cta(title: "start my plan", action: onNext)
                 .rise(0.38)
                 .padding(.top, 16)
         }
@@ -675,9 +674,9 @@ struct PaywallScreen: View {
     }
 
     private let timeline: [(day: String, text: String)] = [
-        ("today", "full access. every game, every read."),
-        ("day 2", "we remind you the trial is ending. once."),
-        ("day 3", "trial ends. $4.99/week. cancel before, no hard feelings."),
+        ("today", "get full access to every game and workout."),
+        ("day 2", "we'll send a reminder before your trial ends."),
+        ("day 3", "your trial ends. cancel anytime before then."),
     ]
 
     @State private var plan = Plan.weekly
@@ -694,7 +693,7 @@ struct PaywallScreen: View {
                 QuietButton(title: "restore") {}
             }
             .padding(.bottom, 14)
-            Text("fund the recovery")
+            Text("choose your plan")
                 .font(.witsDisplay(30))
                 .foregroundStyle(Color.witsInk)
                 .padding(.bottom, 20)
@@ -748,11 +747,11 @@ struct PaywallScreen: View {
                     name: "annual",
                     badge: nil,
                     save: "save 84%",
-                    price: "$39.99/year. for the committed."
+                    price: "$39.99/year — best value."
                 ) { plan = .annual }
                     .rise(0.46)
             }
-            Text("★ 4.8 · \u{201C}this app called me out and i paid it\u{201D}")
+            Text("★ 4.8 · \u{201C}i feel sharper after just a few weeks\u{201D}")
                 .font(.witsBody(13))
                 .foregroundStyle(Color.witsMuted)
                 .frame(maxWidth: .infinity)
@@ -760,7 +759,7 @@ struct PaywallScreen: View {
             Spacer()
             VStack(spacing: 12) {
                 Cta(title: plan == .weekly ? "start free trial" : "go annual") {}
-                Text("cancel anytime. we'll still know.")
+                Text("cancel anytime.")
                     .font(.witsBody(12.5))
                     .foregroundStyle(Color.witsFaint)
             }

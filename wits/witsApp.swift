@@ -12,6 +12,7 @@ struct witsApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(SupabaseManager.shared)
         }
     }
 }

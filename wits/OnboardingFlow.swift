@@ -2,32 +2,54 @@
 //  OnboardingFlow.swift
 //  wits
 //
-//  Flow order, collected data, and the attention-age scoring.
+//  Flow order, collected data, scoring, and Supabase persistence.
+//  Step order mirrors Lumosity's onboarding, in wits' voice, keeping the
+//  three wits games (arrow storm / crowd control / echo grid).
 //
 
 import SwiftUI
 
+/// Number of progress-bearing question screens (goals + 6 likert + gender +
+/// education + attribution + screen time) — used to fill the progress bar.
+let onboardingQuizTotal = 11.0
+
 enum OnboardingStep: Hashable {
-    case hook, welcome, goals, calibrate
+    // 1 — account creation
+    case hook, auth, birthdate
+    // 2 — goals & personalization
+    case welcome, goals, calibrate
+    // 3 — self-assessment
     case likert(Int)
-    case stat, age, screenTime
-    case gauntlet
+    case stat
+    // 4 — demographics
+    case aboutYou, gender, education, attribution, screenTime
+    // 5 — fit test
+    case meetYou, gauntlet
     case flanker, explainFlanker
     case tracker, explainTracker
     case span, explainSpan
+    // 6 — results & engagement
     case calc, result, breakdown
-    case streak, reminder, coach, planBuild, projection, paywall
+    case streak, reminder
+    // 7 — program builder
+    case planIntro, difficulty, coach, exercise, sleep, trainingDays, planBuild
+    // 8 — reveal & paywall
+    case projection, paywall
 
     static let flow: [OnboardingStep] = [
-        .hook, .welcome, .goals, .calibrate,
-        .likert(0), .likert(1), .stat, .likert(2), .likert(3),
-        .age, .screenTime,
-        .gauntlet,
+        .hook,
+        .auth, .birthdate,
+        .welcome, .goals, .calibrate,
+        .likert(0), .likert(1), .likert(2), .stat, .likert(3), .likert(4), .likert(5),
+        .aboutYou, .gender, .education, .attribution, .screenTime,
+        .meetYou, .gauntlet,
         .flanker, .explainFlanker,
         .tracker, .explainTracker,
         .span, .explainSpan,
         .calc, .result, .breakdown,
-        .streak, .reminder, .coach, .planBuild, .projection, .paywall,
+        .streak, .reminder,
+        .planIntro, .difficulty, .coach, .exercise, .sleep, .trainingDays, .planBuild,
+        .projection, .paywall,
     ]
 }
 
@@ -55,13 +77,35 @@ struct SpanStats {
 }
 
 struct OnboardingData {
+    // account / demographics
+    var birthdate: Date?
+    var gender: String?
+    var education: String?
+    var heardAbout: String?
+    var screenTime = 1              // 0–3
+    // goals & self-assessment
     var goals: [String] = []
-    var likert = 0          // 0–12 across four statements
-    var ageMid = 21
-    var screenTime = 1      // 0–3
+    var likertAnswers: [Int: Int] = [:]   // statement index → 0–3
+    // program builder
+    var difficulty: String?
+    var encouragement: String?
+    var exerciseFreq: String?
+    var sleepHours: String?
+    var trainingDays: Int?
+    // fit test
     var flanker: FlankerStats?
     var tracker: TrackStats?
     var span: SpanStats?
+
+    /// Total self-assessment score (0–18 across six statements).
+    var likert: Int { likertAnswers.values.reduce(0, +) }
+
+    /// Age in years derived from the account birthdate (defaults to 21).
+    var ageMid: Int {
+        guard let birthdate else { return 21 }
+        let years = Calendar.current.dateComponents([.year], from: birthdate, to: Date()).year ?? 21
+        return max(13, min(100, years))
+    }
 }
 
 struct TestScore {
@@ -85,7 +129,7 @@ func computeResult(_ d: OnboardingData) -> AttentionResult {
     let spanAcc = d.span.map { Double($0.correctTaps) / Double(max(1, $0.totalTaps)) } ?? 0.5
 
     var age = Double(d.ageMid)
-        + Double(d.likert) * 2.2
+        + Double(d.likert) * 1.5
         + Double(d.screenTime) * 3
         + (1 - flankerAcc) * 12
         + (1 - trackAcc) * 14
@@ -114,6 +158,7 @@ func computeResult(_ d: OnboardingData) -> AttentionResult {
 struct OnboardingView: View {
     var onFinished: () -> Void
 
+    @Environment(SupabaseManager.self) private var supa
     @State private var stepIndex = 0
     @State private var data = OnboardingData()
 
@@ -156,32 +201,60 @@ struct OnboardingView: View {
         switch step {
         case .hook:
             HookScreen(onNext: next)
+        case .auth:
+            AuthScreen(onAuthed: next)
+        case .birthdate:
+            BirthdateScreen { date in
+                data.birthdate = date
+                push(["birthdate": Self.dateString(date)])
+                next()
+            }
         case .welcome:
             WelcomeScreen(onNext: next)
         case .goals:
             GoalsScreen { picked in
                 data.goals = picked
+                push(["goals": picked])
                 next()
             }
         case .calibrate:
             CalibrateScreen(onNext: next)
         case .likert(let index):
             LikertScreen(index: index) { score in
-                data.likert += score
+                data.likertAnswers[index] = score
+                if index == LikertScreen.statements.count - 1 { pushAssessment() }
                 next()
             }
         case .stat:
             StatScreen(onNext: next)
-        case .age:
-            AgeScreen { mid in
-                data.ageMid = mid
+        case .aboutYou:
+            AboutYouScreen(onNext: next)
+        case .gender:
+            GenderScreen { value in
+                data.gender = value
+                push(["gender": value])
+                next()
+            }
+        case .education:
+            EducationScreen { value in
+                data.education = value
+                push(["education": value])
+                next()
+            }
+        case .attribution:
+            AttributionScreen { value in
+                data.heardAbout = value
+                push(["heard_about": value])
                 next()
             }
         case .screenTime:
             ScreenTimeScreen { score in
                 data.screenTime = score
+                push(["screen_time": score])
                 next()
             }
+        case .meetYou:
+            MeetYouScreen(onNext: next)
         case .gauntlet:
             GauntletScreen(onNext: next)
         case .flanker:
@@ -193,7 +266,7 @@ struct OnboardingView: View {
             ExplainScreen(
                 test: "arrow storm",
                 score: "\(flankerPct)%",
-                blurb: "that was the flanker task — the lab standard for interference control since 1974. acting on the signal while the noise screams is the exact muscle a feed full of thumbnails grinds down.",
+                blurb: "that was the flanker task — a measure of response inhibition that researchers have used since 1974. it reflects how well you focus on what matters while tuning out distractions.",
                 onNext: next
             )
         case .tracker:
@@ -205,19 +278,20 @@ struct OnboardingView: View {
             ExplainScreen(
                 test: "crowd control",
                 score: "\(trackerPct)%",
-                blurb: "that was multiple object tracking — how labs have measured divided attention since the 80s. your tabs, your chats, your second screen: same juggling act, fewer dots.",
+                blurb: "that was multiple object tracking — how researchers have measured divided attention since the 1980s. it's the same skill you use to keep track of several things happening at once.",
                 onNext: next
             )
         case .span:
             SpanScreen { stats in
                 data.span = stats
+                pushScores()
                 next()
             }
         case .explainSpan:
             ExplainScreen(
                 test: "echo grid",
                 score: "\(spanPct)%",
-                blurb: "that was a backward spatial span — the reverse corsi test neuropsychologists use for working memory. holding a sequence and flipping it is what deep work feels like.",
+                blurb: "that was a backward spatial span — the reverse corsi test neuropsychologists use to measure working memory. holding a sequence in mind and reordering it is a skill you rely on every day.",
                 last: true,
                 onNext: next
             )
@@ -231,18 +305,99 @@ struct OnboardingView: View {
             StreakScreen(onNext: next)
         case .reminder:
             ReminderScreen(onNext: next)
+        case .planIntro:
+            PlanIntroScreen(onNext: next)
+        case .difficulty:
+            DifficultyScreen { value in
+                data.difficulty = value
+                push(["difficulty": value])
+                next()
+            }
         case .coach:
             CoachScreen(onNext: next)
+        case .exercise:
+            ExerciseScreen { value in
+                data.exerciseFreq = value
+                push(["exercise_freq": value])
+                next()
+            }
+        case .sleep:
+            SleepScreen { value in
+                data.sleepHours = value
+                push(["sleep_hours": value])
+                next()
+            }
+        case .trainingDays:
+            TrainingDaysScreen { value in
+                data.trainingDays = value
+                push(["training_days": value])
+                next()
+            }
         case .planBuild:
             PlanBuildScreen(onNext: next)
         case .projection:
             ProjectionScreen(result: computeResult(data), onNext: next)
         case .paywall:
-            PaywallScreen(onClose: onFinished)
+            PaywallScreen(onClose: complete)
         }
+    }
+
+    // MARK: - Persistence (best-effort; RLS-guarded)
+
+    private func push(_ fields: [String: Any]) {
+        guard supa.isSignedIn else { return }
+        Task { try? await supa.upsertProfile(fields) }
+    }
+
+    private func pushAssessment() {
+        guard supa.isSignedIn else { return }
+        let rows = data.likertAnswers.sorted { $0.key < $1.key }.map { idx, score -> (idx: Int, statement: String, score: Int) in
+            let text = LikertScreen.statements.indices.contains(idx) ? LikertScreen.statements[idx] : ""
+            return (idx: idx, statement: text, score: score)
+        }
+        Task { try? await supa.saveAssessment(rows) }
+    }
+
+    private func pushScores() {
+        guard supa.isSignedIn else { return }
+        let result = computeResult(data)
+        var rows: [[String: Any]] = []
+        if let f = data.flanker {
+            rows.append(["game": "arrow storm", "score": f.score, "percentile": result.tests[0].pct,
+                         "accuracy": accuracy(f.right, f.right + f.wrong)])
+        }
+        if let t = data.tracker {
+            rows.append(["game": "crowd control", "percentile": result.tests[1].pct,
+                         "accuracy": accuracy(t.correctPicks, t.totalTargets)])
+        }
+        if let s = data.span {
+            rows.append(["game": "echo grid", "score": s.score, "percentile": result.tests[2].pct,
+                         "accuracy": accuracy(s.correctTaps, s.totalTaps)])
+        }
+        Task { try? await supa.saveGameScores(rows) }
+    }
+
+    private func complete() {
+        if supa.isSignedIn {
+            Task { try? await supa.upsertProfile(["onboarding_completed": true]) }
+        }
+        onFinished()
+    }
+
+    private func accuracy(_ n: Int, _ d: Int) -> Double {
+        d > 0 ? (Double(n) / Double(d) * 1000).rounded() / 1000 : 0
+    }
+
+    private static func dateString(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
     }
 }
 
 #Preview {
     OnboardingView {}
+        .environment(SupabaseManager.shared)
 }

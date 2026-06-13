@@ -27,11 +27,11 @@ struct GauntletScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
                 .padding(.bottom, 30)
-            Text("part two: the gauntlet")
+            Text("take your fit test")
                 .font(.witsDisplay(32))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("three tests, about a minute each. this is the part you can't fake.")
+            Text("three quick games, about a minute each. we'll measure your baseline.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
@@ -44,7 +44,7 @@ struct GauntletScreen: View {
                 }
             }
             Spacer()
-            Cta(title: "start test one", action: onNext)
+            Cta(title: "start fit test", action: onNext)
                 .rise(0.48)
                 .padding(.top, 16)
         }

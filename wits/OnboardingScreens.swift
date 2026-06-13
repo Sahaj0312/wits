@@ -8,8 +8,6 @@
 
 import SwiftUI
 
-private let quizTotal = 8.0
-
 // MARK: - 1. Hook
 
 struct HookScreen: View {
@@ -21,20 +19,20 @@ struct HookScreen: View {
             VStack(alignment: .leading, spacing: 16) {
                 LogoBlob(size: 72, breathe: true)
                     .rise()
-                Text("you're losing your \(Text("wits").foregroundStyle(Color.witsAccent))")
+                Text("sharpen your \(Text("wits").foregroundStyle(Color.witsAccent))")
                     .font(.witsDisplay(42))
                     .foregroundStyle(Color.witsInk)
                     .rise(0.1)
-                Text("let's measure exactly how many you've got left.")
+                Text("discover what your mind can do, and train it to do more.")
                     .font(.witsBody(17))
                     .foregroundStyle(Color.witsMuted)
                     .rise(0.19)
             }
             Spacer()
             VStack(spacing: 12) {
-                Cta(title: "run the diagnostic", action: onNext)
+                Cta(title: "get started", action: onNext)
                     .rise(0.28)
-                Text("takes 3 minutes. less than one reel spiral.")
+                Text("takes about 3 minutes. no studying required.")
                     .font(.witsBody(12.5))
                     .foregroundStyle(Color.witsFaint)
                     .rise(0.36)
@@ -52,20 +50,20 @@ struct WelcomeScreen: View {
     var onNext: () -> Void
 
     private let steps = [
-        (1, "your habits", "a short, honest interrogation"),
-        (2, "your actual performance", "three tests. no studying allowed"),
-        (3, "your recovery plan", "the comeback, mapped out"),
+        (1, "your goals", "tell us what you'd like to improve"),
+        (2, "your brain performance", "three quick games measure your baseline"),
+        (3, "your training plan", "a personalized program, built for you"),
     ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
                 .padding(.bottom, 30)
-            Text("here's how this goes")
+            Text("here's how it works")
                 .font(.witsDisplay(32))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("we build your attention profile in three parts.")
+            Text("we'll build your personalized plan in three parts.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
@@ -78,7 +76,7 @@ struct WelcomeScreen: View {
                 }
             }
             Spacer()
-            Cta(title: "start part one", action: onNext)
+            Cta(title: "continue", action: onNext)
                 .rise(0.48)
                 .padding(.top, 16)
         }
@@ -93,26 +91,26 @@ struct GoalsScreen: View {
     var onNext: ([String]) -> Void
 
     private static let goals = [
-        "doomscrolling",
-        "can't finish shows",
-        "reading feels impossible",
-        "work focus",
-        "i zone out mid-conversation",
-        "just curious how bad it is",
+        "sharpen my focus",
+        "improve my memory",
+        "boost my attention",
+        "think faster",
+        "keep my mind active",
+        "just exploring",
     ]
 
     @State private var picked: [String] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ProgressTrack(fraction: 1 / quizTotal)
+            ProgressTrack(fraction: 1 / onboardingQuizTotal)
                 .padding(.bottom, 30)
-            Text("what are we fixing")
+            Text("what would you like to improve?")
                 .font(.witsDisplay(30))
                 .foregroundStyle(Color.witsInk)
                 .padding(.bottom, 16)
                 .rise()
-            Text("pick everything that applies. no judgment. some judgment.")
+            Text("select all that apply.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.bottom, 24)
@@ -130,7 +128,7 @@ struct GoalsScreen: View {
                 }
             }
             Spacer()
-            Cta(title: picked.isEmpty ? "pick at least one" : "lock it in", dimmed: picked.isEmpty) {
+            Cta(title: picked.isEmpty ? "select at least one" : "continue", dimmed: picked.isEmpty) {
                 if !picked.isEmpty { onNext(picked) }
             }
             .padding(.top, 16)
@@ -173,17 +171,17 @@ struct CalibrateScreen: View {
             VStack(alignment: .leading, spacing: 16) {
                 LogoBlob(size: 56, breathe: true)
                     .rise()
-                Text("help us calibrate the roast")
+                Text("let's personalize your plan")
                     .font(.witsDisplay(32))
                     .foregroundStyle(Color.witsInk)
                     .rise(0.08)
-                Text("four statements. tell us how hard they hit. honesty makes the diagnosis more accurate, and funnier.")
+                Text("a few quick statements. tell us how much each one sounds like you — it helps us tailor your program.")
                     .font(.witsBody(16))
                     .foregroundStyle(Color.witsMuted)
                     .rise(0.16)
             }
             Spacer()
-            Cta(title: "i'm ready", action: onNext)
+            Cta(title: "continue", action: onNext)
                 .rise(0.26)
                 .padding(.top, 16)
         }
@@ -198,11 +196,13 @@ struct LikertScreen: View {
     var index: Int
     var onAnswer: (Int) -> Void
 
-    private static let statements = [
-        "i open my phone to check one thing and resurface 40 minutes later.",
-        "i rewind shows because i wasn't actually listening.",
-        "i read the same paragraph three times and retain nothing.",
-        "a movie without a second screen feels impossible.",
+    static let statements = [
+        "i misplace everyday things like my keys, phone, or glasses.",
+        "some days my thinking feels foggy for no clear reason.",
+        "i read or hear something and forget it moments later.",
+        "names slip away right after i'm introduced to someone.",
+        "i find it hard to stay focused on one task.",
+        "i lose the thread during longer conversations.",
     ]
     private static let options: [(label: String, score: Int)] = [
         ("strongly disagree", 0),
@@ -215,7 +215,7 @@ struct LikertScreen: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ProgressTrack(fraction: Double(2 + index) / quizTotal)
+            ProgressTrack(fraction: Double(2 + index) / onboardingQuizTotal)
                 .padding(.bottom, 30)
             Text("statement \(index + 1) of \(Self.statements.count)")
                 .font(.system(size: 12.5, weight: .bold, design: .rounded))
@@ -252,7 +252,7 @@ struct StatScreen: View {
     var onNext: () -> Void
 
     @State private var value = 0
-    private let target = 144
+    private let target = 10
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -264,11 +264,11 @@ struct StatScreen: View {
                     .foregroundStyle(Color.witsAccent)
                     .monospacedDigit()
                     .rise()
-                Text("times a day the average person checks their phone.")
+                Text("minutes a day is all it takes to start training your brain.")
                     .font(.system(size: 19, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.witsInk)
                     .rise(0.12)
-                Text("based on your answers so far, you're not average.")
+                Text("small sessions, done consistently, add up over time.")
                     .font(.witsBody(15))
                     .foregroundStyle(Color.witsMuted)
                     .rise(0.22)
@@ -293,59 +293,7 @@ struct StatScreen: View {
     }
 }
 
-// MARK: - 7. About you: age
-
-struct AgeScreen: View {
-    var onAnswer: (Int) -> Void
-
-    private static let ages: [(label: String, mid: Int)] = [
-        ("under 18", 16),
-        ("18–24", 21),
-        ("25–34", 29),
-        ("35 and up", 42),
-    ]
-
-    @State private var picked: Int?
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ProgressTrack(fraction: 6 / quizTotal)
-                .padding(.bottom, 30)
-            Text("about you")
-                .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.witsFaint)
-                .padding(.bottom, 10)
-                .rise()
-            Text("how old are you actually")
-                .font(.witsDisplay(30))
-                .foregroundStyle(Color.witsInk)
-                .padding(.bottom, 16)
-                .rise(0.06)
-            Text("we need a baseline to measure the damage against.")
-                .font(.witsBody(16))
-                .foregroundStyle(Color.witsMuted)
-                .padding(.bottom, 24)
-                .rise(0.1)
-            VStack(spacing: 10) {
-                ForEach(Array(Self.ages.enumerated()), id: \.offset) { i, age in
-                    AnswerRow(label: age.label, picked: picked == i) {
-                        guard picked == nil else { return }
-                        picked = i
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            onAnswer(age.mid)
-                        }
-                    }
-                    .rise(0.14 + Double(i) * 0.07)
-                }
-            }
-            Spacer()
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 12)
-    }
-}
-
-// MARK: - 8. About you: screen time
+// MARK: - About you: screen time
 
 struct ScreenTimeScreen: View {
     var onAnswer: (Int) -> Void
@@ -354,26 +302,26 @@ struct ScreenTimeScreen: View {
         ("under 3 hours", 0),
         ("3–5 hours", 1),
         ("5–8 hours", 2),
-        ("the weekly report scares me, so i turned it off", 3),
+        ("more than 8 hours", 3),
     ]
 
     @State private var picked: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            ProgressTrack(fraction: 7 / quizTotal)
+            ProgressTrack(fraction: 11 / onboardingQuizTotal)
                 .padding(.bottom, 30)
             Text("about you")
                 .font(.system(size: 12.5, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.witsFaint)
                 .padding(.bottom, 10)
                 .rise()
-            Text("honest daily screen time")
+            Text("how much screen time on a typical day?")
                 .font(.witsDisplay(30))
                 .foregroundStyle(Color.witsInk)
                 .padding(.bottom, 16)
                 .rise(0.06)
-            Text("we said honest.")
+            Text("a rough estimate is fine.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.bottom, 24)
