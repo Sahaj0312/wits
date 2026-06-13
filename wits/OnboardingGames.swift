@@ -111,31 +111,69 @@ private struct GameTopTag: View {
     }
 }
 
-/// Intro card: game number, name, skill line, demo slot, "start tutorial".
-private struct GameIntro<Demo: View>: View {
+/// Hero panel for the pre-game explainer: fixed navy stage with soft accent
+/// glows, so the teal illustration reads the same in light and dark mode.
+private struct HeroPanel<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [Color(light: 0x243155, dark: 0x232E55), Color(light: 0x161F3A, dark: 0x141B33)],
+                startPoint: .top, endPoint: .bottom
+            )
+            Circle()
+                .fill(Color.witsAccent.opacity(0.10))
+                .frame(width: 220, height: 220)
+                .offset(x: -110, y: -80)
+            Circle()
+                .fill(Color.witsAccent.opacity(0.08))
+                .frame(width: 180, height: 180)
+                .offset(x: 130, y: 90)
+            content
+        }
+        .frame(height: 195)
+        .frame(maxWidth: .infinity)
+        .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+        .shadow(color: .witsShadow, radius: 10, y: 6)
+    }
+}
+
+/// Pre-game explainer card: hero illustration, "X tests your Y" headline,
+/// how it plays, and what it measures.
+private struct GameExplainer<Hero: View>: View {
     var tag: String
     var title: String
-    var skillLine: String
+    var skill: String
+    var how: String
+    var why: String
     var onStart: () -> Void
-    @ViewBuilder var demo: Demo
+    @ViewBuilder var hero: Hero
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             GameTopTag(text: tag)
-            Spacer()
-            VStack(alignment: .leading, spacing: 16) {
-                Text(title)
-                    .font(.witsDisplay(36))
-                    .foregroundStyle(Color.witsInk)
-                    .rise()
-                Text(skillLine)
-                    .font(.witsBody(17))
-                    .foregroundStyle(Color.witsMuted)
-                    .rise(0.08)
-                demo
-                    .rise(0.18)
+                .padding(.bottom, 18)
+            HeroPanel { hero }
+                .rise()
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("\(title) tests your \(Text(skill).foregroundStyle(Color.witsAccent)).")
+                        .font(.witsDisplay(27))
+                        .foregroundStyle(Color.witsInk)
+                        .rise(0.08)
+                    Text(how)
+                        .font(.witsBody(15.5))
+                        .foregroundStyle(Color.witsMuted)
+                        .rise(0.16)
+                    Text(why)
+                        .font(.witsBody(15.5))
+                        .foregroundStyle(Color.witsMuted)
+                        .rise(0.22)
+                }
+                .padding(.top, 22)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            Spacer()
             Cta(title: "start tutorial", action: onStart)
                 .rise(0.3)
                 .padding(.top, 16)
@@ -239,20 +277,28 @@ struct FlankerScreen: View {
     var body: some View {
         switch phase {
         case .intro:
-            GameIntro(
+            GameExplainer(
                 tag: "test 1 of 3",
                 title: "arrow storm",
-                skillLine: "five arrows flash. answer for the middle one and ignore the rest. the clock per arrow shrinks as you get better.",
+                skill: "interference control",
+                how: "five arrows flash. you answer for the middle one while its neighbours point the other way and try to drag your answer with them. the clock per arrow shrinks as you get better.",
+                why: "this is the flanker task, a lab standard since 1974. it measures how well you act on the signal while the noise screams — the muscle that keeps you on one thing when everything on screen is flashing.",
                 onStart: { phase = .tutorial }
             ) {
-                VStack(alignment: .leading, spacing: 10) {
-                    arrowRow(right: false, congruent: false, size: 24)
-                        .padding(.horizontal, 22)
-                        .padding(.vertical, 14)
-                        .cardSurface()
-                    Text("this one's a \(Text("left").foregroundStyle(Color.witsAccent)) — four arrows are lying to you")
-                        .font(.witsBody(12.5))
-                        .foregroundStyle(Color.witsFaint)
+                VStack(spacing: 18) {
+                    HStack(spacing: 14) {
+                        ForEach(0..<5, id: \.self) { i in
+                            Image(systemName: i == 2 ? "arrowtriangle.right.fill" : "arrowtriangle.left.fill")
+                                .font(.system(size: 30, weight: .heavy))
+                                .foregroundStyle(i == 2 ? Color.witsAccent : .white.opacity(0.4))
+                        }
+                    }
+                    Capsule()
+                        .fill(.white.opacity(0.16))
+                        .frame(width: 120, height: 5)
+                        .overlay(alignment: .leading) {
+                            Capsule().fill(Color.witsWarm).frame(width: 42)
+                        }
                 }
             }
         case .tutorial:
@@ -518,22 +564,32 @@ struct TrackerScreen: View {
     var body: some View {
         switch phase {
         case .intro:
-            GameIntro(
+            GameExplainer(
                 tag: "test 2 of 3",
                 title: "crowd control",
-                skillLine: "a few dots glow, then go dark and scatter into the crowd. keep your eyes on them — every round adds more to hold.",
+                skill: "divided attention",
+                how: "a few dots glow, then go dark and scatter into an identical crowd. keep your eyes on all of them at once, and point them out when everything freezes. every round adds more to hold.",
+                why: "this is multiple object tracking, used in attention labs since the 80s. it measures how many moving things you can follow at once — the exact load your tabs, chats and second screen put on you together.",
                 onStart: {
                     phase = .tutorial
                     startRound()
                 }
             ) {
-                HStack(spacing: 10) {
-                    ForEach(0..<6, id: \.self) { i in
+                GeometryReader { geo in
+                    let spots: [(x: Double, y: Double, target: Bool)] = [
+                        (0.14, 0.30, true), (0.30, 0.68, false), (0.43, 0.22, false),
+                        (0.56, 0.58, true), (0.70, 0.26, false), (0.84, 0.62, true),
+                        (0.24, 0.46, false), (0.78, 0.42, false),
+                    ]
+                    ForEach(Array(spots.enumerated()), id: \.offset) { _, s in
                         Circle()
-                            .fill([0, 3].contains(i) ? Color.witsAccent : Color.witsTint)
-                            .frame(width: 26, height: 26)
+                            .fill(s.target ? Color.witsAccent : .white.opacity(0.30))
+                            .frame(width: 24, height: 24)
+                            .shadow(color: s.target ? Color.witsAccent.opacity(0.6) : .clear, radius: 7)
+                            .position(x: s.x * geo.size.width, y: s.y * geo.size.height)
                     }
                 }
+                .padding(14)
             }
         case .tutorial, .playing:
             board
@@ -787,28 +843,40 @@ struct SpanScreen: View {
     var body: some View {
         switch phase {
         case .intro:
-            GameIntro(
+            GameExplainer(
                 tag: "test 3 of 3",
                 title: "echo grid",
-                skillLine: "tiles light up in order, then go dark. tap them back in reverse — last one first. nail it and the path gets longer.",
+                skill: "working memory",
+                how: "tiles light up one at a time, then go dark. you play the path back in reverse — last tile first. perfect rounds make the path longer, slips make it shorter.",
+                why: "this is the backward corsi span, the test neuropsychologists reach for to measure working memory. holding a sequence in your head and flipping it around is the same load deep work puts on you.",
                 onStart: {
                     inTutorial = true
                     startTrial(reset: true)
                     phase = .tutorial
                 }
             ) {
-                LazyVGrid(columns: Array(repeating: GridItem(.fixed(40), spacing: 6), count: 4), spacing: 6) {
-                    ForEach(0..<12, id: \.self) { i in
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .fill([1, 6, 8].contains(i) ? Color.witsAccent : Color.witsTint)
-                            .frame(width: 40, height: 40)
-                            .overlay {
-                                if let n = [1, 6, 8].firstIndex(of: i) {
-                                    Text("\(n + 1)")
-                                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                                        .foregroundStyle(.white)
+                HStack(spacing: 22) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(32), spacing: 5), count: 3), spacing: 5) {
+                        ForEach(0..<9, id: \.self) { i in
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill([1, 5, 6].contains(i) ? Color.witsAccent : .white.opacity(0.12))
+                                .frame(width: 32, height: 32)
+                                .overlay {
+                                    if let n = [1, 5, 6].firstIndex(of: i) {
+                                        Text("\(n + 1)")
+                                            .font(.system(size: 13, weight: .heavy, design: .rounded))
+                                            .foregroundStyle(.white)
+                                    }
                                 }
-                            }
+                        }
+                    }
+                    VStack(spacing: 8) {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.system(size: 17, weight: .heavy))
+                            .foregroundStyle(Color.witsAccent)
+                        Text("3 → 2 → 1")
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.85))
                     }
                 }
             }
