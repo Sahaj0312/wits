@@ -13,71 +13,119 @@ import SwiftUI
 struct CalcScreen: View {
     var onNext: () -> Void
 
-    private static let roasts = [
-        "analyzing your damage",
-        "cross-referencing your screen time confession",
-        "comparing you to a goldfish",
-        "the goldfish won",
-        "factoring in the dots you lost track of",
-        "compiling the diagnosis",
+    private struct Step {
+        let label: String
+        var doneLabel: String?
+        let at: Double          // progress fraction when this step completes
+    }
+
+    private static let steps: [Step] = [
+        Step(label: "scoring your reflexes", at: 0.16),
+        Step(label: "cross-referencing your screen time confession", at: 0.34),
+        Step(label: "comparing you to a goldfish", doneLabel: "the goldfish won", at: 0.52),
+        Step(label: "factoring in the dots you lost track of", at: 0.72),
+        Step(label: "compiling the diagnosis", at: 0.94),
     ]
 
-    @State private var pct = 0
-    @State private var lineIndex = 0
+    @State private var t = 0.0
+
+    private var pct: Int { min(100, Int((t * 100).rounded())) }
 
     var body: some View {
-        VStack(spacing: 26) {
+        VStack(spacing: 30) {
+            Spacer()
             ZStack {
                 Circle()
                     .stroke(Color.witsLine, lineWidth: 10)
                 Circle()
-                    .trim(from: 0, to: Double(pct) / 100)
+                    .trim(from: 0, to: t)
                     .stroke(Color.witsAccent, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                    .animation(.linear(duration: 0.12), value: pct)
-                HStack(alignment: .firstTextBaseline, spacing: 1) {
-                    Text("\(pct)")
-                        .font(.system(size: 40, weight: .heavy, design: .rounded))
+                VStack(spacing: 8) {
+                    LogoBlob(size: 46, breathe: true)
+                    Text("\(pct)%")
+                        .font(.system(size: 24, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsInk)
-                    Text("%")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.witsFaint)
+                        .monospacedDigit()
                 }
-                .monospacedDigit()
             }
-            .frame(width: 150, height: 150)
-            Text(Self.roasts[lineIndex])
-                .font(.witsBody(16, weight: .semibold))
-                .foregroundStyle(Color.witsMuted)
+            .frame(width: 156, height: 156)
+            .rise()
+
+            VStack(spacing: 0) {
+                ForEach(Array(Self.steps.enumerated()), id: \.offset) { i, step in
+                    let done = t >= step.at
+                    let active = !done && (i == 0 || t >= Self.steps[i - 1].at)
+                    HStack(spacing: 12) {
+                        ZStack {
+                            if done {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 9, weight: .heavy))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 20, height: 20)
+                                    .background(Color.witsAccent, in: Circle())
+                                    .transition(.scale(scale: 0.5).combined(with: .opacity))
+                            } else if active {
+                                MiniSpinner()
+                            } else {
+                                Circle()
+                                    .strokeBorder(Color.witsLine, lineWidth: 2)
+                                    .frame(width: 20, height: 20)
+                            }
+                        }
+                        .frame(width: 20, height: 20)
+                        Text(done ? (step.doneLabel ?? step.label) : step.label)
+                            .font(.witsBody(14, weight: .semibold))
+                            .foregroundStyle(done ? Color.witsInk : active ? Color.witsMuted : Color.witsFaint)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(done)
+                            .transition(.opacity)
+                    }
+                    .padding(.vertical, 10)
+                    .animation(.easeOut(duration: 0.22), value: done)
+                    .animation(.easeOut(duration: 0.22), value: active)
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 8)
+            .cardSurface()
+            .rise(0.12)
+
+            Text("this takes a few seconds. unlike your attention, it will finish.")
+                .font(.witsBody(12.5))
+                .foregroundStyle(Color.witsFaint)
                 .multilineTextAlignment(.center)
-                .frame(minHeight: 24)
-                .id(lineIndex)
-                .transition(.opacity)
-                .animation(.easeOut(duration: 0.22), value: lineIndex)
+                .rise(0.22)
+            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal, WitsMetrics.screenPadding)
         .task {
-            let total = 5.2
+            let total = 5.6
             let start = Date()
-            var nextLine = 0.85
             while !Task.isCancelled {
-                try? await Task.sleep(for: .milliseconds(50))
-                let elapsed = Date().timeIntervalSince(start)
-                let t = min(1, elapsed / total)
-                let eased = t < 0.7 ? t * 1.1 : 0.77 + (t - 0.7) * 0.77
-                pct = min(100, Int((eased * 100).rounded()))
-                if elapsed >= nextLine {
-                    lineIndex = min(lineIndex + 1, Self.roasts.count - 1)
-                    nextLine += 0.85
-                }
-                if t >= 1 {
-                    try? await Task.sleep(for: .milliseconds(450))
+                try? await Task.sleep(for: .milliseconds(40))
+                let raw = min(1, Date().timeIntervalSince(start) / total)
+                t = raw * raw * (3 - 2 * raw)   // smoothstep: lingers at the ends
+                if raw >= 1 {
+                    try? await Task.sleep(for: .milliseconds(550))
                     onNext()
                     return
                 }
             }
         }
+    }
+}
+
+private struct MiniSpinner: View {
+    @State private var on = false
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.72)
+            .stroke(Color.witsAccent, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+            .frame(width: 15, height: 15)
+            .rotationEffect(.degrees(on ? 360 : 0))
+            .animation(.linear(duration: 0.8).repeatForever(autoreverses: false), value: on)
+            .onAppear { on = true }
     }
 }
 
@@ -177,11 +225,55 @@ struct ResultScreen: View {
 
 // MARK: - Breakdown
 
+/// Normal-distribution silhouette, filled from the left edge.
+private struct BellShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        let mu = 0.5, sigma = 0.17
+        p.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        let samples = 60
+        for i in 0...samples {
+            let u = Double(i) / Double(samples)
+            let g = exp(-pow((u - mu) / sigma, 2) / 2)
+            p.addLine(to: CGPoint(x: rect.minX + u * rect.width,
+                                  y: rect.maxY - g * rect.height * 0.94))
+        }
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.closeSubpath()
+        return p
+    }
+}
+
+private struct BellCurveView: View {
+    var fraction: Double    // 0...1 — how much of the population you beat
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                BellShape()
+                    .fill(Color.witsInk.opacity(0.10))
+                BellShape()
+                    .fill(Color.witsAccent)
+                    .mask(alignment: .leading) {
+                        Rectangle()
+                            .frame(width: geo.size.width * fraction)
+                            .frame(maxHeight: .infinity)
+                    }
+            }
+            .overlay(alignment: .bottom) {
+                Rectangle()
+                    .fill(Color.witsLine)
+                    .frame(height: 1.5)
+            }
+        }
+    }
+}
+
 struct BreakdownScreen: View {
     var result: AttentionResult
     var onNext: () -> Void
 
-    @State private var barsShown = false
+    @State private var curvesShown = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -191,7 +283,7 @@ struct BreakdownScreen: View {
                 .font(.witsDisplay(32))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("where you beat the curve, and where the curve beat you.")
+            Text("where you sit on the curve. the teal part is everyone behind you.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
@@ -199,32 +291,37 @@ struct BreakdownScreen: View {
                 .rise(0.08)
             VStack(spacing: 10) {
                 ForEach(Array(result.tests.enumerated()), id: \.element.name) { i, test in
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 12) {
                         HStack(alignment: .firstTextBaseline) {
                             Text(test.name)
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.witsInk)
                             Spacer()
-                            Text("\(test.pct)%")
-                                .font(.system(size: 15, weight: .heavy, design: .rounded))
-                                .foregroundStyle(Color.witsAccent)
+                            Text(test.skill)
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.witsFaint)
                         }
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Capsule().fill(Color.witsTint)
-                                Capsule()
-                                    .fill(Color.witsAccent)
-                                    .frame(width: barsShown ? geo.size.width * Double(test.pct) / 100 : 0)
-                                    .animation(
-                                        .timingCurve(0.2, 0.8, 0.3, 1, duration: 0.7).delay(0.3 + Double(i) * 0.1),
-                                        value: barsShown
-                                    )
+                        HStack(spacing: 18) {
+                            BellCurveView(fraction: curvesShown ? Double(test.pct) / 100 : 0)
+                                .frame(height: 62)
+                                .animation(
+                                    .timingCurve(0.2, 0.8, 0.3, 1, duration: 0.9).delay(0.3 + Double(i) * 0.12),
+                                    value: curvesShown
+                                )
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("sharper than")
+                                    .font(.witsBody(12.5))
+                                    .foregroundStyle(Color.witsMuted)
+                                Text("\(test.pct)%")
+                                    .font(.system(size: 30, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(Color.witsAccent)
+                                    .monospacedDigit()
+                                Text("of users")
+                                    .font(.witsBody(12.5))
+                                    .foregroundStyle(Color.witsMuted)
                             }
+                            .frame(width: 92, alignment: .leading)
                         }
-                        .frame(height: 8)
-                        Text("\(test.skill) — better than \(test.pct)% of users")
-                            .font(.witsBody(12.5))
-                            .foregroundStyle(Color.witsMuted)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 15)
@@ -239,7 +336,7 @@ struct BreakdownScreen: View {
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 12)
-        .onAppear { barsShown = true }
+        .onAppear { curvesShown = true }
     }
 }
 
