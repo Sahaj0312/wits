@@ -64,6 +64,21 @@ struct ProgressTab: View {
                     DomainBars(scores: domainScores)
                 }
 
+                if let msg = app.percentileMessage {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.3.fill")
+                            .font(.system(size: 18, weight: .heavy))
+                            .foregroundStyle(Color.witsAccent)
+                        Text(msg)
+                            .font(.witsBody(14, weight: .semibold))
+                            .foregroundStyle(Color.witsInk)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .cardSurface()
+                }
+
                 Text("wits measures how you do on these games over time. it doesn't claim to raise your iq — it shows you getting sharper at the skills you train.")
                     .font(.witsBody(12.5))
                     .foregroundStyle(Color.witsFaint)

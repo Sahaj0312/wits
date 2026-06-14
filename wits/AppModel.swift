@@ -40,6 +40,10 @@ final class AppModel {
     var league: LeagueResult? = nil
     private var leagueWeekStart: String?
     private var leagueWeekXP = 0
+    var percentile: Int? = nil
+    var percentileMessage: String? = nil
+    var friendCode: String? = nil
+    var friends: [FriendInfo] = []
 
     let supa: SupabaseManager
     let store = Store()
@@ -74,6 +78,7 @@ final class AppModel {
         Task { await reconcile() }
         Task { await store.load() }
         Task { await refreshLeague() }
+        Task { await refreshSocial() }
     }
 
     // MARK: Leagues
@@ -86,6 +91,43 @@ final class AppModel {
         leagueWeekStart = res.week_start
         leagueWeekXP = res.standings.first(where: { $0.isMe })?.xp ?? leagueWeekXP
         saveCache()
+    }
+
+    // MARK: Social (percentile + friends)
+
+    func refreshSocial() async {
+        guard supa.isSignedIn else { return }
+        if let d = try? await supa.callFunction("social", body: ["action": "percentile"]),
+           let r = try? JSONDecoder().decode(PercentileResp.self, from: d), r.hasData {
+            percentile = r.percentile
+            percentileMessage = r.message
+        }
+        await refreshFriends()
+    }
+
+    func loadFriendCode() async {
+        guard supa.isSignedIn else { return }
+        if let d = try? await supa.callFunction("social", body: ["action": "friendCode"]),
+           let r = try? JSONDecoder().decode(CodeResp.self, from: d) {
+            friendCode = r.code
+        }
+    }
+
+    @discardableResult
+    func addFriend(_ code: String) async -> Bool {
+        guard let d = try? await supa.callFunction("social", body: ["action": "friendAdd", "code": code]),
+              let r = try? JSONDecoder().decode([String: Bool].self, from: d), r["ok"] == true
+        else { return false }
+        await refreshFriends()
+        return true
+    }
+
+    func refreshFriends() async {
+        guard supa.isSignedIn else { return }
+        if let d = try? await supa.callFunction("social", body: ["action": "friendList"]),
+           let r = try? JSONDecoder().decode(FriendListResp.self, from: d) {
+            friends = r.friends
+        }
     }
 
     /// Add weekly league XP (from a finished workout) and re-rank.
@@ -363,6 +405,23 @@ final class AppModel {
         return nil
     }
 }
+
+// MARK: - Social decode models
+
+struct FriendInfo: Decodable {
+    var streak: Int
+    var trainedToday: Bool
+    var friendStreak: Int
+}
+
+struct PercentileResp: Decodable {
+    var hasData: Bool
+    var percentile: Int?
+    var message: String?
+}
+
+struct CodeResp: Decodable { var code: String? }
+struct FriendListResp: Decodable { var friends: [FriendInfo] }
 
 extension DailyProgressRow {
     var dayDate: Date? {
