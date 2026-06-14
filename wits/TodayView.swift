@@ -12,6 +12,8 @@ import SwiftUI
 struct TodayView: View {
     @Environment(AppModel.self) private var app
     @State private var playing = false
+    @State private var showPrimer = false
+    @AppStorage("notifPrimerAsked") private var notifPrimerAsked = false
 
     private var greeting: String {
         let h = Calendar.current.component(.hour, from: Date())
@@ -46,9 +48,17 @@ struct TodayView: View {
                 onWorkoutDone: { results in
                     app.finishWorkout(results)
                     playing = false
+                    // first value moment → offer reminders (once)
+                    if !notifPrimerAsked && !app.profile.notificationsEnabled {
+                        notifPrimerAsked = true
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { showPrimer = true }
+                    }
                 },
                 onQuit: { playing = false }
             )
+        }
+        .sheet(isPresented: $showPrimer) {
+            NotificationPrimer()
         }
     }
 

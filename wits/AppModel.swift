@@ -54,6 +54,7 @@ final class AppModel {
         guard load == .idle else { return }
         rebuildTodayIfNeeded()
         recomputeEntitlement()
+        refreshReminderSchedule()
         load = .ready
         Task { await reconcile() }
     }
@@ -72,6 +73,36 @@ final class AppModel {
 
     var difficultyFor: (GameID) -> DifficultyState {
         { [difficulty] id in difficulty[id] ?? .seed(for: id) }
+    }
+
+    // MARK: Reminders
+
+    /// Turn the daily reminder on/off and persist the choice. Caller must have
+    /// already obtained notification authorization when enabling.
+    func setReminder(hour: Int, minute: Int, enabled: Bool) {
+        profile.reminderHour = enabled ? hour : nil
+        profile.reminderMinute = minute
+        profile.notificationsEnabled = enabled
+        saveCache()
+        if enabled {
+            WitsNotifications.scheduleDaily(hour: hour, minute: minute)
+        } else {
+            WitsNotifications.cancelAll()
+        }
+        Task {
+            try? await supa.upsertProfile([
+                "reminder_hour": enabled ? hour : NSNull(),
+                "reminder_minute": minute,
+                "notifications_enabled": enabled,
+            ])
+        }
+    }
+
+    /// Re-arm the OS schedule from persisted prefs on launch (system clears
+    /// pending requests in some cases; cheap to re-add).
+    func refreshReminderSchedule() {
+        guard profile.notificationsEnabled, let h = profile.reminderHour else { return }
+        WitsNotifications.scheduleDaily(hour: h, minute: profile.reminderMinute)
     }
 
     var isWorkoutDoneToday: Bool {

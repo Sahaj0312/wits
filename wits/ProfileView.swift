@@ -11,6 +11,7 @@ struct ProfileView: View {
     @Environment(AppModel.self) private var app
     @Environment(SupabaseManager.self) private var supa
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @State private var showReminder = false
 
     private var entitlementLabel: String {
         switch app.entitlement {
@@ -43,7 +44,10 @@ struct ProfileView: View {
                     stat(value: "\(app.streak.freezes)", label: "freezes")
                 }
 
-                infoRow(icon: "bell.fill", title: "daily reminder", value: reminderLabel)
+                Button { showReminder = true } label: {
+                    infoRow(icon: "bell.fill", title: "daily reminder", value: reminderLabel)
+                }
+                .buttonStyle(.plain)
                 infoRow(icon: "creditcard.fill", title: "plan", value: entitlementLabel)
 
                 Button {
@@ -69,6 +73,9 @@ struct ProfileView: View {
             .padding(.bottom, 24)
         }
         .background(Color.witsBg.ignoresSafeArea())
+        .sheet(isPresented: $showReminder) {
+            ReminderSettingsSheet(app: app)
+        }
     }
 
     private func stat(value: String, label: String) -> some View {
