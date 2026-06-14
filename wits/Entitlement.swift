@@ -23,6 +23,8 @@ enum Entitlement: Equatable {
         }
     }
 
+    var isExpired: Bool { self == .expired }
+
     /// Whole days left in the trial (0 if not on trial).
     var trialDaysLeft: Int {
         guard case let .trial(endsAt) = self else { return 0 }

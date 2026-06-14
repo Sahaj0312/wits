@@ -11,6 +11,7 @@ import SwiftUI
 struct GamesLibraryView: View {
     @Environment(AppModel.self) private var app
     @State private var freePlay: GameID?
+    @State private var showPaywall = false
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -45,11 +46,13 @@ struct GamesLibraryView: View {
                 onQuit: { freePlay = nil }
             )
         }
+        .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
     }
 
     private func card(_ g: GameID) -> some View {
         Button {
-            if g.isLive { freePlay = g }
+            guard g.isLive else { return }
+            if app.entitlement.isExpired { showPaywall = true } else { freePlay = g }
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: g.symbol)

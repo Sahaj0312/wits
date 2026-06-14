@@ -13,6 +13,7 @@ struct TodayView: View {
     @Environment(AppModel.self) private var app
     @State private var playing = false
     @State private var showPrimer = false
+    @State private var showPaywall = false
     @State private var challengeGame: GameID?
     @AppStorage("notifPrimerAsked") private var notifPrimerAsked = false
 
@@ -63,6 +64,9 @@ struct TodayView: View {
         }
         .sheet(isPresented: $showPrimer) {
             NotificationPrimer()
+        }
+        .fullScreenCover(isPresented: $showPaywall) {
+            PaywallView()
         }
         .fullScreenCover(item: $challengeGame) { g in
             GameHost(
@@ -160,7 +164,9 @@ struct TodayView: View {
             }
             .padding(.top, 20)
 
-            Cta(title: "start workout") { playing = true }
+            Cta(title: app.entitlement.isExpired ? "subscribe to keep training" : "start workout") {
+                if app.entitlement.isExpired { showPaywall = true } else { playing = true }
+            }
                 .padding(.top, 22)
                 .rise(0.4)
 

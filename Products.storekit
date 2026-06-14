@@ -1,0 +1,74 @@
+{
+  "identifier" : "WITS-STOREKIT-CONFIG",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_applicationInternalID" : "wits",
+    "_developerTeamID" : "",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US"
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "wits-premium",
+      "localizations" : [],
+      "name" : "wits premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "39.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "wits-yearly",
+          "introductoryOffer" : {
+            "internalID" : "wits-yearly-trial",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "localizations" : [
+            {
+              "description" : "Unlimited training, billed yearly",
+              "displayName" : "Wits Yearly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.sahaj03.wits.yearly",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "Wits Yearly",
+          "subscriptionGroupID" : "wits-premium",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "4.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "wits-weekly",
+          "introductoryOffer" : {
+            "internalID" : "wits-weekly-trial",
+            "paymentMode" : "free",
+            "subscriptionPeriod" : "P3D"
+          },
+          "localizations" : [
+            {
+              "description" : "Unlimited training, billed weekly",
+              "displayName" : "Wits Weekly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.sahaj03.wits.weekly",
+          "recurringSubscriptionPeriod" : "P1W",
+          "referenceName" : "Wits Weekly",
+          "subscriptionGroupID" : "wits-premium",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}
