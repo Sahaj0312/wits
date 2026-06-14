@@ -30,6 +30,34 @@ enum EchoGrid: Game {
     }
 }
 
+enum ColorClash: Game {
+    static let id = GameID.colorClash
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(ColorClashScreen(cfg: config, onResult: onComplete))
+    }
+}
+
+enum SpotSpeed: Game {
+    static let id = GameID.spotSpeed
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(SpotSpeedScreen(cfg: config, onResult: onComplete))
+    }
+}
+
+enum MatchBack: Game {
+    static let id = GameID.matchBack
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(MatchBackScreen(cfg: config, onResult: onComplete))
+    }
+}
+
+enum RuleFinder: Game {
+    static let id = GameID.ruleFinder
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(RuleFinderScreen(cfg: config, onResult: onComplete))
+    }
+}
+
 /// Single dispatch the host uses to launch any game.
 @MainActor
 func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -37,7 +65,10 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .arrowStorm:  ArrowStorm.makeView(config: config, onComplete: onComplete)
     case .crowdControl: CrowdControl.makeView(config: config, onComplete: onComplete)
     case .echoGrid:    EchoGrid.makeView(config: config, onComplete: onComplete)
-    default:           AnyView(ComingSoonGame(id: id, onComplete: onComplete))
+    case .colorClash:  ColorClash.makeView(config: config, onComplete: onComplete)
+    case .spotSpeed:   SpotSpeed.makeView(config: config, onComplete: onComplete)
+    case .matchBack:   MatchBack.makeView(config: config, onComplete: onComplete)
+    case .ruleFinder:  RuleFinder.makeView(config: config, onComplete: onComplete)
     }
 }
 
@@ -46,6 +77,7 @@ func advanceDifficulty(for id: GameID, _ s: DifficultyState, accuracy: Double) -
     case .arrowStorm:  ArrowStorm.advance(s, accuracy: accuracy)
     case .crowdControl: CrowdControl.advance(s, accuracy: accuracy)
     case .echoGrid:    EchoGrid.advance(s, accuracy: accuracy)
+    case .colorClash:  ColorClash.advance(s, accuracy: accuracy)
     default:           Staircase.adjust(s, accuracy: accuracy)
     }
 }

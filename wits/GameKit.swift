@@ -21,7 +21,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     var id: String { rawValue }
 
     /// Games playable today. Roadmap games show as "coming soon" in the library.
-    static var live: [GameID] { [.arrowStorm, .crowdControl, .echoGrid] }
+    static var live: [GameID] { [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder] }
     var isLive: Bool { Self.live.contains(self) }
 }
 

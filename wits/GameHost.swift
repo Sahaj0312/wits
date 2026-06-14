@@ -24,7 +24,7 @@ struct GameHost: View {
     private enum Stage: Equatable { case playing, interstitial, summary }
 
     @State private var index = 0
-    @State private var stage: Stage = .playing
+    @State private var stage: Stage = .interstitial
     @State private var results: [GameResult] = []
 
     private var currentGame: GameID? {
@@ -99,19 +99,25 @@ struct GameHost: View {
 
     private var interstitial: some View {
         let next = currentGame
+        let first = index == 0
         return VStack(spacing: 0) {
+            progressDots.padding(.top, 8)
             Spacer()
-            VStack(spacing: 12) {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 40, weight: .heavy))
+            VStack(spacing: 14) {
+                Image(systemName: first ? (next?.symbol ?? "bolt.fill") : "checkmark.circle.fill")
+                    .font(.system(size: 42, weight: .heavy))
                     .foregroundStyle(Color.witsAccent)
-                Text("nice.")
-                    .font(.witsDisplay(28))
-                    .foregroundStyle(Color.witsInk)
+                Text(first ? "first up" : "nice.")
+                    .font(.witsBody(15, weight: .semibold))
+                    .foregroundStyle(Color.witsMuted)
                 if let next {
-                    Text("next up: \(next.displayName)")
-                        .font(.witsBody(16))
+                    Text(next.displayName)
+                        .font(.witsDisplay(28))
+                        .foregroundStyle(Color.witsInk)
+                    Text(next.tagline)
+                        .font(.witsBody(15.5))
                         .foregroundStyle(Color.witsMuted)
+                        .multilineTextAlignment(.center)
                 }
             }
             .padding(28)
@@ -119,7 +125,7 @@ struct GameHost: View {
             .cardSurface()
             .rise()
             Spacer()
-            Cta(title: "continue") {
+            Cta(title: first ? "start" : "continue") {
                 withAnimation { stage = .playing }
             }
             .rise(0.12)

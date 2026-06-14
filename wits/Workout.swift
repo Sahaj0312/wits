@@ -19,15 +19,21 @@ struct DailyWorkout: Identifiable, Codable {
 }
 
 enum WorkoutBuilder {
-    /// Builds the day's workout. With three live games we play all three, but the
-    /// order rotates by day so the first game (the one most likely to get the
-    /// freshest attention) cycles.
+    /// Up to this many games per daily workout — keeps a session ~3-4 minutes
+    /// even as the library grows.
+    static let size = 4
+
+    /// Builds the day's workout: a rotating window over the live library so the
+    /// set varies day to day while still covering every game over time.
     static func build(for day: Date, calendar: Calendar = .current) -> DailyWorkout {
         let pool = GameID.live
-        guard !pool.isEmpty else { return DailyWorkout(day: calendar.startOfDay(for: day), games: []) }
+        let start = calendar.startOfDay(for: day)
+        guard !pool.isEmpty else { return DailyWorkout(day: start, games: []) }
         let doy = calendar.ordinality(of: .day, in: .year, for: day) ?? 0
-        let shift = doy % pool.count
-        let rotated = Array(pool[shift...] + pool[..<shift])
-        return DailyWorkout(id: UUID(), day: calendar.startOfDay(for: day), games: rotated)
+        let count = min(size, pool.count)
+        let offset = (doy * count) % pool.count
+        let rotated = pool[offset...] + pool[..<offset]
+        let games = Array(rotated.prefix(count))
+        return DailyWorkout(id: UUID(), day: start, games: games)
     }
 }
