@@ -217,7 +217,7 @@ struct LikertScreen: View {
         VStack(alignment: .leading, spacing: 0) {
             ProgressTrack(fraction: Double(2 + index) / onboardingQuizTotal)
                 .padding(.bottom, 30)
-            Text("statement \(index + 1) of \(Self.statements.count)")
+            Text("how much does this sound like you?")
                 .font(.system(size: 12.5, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.witsFaint)
                 .padding(.bottom, 10)
