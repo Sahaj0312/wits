@@ -32,6 +32,9 @@ struct ProgressTab: View {
     private var completedDays: [DailyProgressRow] {
         app.progressDays.filter { $0.workout_done == true }
     }
+    private var headlinePoints: [SeriesPoint] { ProgressMath.headlineSeries(app.progressDays) }
+    private var domainScores: [CognitiveDomain: Double] { ProgressMath.latestDomainScores(app.progressDays) }
+    private var heroScore: Double? { ProgressMath.headline(app.progressDays) }
 
     var body: some View {
         ScrollView {
@@ -44,23 +47,19 @@ struct ProgressTab: View {
                 HStack(spacing: 12) {
                     metric(value: "\(app.streak.current)", label: "day streak")
                     metric(value: "\(completedDays.count)", label: "workouts")
-                    metric(value: app.headlineIndex.map { "\(Int($0))" } ?? "—", label: "wits score")
+                    metric(value: heroScore.map { "\(Int($0))" } ?? "—", label: "wits score")
                 }
 
-                Text("recent days")
-                    .font(.witsBody(15, weight: .bold))
-                    .foregroundStyle(Color.witsMuted)
-                    .padding(.top, 4)
-
-                if completedDays.isEmpty {
-                    Text("finish a workout to start your improvement chart. with a few days of data, you'll see how your scores trend.")
-                        .font(.witsBody(15))
-                        .foregroundStyle(Color.witsMuted)
-                        .padding(16)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .cardSurface()
+                section("your brain is improving")
+                if headlinePoints.count >= 2 {
+                    HeadlineChart(points: headlinePoints)
                 } else {
-                    miniChart
+                    emptyCard("finish a couple of workouts to start your improvement chart. with a few days of data, you'll see how your scores trend.")
+                }
+
+                if !domainScores.isEmpty {
+                    section("by skill")
+                    DomainBars(scores: domainScores)
                 }
 
                 Text("wits measures how you do on these games over time. it doesn't claim to raise your iq — it shows you getting sharper at the skills you train.")
@@ -74,24 +73,20 @@ struct ProgressTab: View {
         .background(Color.witsBg.ignoresSafeArea())
     }
 
-    private var miniChart: some View {
-        let days = completedDays.suffix(14)
-        let maxV = max(1, days.compactMap { $0.headline_index }.max() ?? 1)
-        return HStack(alignment: .bottom, spacing: 6) {
-            ForEach(Array(days.enumerated()), id: \.offset) { _, d in
-                let v = d.headline_index ?? 0
-                VStack {
-                    Capsule()
-                        .fill(Color.witsAccent)
-                        .frame(height: max(6, CGFloat(v / maxV) * 120))
-                }
-                .frame(maxWidth: .infinity)
-            }
-        }
-        .frame(height: 130)
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .cardSurface()
+    private func section(_ title: String) -> some View {
+        Text(title)
+            .font(.witsBody(15, weight: .bold))
+            .foregroundStyle(Color.witsMuted)
+            .padding(.top, 4)
+    }
+
+    private func emptyCard(_ text: String) -> some View {
+        Text(text)
+            .font(.witsBody(15))
+            .foregroundStyle(Color.witsMuted)
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardSurface()
     }
 
     private func metric(value: String, label: String) -> some View {
