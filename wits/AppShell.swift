@@ -17,6 +17,8 @@ struct RootShell: View {
                 .tabItem { Label("progress", systemImage: "chart.line.uptrend.xyaxis") }
             GamesLibraryView()
                 .tabItem { Label("games", systemImage: "square.grid.2x2.fill") }
+            LeaguesView()
+                .tabItem { Label("league", systemImage: "trophy.fill") }
             ProfileView()
                 .tabItem { Label("you", systemImage: "person.fill") }
         }

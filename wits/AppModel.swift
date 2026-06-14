@@ -37,6 +37,9 @@ final class AppModel {
     var headlineIndex: Double? = nil
     /// Per-day rollups for the progress chart (ascending by day).
     var progressDays: [DailyProgressRow] = []
+    var league: LeagueResult? = nil
+    private var leagueWeekStart: String?
+    private var leagueWeekXP = 0
 
     let supa: SupabaseManager
     let store = Store()
@@ -70,6 +73,31 @@ final class AppModel {
         load = .ready
         Task { await reconcile() }
         Task { await store.load() }
+        Task { await refreshLeague() }
+    }
+
+    // MARK: Leagues
+
+    func refreshLeague() async {
+        guard supa.isSignedIn else { return }
+        guard let data = try? await supa.callFunction("league-join"),
+              let res = try? JSONDecoder().decode(LeagueResult.self, from: data) else { return }
+        league = res
+        leagueWeekStart = res.week_start
+        leagueWeekXP = res.standings.first(where: { $0.isMe })?.xp ?? leagueWeekXP
+        saveCache()
+    }
+
+    /// Add weekly league XP (from a finished workout) and re-rank.
+    func addLeagueXP(_ points: Int) {
+        guard points > 0, let lid = league?.league_id else { return }
+        leagueWeekXP += points
+        saveCache()
+        let xp = leagueWeekXP
+        Task {
+            try? await supa.upsertLeagueXP(leagueID: lid, xp: xp)
+            await refreshLeague()
+        }
     }
 
     /// New users start with two streak freezes to clear the fragile 7-day hump.
@@ -171,6 +199,7 @@ final class AppModel {
     func finishWorkout(_ results: [GameResult]) {
         today.results = results
         streak = StreakEngine.recordActivity(streak, today: Date())
+        addLeagueXP(max(1, results.reduce(0) { $0 + $1.score } / 100))
 
         let domainScores = Self.domainScores(from: results)
         let headline = Self.headline(from: domainScores)
@@ -280,6 +309,8 @@ final class AppModel {
         var today: DailyWorkout
         var headlineIndex: Double?
         var progressDays: [DailyProgressRow]
+        var leagueWeekStart: String?
+        var leagueWeekXP: Int?
     }
 
     private func saveCache() {
@@ -289,7 +320,9 @@ final class AppModel {
             difficulty: Dictionary(uniqueKeysWithValues: difficulty.map { ($0.key.rawValue, $0.value) }),
             today: today,
             headlineIndex: headlineIndex,
-            progressDays: progressDays
+            progressDays: progressDays,
+            leagueWeekStart: leagueWeekStart,
+            leagueWeekXP: leagueWeekXP
         )
         if let data = try? JSONEncoder().encode(state) {
             UserDefaults.standard.set(data, forKey: cacheKey)
@@ -306,6 +339,8 @@ final class AppModel {
         })
         headlineIndex = state.headlineIndex
         progressDays = state.progressDays
+        leagueWeekStart = state.leagueWeekStart
+        leagueWeekXP = state.leagueWeekXP ?? 0
         // keep cached workout only if it's still today's
         if Calendar.current.isDate(state.today.day, inSameDayAs: Date()) {
             today = state.today

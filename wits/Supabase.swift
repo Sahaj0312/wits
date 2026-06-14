@@ -118,6 +118,23 @@ struct StreakRow: Decodable {
     var freezes: Int?
 }
 
+struct LeagueStanding: Codable, Identifiable {
+    var rank: Int
+    var xp: Int
+    var isMe: Bool
+    var id: Int { rank }
+}
+
+struct LeagueResult: Codable {
+    var league_id: String
+    var tier: Int
+    var week_start: String
+    var size: Int
+    var promote: Int
+    var relegate: Int
+    var standings: [LeagueStanding]
+}
+
 // MARK: - Manager
 
 @Observable
@@ -408,6 +425,34 @@ final class SupabaseManager {
             URLQueryItem(name: "limit", value: "1"),
         ])
         return try JSONDecoder().decode([StreakRow].self, from: data).first
+    }
+
+    func upsertLeagueXP(leagueID: String, xp: Int) async throws {
+        guard let id = userID else { throw SupabaseError.notSignedIn }
+        let row: [String: Any] = ["league_id": leagueID, "user_id": id, "xp": xp]
+        try await restWrite(
+            table: "league_members", body: [row],
+            prefer: "resolution=merge-duplicates,return=minimal",
+            query: [URLQueryItem(name: "on_conflict", value: "league_id,user_id")]
+        )
+    }
+
+    /// POST to an edge function with the user's bearer token.
+    func callFunction(_ name: String, body: [String: Any] = [:]) async throws -> Data {
+        guard let token = await validAccessToken() else { throw SupabaseError.notSignedIn }
+        let url = SupabaseConfig.url.appendingPathComponent("functions/v1/\(name)")
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw SupabaseError.message(Self.errorMessage(from: data, status: status))
+        }
+        return data
     }
 
     static func dayString(_ date: Date) -> String {
