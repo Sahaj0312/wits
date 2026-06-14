@@ -81,6 +81,43 @@ enum SupabaseError: LocalizedError {
     }
 }
 
+// MARK: - Read row models (PostgREST → Decodable)
+
+struct ProfileRow: Decodable {
+    var birthdate: String?
+    var goals: [String]?
+    var training_days: Int?
+    var reminder_hour: Int?
+    var reminder_minute: Int?
+    var notifications_enabled: Bool?
+    var trial_started_at: String?
+    var subscription_until: String?
+    var onboarding_completed: Bool?
+}
+
+struct DifficultyRow: Decodable {
+    var game: String
+    var level: Double
+    var reversals: Int?
+    var last_direction: Int?
+    var sessions_played: Int?
+}
+
+struct DailyProgressRow: Codable {
+    var day: String
+    var workout_done: Bool?
+    var games_played: Int?
+    var headline_index: Double?
+    var domain_scores: [String: Double]?
+}
+
+struct StreakRow: Decodable {
+    var current_streak: Int?
+    var longest_streak: Int?
+    var last_active_day: String?
+    var freezes: Int?
+}
+
 // MARK: - Manager
 
 @Observable
@@ -249,6 +286,8 @@ final class SupabaseManager {
         if cp == .completed {
             fields["onboarding_completed"] = true
             fields["completed_at"] = ISO8601DateFormatter().string(from: Date())
+            // Start the 3-day trial clock the moment onboarding finishes.
+            fields["trial_started_at"] = ISO8601DateFormatter().string(from: Date())
         }
         Task { try? await upsertProfile(fields) }
     }
@@ -261,6 +300,122 @@ final class SupabaseManager {
             return r
         }
         try await restWrite(table: "game_scores", body: body, prefer: "return=minimal")
+    }
+
+    // MARK: - Main-app persistence (sessions / difficulty / progress / streak)
+
+    private static let iso = ISO8601DateFormatter()
+
+    /// One row per scored run in the main app (supersedes game_scores).
+    func saveSession(_ r: GameResult, source: String) async throws {
+        guard let id = userID else { throw SupabaseError.notSignedIn }
+        var row: [String: Any] = [
+            "user_id": id,
+            "game": r.game.rawValue,
+            "domain": r.domain.rawValue,
+            "source": source,
+            "score": r.score,
+            "accuracy": r.accuracy,
+            "trials": r.trials,
+            "started_at": Self.iso.string(from: r.startedAt),
+        ]
+        if let t = r.threshold { row["threshold"] = t }
+        if let rt = r.medianRTms { row["median_rt_ms"] = rt }
+        if let d = r.newDifficulty?.level { row["difficulty"] = d }
+        if !r.raw.isEmpty { row["details"] = r.raw }
+        try await restWrite(table: "game_sessions", body: [row], prefer: "return=minimal")
+    }
+
+    func upsertDifficulty(game: GameID, _ s: DifficultyState) async throws {
+        guard let id = userID else { throw SupabaseError.notSignedIn }
+        let row: [String: Any] = [
+            "user_id": id, "game": game.rawValue,
+            "level": s.level, "reversals": s.reversals,
+            "last_direction": s.lastDirection, "sessions_played": s.sessionsPlayed,
+            "updated_at": Self.iso.string(from: Date()),
+        ]
+        try await restWrite(
+            table: "game_difficulty", body: [row],
+            prefer: "resolution=merge-duplicates,return=minimal",
+            query: [URLQueryItem(name: "on_conflict", value: "user_id,game")]
+        )
+    }
+
+    func upsertDailyProgress(day: String, workoutDone: Bool, gamesPlayed: Int,
+                             headlineIndex: Double?, domainScores: [String: Double]) async throws {
+        guard let id = userID else { throw SupabaseError.notSignedIn }
+        var row: [String: Any] = [
+            "user_id": id, "day": day,
+            "workout_done": workoutDone, "games_played": gamesPlayed,
+            "domain_scores": domainScores,
+            "updated_at": Self.iso.string(from: Date()),
+        ]
+        if let h = headlineIndex { row["headline_index"] = h }
+        try await restWrite(
+            table: "daily_progress", body: [row],
+            prefer: "resolution=merge-duplicates,return=minimal",
+            query: [URLQueryItem(name: "on_conflict", value: "user_id,day")]
+        )
+    }
+
+    func upsertStreak(_ s: StreakState) async throws {
+        guard let id = userID else { throw SupabaseError.notSignedIn }
+        var row: [String: Any] = [
+            "user_id": id,
+            "current_streak": s.current, "longest_streak": s.longest,
+            "freezes": s.freezes,
+            "updated_at": Self.iso.string(from: Date()),
+        ]
+        if let last = s.lastActiveDay { row["last_active_day"] = Self.dayString(last) }
+        try await restWrite(
+            table: "streaks", body: [row],
+            prefer: "resolution=merge-duplicates,return=minimal",
+            query: [URLQueryItem(name: "on_conflict", value: "user_id")]
+        )
+    }
+
+    // MARK: Reads
+
+    func fetchProfile() async throws -> ProfileRow? {
+        guard let id = userID else { throw SupabaseError.notSignedIn }
+        let data = try await restRead(table: "profiles", query: [
+            URLQueryItem(name: "id", value: "eq.\(id)"),
+            URLQueryItem(name: "select", value: "*"),
+            URLQueryItem(name: "limit", value: "1"),
+        ])
+        return try JSONDecoder().decode([ProfileRow].self, from: data).first
+    }
+
+    func fetchDifficulty() async throws -> [DifficultyRow] {
+        let data = try await restRead(table: "game_difficulty", query: [
+            URLQueryItem(name: "select", value: "*"),
+        ])
+        return try JSONDecoder().decode([DifficultyRow].self, from: data)
+    }
+
+    func fetchDailyProgress(since day: String) async throws -> [DailyProgressRow] {
+        let data = try await restRead(table: "daily_progress", query: [
+            URLQueryItem(name: "select", value: "*"),
+            URLQueryItem(name: "day", value: "gte.\(day)"),
+            URLQueryItem(name: "order", value: "day.asc"),
+        ])
+        return try JSONDecoder().decode([DailyProgressRow].self, from: data)
+    }
+
+    func fetchStreak() async throws -> StreakRow? {
+        let data = try await restRead(table: "streaks", query: [
+            URLQueryItem(name: "select", value: "*"),
+            URLQueryItem(name: "limit", value: "1"),
+        ])
+        return try JSONDecoder().decode([StreakRow].self, from: data).first
+    }
+
+    static func dayString(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
     }
 
     // MARK: - Networking
@@ -328,6 +483,29 @@ final class SupabaseManager {
             let status = (response as? HTTPURLResponse)?.statusCode ?? -1
             throw SupabaseError.message(Self.errorMessage(from: data, status: status))
         }
+    }
+
+    /// GET twin of restWrite. RLS scopes every read to the signed-in user.
+    private func restRead(table: String, query: [URLQueryItem]) async throws -> Data {
+        guard let token = await validAccessToken() else { throw SupabaseError.notSignedIn }
+        var comps = URLComponents(
+            url: SupabaseConfig.url.appendingPathComponent("rest/v1/\(table)"),
+            resolvingAgainstBaseURL: false
+        )!
+        if !query.isEmpty { comps.queryItems = query }
+
+        var req = URLRequest(url: comps.url!)
+        req.httpMethod = "GET"
+        req.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let (data, response) = try await URLSession.shared.data(for: req)
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw SupabaseError.message(Self.errorMessage(from: data, status: status))
+        }
+        return data
     }
 
     // MARK: - Helpers

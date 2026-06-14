@@ -9,41 +9,38 @@ import SwiftUI
 
 struct ContentView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+    @Environment(AppModel.self) private var app
 
     var body: some View {
         if hasCompletedOnboarding {
-            HomePlaceholder {
-                hasCompletedOnboarding = false
+            switch app.load {
+            case .ready:
+                RootShell()
+            case .idle:
+                SplashView()
+                    .onAppear { app.bootstrap() }
             }
         } else {
             OnboardingView {
                 hasCompletedOnboarding = true
+                app.bootstrap()
             }
         }
     }
 }
 
-/// Stand-in for the main app until it exists.
-private struct HomePlaceholder: View {
-    var resetOnboarding: () -> Void
-
+/// Branded loader shown only while the cache hydrates (sub-second in practice).
+struct SplashView: View {
     var body: some View {
         ZStack {
             Color.witsBg.ignoresSafeArea()
-            VStack(spacing: 20) {
-                LogoBlob(size: 64, breathe: true)
-                Text("welcome to wits")
-                    .font(.witsDisplay(28))
-                    .foregroundStyle(Color.witsInk)
-                Text("the main app goes here.")
-                    .font(.witsBody(16))
-                    .foregroundStyle(Color.witsMuted)
-                QuietButton(title: "replay onboarding", action: resetOnboarding)
-            }
+            LogoBlob(size: 64, breathe: true)
         }
     }
 }
 
 #Preview {
     ContentView()
+        .environment(SupabaseManager.shared)
+        .environment(AppModel(supa: .shared))
 }

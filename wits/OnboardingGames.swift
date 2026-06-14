@@ -92,152 +92,40 @@ struct ExplainScreen: View {
     }
 }
 
-// MARK: - Shared game scaffolding
-
-private enum GamePhase {
-    case intro, tutorial, ready, playing
-}
-
-private struct GameTopTag: View {
-    var text: String
-    var body: some View {
-        HStack {
-            Wordmark()
-            Spacer()
-            Text(text)
-                .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.witsFaint)
-        }
-    }
-}
-
-/// Hero panel for the pre-game explainer: fixed navy stage with soft accent
-/// glows, so the teal illustration reads the same in light and dark mode.
-private struct HeroPanel<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: [Color(light: 0x243155, dark: 0x232E55), Color(light: 0x161F3A, dark: 0x141B33)],
-                startPoint: .top, endPoint: .bottom
-            )
-            Circle()
-                .fill(Color.witsAccent.opacity(0.10))
-                .frame(width: 220, height: 220)
-                .offset(x: -110, y: -80)
-            Circle()
-                .fill(Color.witsAccent.opacity(0.08))
-                .frame(width: 180, height: 180)
-                .offset(x: 130, y: 90)
-            content
-        }
-        .frame(height: 195)
-        .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
-        .shadow(color: .witsShadow, radius: 10, y: 6)
-    }
-}
-
-/// Pre-game explainer card: hero illustration, "X tests your Y" headline,
-/// how it plays, and what it measures.
-private struct GameExplainer<Hero: View>: View {
-    var tag: String
-    var title: String
-    var skill: String
-    var how: String
-    var why: String
-    var onStart: () -> Void
-    @ViewBuilder var hero: Hero
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            GameTopTag(text: tag)
-                .padding(.bottom, 18)
-            HeroPanel { hero }
-                .rise()
-            ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("\(title) tests your \(Text(skill).foregroundStyle(Color.witsAccent)).")
-                        .font(.witsDisplay(27))
-                        .foregroundStyle(Color.witsInk)
-                        .rise(0.08)
-                    Text(how)
-                        .font(.witsBody(15.5))
-                        .foregroundStyle(Color.witsMuted)
-                        .rise(0.16)
-                    Text(why)
-                        .font(.witsBody(15.5))
-                        .foregroundStyle(Color.witsMuted)
-                        .rise(0.22)
-                }
-                .padding(.top, 22)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Cta(title: "start tutorial", action: onStart)
-                .rise(0.3)
-                .padding(.top, 16)
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 12)
-    }
-}
-
-/// "Nice work" interstitial between tutorial and the scored run.
-private struct GameReady: View {
-    var onPlay: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            VStack(spacing: 14) {
-                Text("you've got it")
-                    .font(.witsDisplay(28))
-                    .foregroundStyle(Color.witsInk)
-                Text("now it counts. respond as quickly as possible while avoiding mistakes.")
-                    .font(.witsBody(16))
-                    .foregroundStyle(Color.witsMuted)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(28)
-            .frame(maxWidth: .infinity)
-            .cardSurface()
-            .rise()
-            Spacer()
-            Cta(title: "let's play", action: onPlay)
-                .rise(0.15)
-                .padding(.top, 16)
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 12)
-    }
-}
-
-private struct TutorialHint: View {
-    var text: String
-    var body: some View {
-        Text(text)
-            .font(.witsBody(14, weight: .semibold))
-            .foregroundStyle(Color.witsMuted)
-            .multilineTextAlignment(.center)
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-    }
-}
-
 // MARK: - Test 1: arrow storm (flanker task)
 // Five arrows. Only the middle one matters; the flankers usually disagree.
 // An adaptive response deadline tightens as you streak — too slow counts
 // as a miss. Based on the Eriksen flanker paradigm (1974).
 
 struct FlankerScreen: View {
-    var onComplete: (FlankerStats) -> Void
+    /// nil → onboarding fit-test mode (intro + tutorial). non-nil → main-app
+    /// workout mode: skip straight to a difficulty-seeded scored run.
+    var cfg: GameConfig?
+    var onResult: ((GameResult) -> Void)?
+    var onComplete: ((FlankerStats) -> Void)?
+
+    init(cfg: GameConfig? = nil,
+         onResult: ((GameResult) -> Void)? = nil,
+         onComplete: ((FlankerStats) -> Void)? = nil) {
+        self.cfg = cfg
+        self.onResult = onResult
+        self.onComplete = onComplete
+        _phase = State(initialValue: cfg == nil ? .intro : .playing)
+        if let cfg {
+            _window = State(initialValue: Self.seededWindow(cfg.difficulty.level))
+            _trial = State(initialValue: Self.makeTrial())
+        }
+    }
 
     private static let gameSeconds = 45.0
     private static let maxWindow = 1.4
     private static let minWindow = 0.75
+
+    /// Higher level → tighter starting deadline (harder).
+    private static func seededWindow(_ level: Double) -> Double {
+        max(minWindow, maxWindow - level * 0.08)
+    }
+    private var startedAt = Date()
 
     private struct Trial: Identifiable {
         let id = UUID()
@@ -513,9 +401,25 @@ struct FlankerScreen: View {
                 guard !finished else { return }
                 finished = true
                 try? await Task.sleep(for: .milliseconds(350))
-                onComplete(stats)
+                finish()
                 return
             }
+        }
+    }
+
+    private func finish() {
+        if let onResult {
+            let total = stats.right + stats.wrong
+            let acc = total > 0 ? Double(stats.right) / Double(total) : 0
+            var r = GameResult(game: .arrowStorm, score: stats.score, accuracy: acc)
+            r.trials = total
+            r.threshold = window
+            r.startedAt = startedAt
+            r.durationMs = Int(Self.gameSeconds * 1000)
+            r.raw = ["bestStreak": Double(stats.bestStreak)]
+            onResult(r)
+        } else {
+            onComplete?(stats)
         }
     }
 }
@@ -526,7 +430,20 @@ struct FlankerScreen: View {
 // the dots freeze. Based on the multiple-object-tracking paradigm (1988).
 
 struct TrackerScreen: View {
-    var onComplete: (TrackStats) -> Void
+    var cfg: GameConfig?
+    var onResult: ((GameResult) -> Void)?
+    var onComplete: ((TrackStats) -> Void)?
+
+    init(cfg: GameConfig? = nil,
+         onResult: ((GameResult) -> Void)? = nil,
+         onComplete: ((TrackStats) -> Void)? = nil) {
+        self.cfg = cfg
+        self.onResult = onResult
+        self.onComplete = onComplete
+        _phase = State(initialValue: cfg == nil ? .intro : .playing)
+    }
+
+    private var startedAt = Date()
 
     // (targets, dots, unit speed) per scored round
     private static let rounds: [(targets: Int, dots: Int, speed: Double)] = [
@@ -658,6 +575,7 @@ struct TrackerScreen: View {
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.top, 24)
         .padding(.bottom, 12)
+        .onAppear { if cfg != nil && dots.isEmpty { startRound() } }
     }
 
     private func dotView(_ dot: Dot) -> some View {
@@ -713,11 +631,25 @@ struct TrackerScreen: View {
             if isTutorial {
                 phase = .ready
             } else if round + 1 >= Self.rounds.count {
-                onComplete(stats)
+                finish()
             } else {
                 round += 1
                 startRound()
             }
+        }
+    }
+
+    private func finish() {
+        if let onResult {
+            let acc = stats.totalTargets > 0 ? Double(stats.correctPicks) / Double(stats.totalTargets) : 0
+            var r = GameResult(game: .crowdControl, score: stats.correctPicks * 250, accuracy: acc)
+            r.trials = stats.rounds
+            r.threshold = Double(stats.perfectRounds)
+            r.startedAt = startedAt
+            r.raw = ["perfectRounds": Double(stats.perfectRounds), "totalTargets": Double(stats.totalTargets)]
+            onResult(r)
+        } else {
+            onComplete?(stats)
         }
     }
 
@@ -814,7 +746,20 @@ struct TrackerScreen: View {
 // Corsi block-tapping task.
 
 struct SpanScreen: View {
-    var onComplete: (SpanStats) -> Void
+    var cfg: GameConfig?
+    var onResult: ((GameResult) -> Void)?
+    var onComplete: ((SpanStats) -> Void)?
+
+    init(cfg: GameConfig? = nil,
+         onResult: ((GameResult) -> Void)? = nil,
+         onComplete: ((SpanStats) -> Void)? = nil) {
+        self.cfg = cfg
+        self.onResult = onResult
+        self.onComplete = onComplete
+        _phase = State(initialValue: cfg == nil ? .intro : .playing)
+    }
+
+    private var startedAt = Date()
 
     private static let totalTrials = 8
     private static let columns = 4
@@ -940,6 +885,7 @@ struct SpanScreen: View {
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.top, 24)
         .padding(.bottom, 12)
+        .onAppear { if cfg != nil && seq.isEmpty { startTrial(reset: true) } }
     }
 
     private func ordinal(_ n: Int) -> String {
@@ -1018,7 +964,7 @@ struct SpanScreen: View {
     private func startTrial(reset: Bool) {
         if reset {
             stats = SpanStats()
-            span = inTutorial ? 2 : 3
+            span = inTutorial ? 2 : min(6, 3 + Int((cfg?.difficulty.level ?? 0) / 2))
             trial = 1
         }
         generation += 1
@@ -1090,11 +1036,25 @@ struct SpanScreen: View {
             }
             span = perfect ? min(7, span + 1) : max(2, span - 1)
             if trial >= Self.totalTrials {
-                onComplete(stats)
+                finish()
             } else {
                 trial += 1
                 startTrial(reset: false)
             }
+        }
+    }
+
+    private func finish() {
+        if let onResult {
+            let acc = stats.totalTaps > 0 ? Double(stats.correctTaps) / Double(stats.totalTaps) : 0
+            var r = GameResult(game: .echoGrid, score: stats.score, accuracy: acc)
+            r.trials = stats.trials
+            r.threshold = Double(stats.maxSpan)
+            r.startedAt = startedAt
+            r.raw = ["maxSpan": Double(stats.maxSpan), "perfectTrials": Double(stats.perfectTrials)]
+            onResult(r)
+        } else {
+            onComplete?(stats)
         }
     }
 }
