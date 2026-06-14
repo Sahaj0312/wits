@@ -21,15 +21,18 @@ struct GameHost: View {
     /// Dismiss without finishing (user backs out).
     let onQuit: () -> Void
 
-    private enum Stage: Equatable { case playing, interstitial, summary }
+    private enum Stage: Equatable { case playing, bonus, interstitial, summary }
 
     @State private var index = 0
     @State private var stage: Stage = .interstitial
     @State private var results: [GameResult] = []
+    @State private var bonusValue: Int?
 
     private var currentGame: GameID? {
         index < workout.games.count ? workout.games[index] : nil
     }
+
+    private var daySeed: UInt64 { RewardEngine.daySeed(workout.day) }
 
     var body: some View {
         ZStack {
@@ -55,6 +58,7 @@ struct GameHost: View {
     private var stageKey: String {
         switch stage {
         case .playing: "play-\(index)"
+        case .bonus: "bonus-\(index)"
         case .interstitial: "inter-\(index)"
         case .summary: "summary"
         }
@@ -76,6 +80,8 @@ struct GameHost: View {
             } else {
                 Color.clear.onAppear { stage = .summary }
             }
+        case .bonus:
+            bonusView
         case .interstitial:
             interstitial
         case .summary:
@@ -83,6 +89,33 @@ struct GameHost: View {
                 onWorkoutDone(results)
             }
         }
+    }
+
+    private var bonusView: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            VStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 44, weight: .heavy))
+                    .foregroundStyle(Color.witsWarm)
+                Text("surprise ×\(bonusValue ?? 2)")
+                    .font(.witsDisplay(32))
+                    .foregroundStyle(Color.witsInk)
+                Text("lucky round — your score for that game just got multiplied.")
+                    .font(.witsBody(15.5))
+                    .foregroundStyle(Color.witsMuted)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(28)
+            .frame(maxWidth: .infinity)
+            .cardSurface()
+            .rise()
+            Spacer()
+            Cta(title: "nice") { withAnimation { proceed() } }
+                .rise(0.12)
+        }
+        .padding(.horizontal, WitsMetrics.screenPadding)
+        .padding(.vertical, 12)
     }
 
     /// Endowed-progress dots: completed games already filled when this game starts.
@@ -135,13 +168,27 @@ struct GameHost: View {
     }
 
     private func handle(_ result: GameResult) {
-        results.append(result)
-        onGameResult(result)
+        var r = result
+        let bonus = RewardEngine.bonus(seed: daySeed, index: index)
+        if let bonus { r.score *= bonus }
+        results.append(r)
+        onGameResult(r)
+        if let bonus {
+            bonusValue = bonus
+            withAnimation { stage = .bonus }
+        } else {
+            withAnimation { proceed() }
+        }
+    }
+
+    /// Advance to the next game's lead-in, or the summary.
+    private func proceed() {
+        bonusValue = nil
         if index + 1 < workout.games.count {
             index += 1
-            withAnimation { stage = .interstitial }
+            stage = .interstitial
         } else {
-            withAnimation { stage = .summary }
+            stage = .summary
         }
     }
 }

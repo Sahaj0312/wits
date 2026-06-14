@@ -55,8 +55,17 @@ final class AppModel {
         rebuildTodayIfNeeded()
         recomputeEntitlement()
         refreshReminderSchedule()
+        seedFreezesIfNew()
         load = .ready
         Task { await reconcile() }
+    }
+
+    /// New users start with two streak freezes to clear the fragile 7-day hump.
+    private func seedFreezesIfNew() {
+        guard !UserDefaults.standard.bool(forKey: "wits.freezesSeeded") else { return }
+        if streak.lastActiveDay == nil { streak.freezes = max(streak.freezes, 2) }
+        UserDefaults.standard.set(true, forKey: "wits.freezesSeeded")
+        saveCache()
     }
 
     /// Foreground / midnight: resolve streak grace and refresh the day's workout.
@@ -125,6 +134,25 @@ final class AppModel {
             try? await supa.saveSession(r, source: source)
             try? await supa.upsertDifficulty(game: id, next)
         }
+    }
+
+    // MARK: Daily challenge (surprise extra game → earns a streak freeze)
+
+    var dailyChallengeGame: GameID? {
+        RewardEngine.dailyChallenge(seed: RewardEngine.daySeed(Calendar.current.startOfDay(for: Date())))
+    }
+
+    private var challengeKey: String { "wits.challengeDone." + SupabaseManager.dayString(Date()) }
+
+    var dailyChallengeDone: Bool { UserDefaults.standard.bool(forKey: challengeKey) }
+
+    func completeDailyChallenge(_ result: GameResult) {
+        recordGameResult(result, source: "challenge")
+        guard !dailyChallengeDone else { return }
+        UserDefaults.standard.set(true, forKey: challengeKey)
+        streak.freezes = min(3, streak.freezes + 1)
+        saveCache()
+        Task { try? await supa.upsertStreak(streak) }
     }
 
     /// Called once the full workout completes: tick the streak + roll up the day.

@@ -13,6 +13,7 @@ struct TodayView: View {
     @Environment(AppModel.self) private var app
     @State private var playing = false
     @State private var showPrimer = false
+    @State private var challengeGame: GameID?
     @AppStorage("notifPrimerAsked") private var notifPrimerAsked = false
 
     private var greeting: String {
@@ -33,6 +34,9 @@ struct TodayView: View {
                     doneCard.padding(.top, 22)
                 } else {
                     workoutCard.padding(.top, 22)
+                }
+                if let g = app.dailyChallengeGame, !app.dailyChallengeDone {
+                    challengeCard(g).padding(.top, 14)
                 }
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
@@ -60,6 +64,47 @@ struct TodayView: View {
         .sheet(isPresented: $showPrimer) {
             NotificationPrimer()
         }
+        .fullScreenCover(item: $challengeGame) { g in
+            GameHost(
+                workout: DailyWorkout(day: app.today.day, games: [g]),
+                difficultyFor: app.difficultyFor,
+                onGameResult: { _ in },
+                onWorkoutDone: { results in
+                    if let r = results.first { app.completeDailyChallenge(r) }
+                    challengeGame = nil
+                },
+                onQuit: { challengeGame = nil }
+            )
+        }
+    }
+
+    private func challengeCard(_ g: GameID) -> some View {
+        Button { challengeGame = g } label: {
+            HStack(spacing: 14) {
+                Image(systemName: "gift.fill")
+                    .font(.system(size: 18, weight: .heavy))
+                    .foregroundStyle(Color.witsWarm)
+                    .frame(width: 44, height: 44)
+                    .background(Color.witsWarm.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("surprise challenge")
+                        .font(.system(size: 15.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                    Text("one round of \(g.displayName) · earns a streak freeze")
+                        .font(.system(size: 13, weight: .medium, design: .rounded))
+                        .foregroundStyle(Color.witsMuted)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(Color.witsFaint)
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardSurface()
+        }
+        .buttonStyle(.plain)
+        .rise(0.1)
     }
 
     private var header: some View {
@@ -84,6 +129,11 @@ struct TodayView: View {
                 .font(.system(size: 16, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.witsInk)
                 .monospacedDigit()
+            if app.streak.freezes > 0 {
+                Image(systemName: "snowflake")
+                    .font(.system(size: 12, weight: .heavy))
+                    .foregroundStyle(Color.witsAccent)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
