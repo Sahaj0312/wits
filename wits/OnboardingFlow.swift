@@ -202,11 +202,14 @@ struct OnboardingView: View {
         case .hook:
             HookScreen(onNext: next)
         case .auth:
-            AuthScreen(onAuthed: next)
+            AuthScreen(onAuthed: {
+                supa.recordCheckpoint(.accountCreated)
+                next()
+            })
         case .birthdate:
             BirthdateScreen { date in
                 data.birthdate = date
-                push(["birthdate": Self.dateString(date)])
+                supa.recordCheckpoint(.birthdate, merging: ["birthdate": Self.dateString(date)])
                 next()
             }
         case .welcome:
@@ -214,7 +217,7 @@ struct OnboardingView: View {
         case .goals:
             GoalsScreen { picked in
                 data.goals = picked
-                push(["goals": picked])
+                supa.recordCheckpoint(.goals, merging: ["goals": picked])
                 next()
             }
         case .calibrate:
@@ -222,7 +225,10 @@ struct OnboardingView: View {
         case .likert(let index):
             LikertScreen(index: index) { score in
                 data.likertAnswers[index] = score
-                if index == LikertScreen.statements.count - 1 { pushAssessment() }
+                if index == LikertScreen.statements.count - 1 {
+                    pushAssessment()
+                    supa.recordCheckpoint(.selfAssessment)
+                }
                 next()
             }
         case .stat:
@@ -232,25 +238,23 @@ struct OnboardingView: View {
         case .gender:
             GenderScreen { value in
                 data.gender = value
-                push(["gender": value])
                 next()
             }
         case .education:
             EducationScreen { value in
                 data.education = value
-                push(["education": value])
                 next()
             }
         case .attribution:
             AttributionScreen { value in
                 data.heardAbout = value
-                push(["heard_about": value])
                 next()
             }
         case .screenTime:
             ScreenTimeScreen { score in
                 data.screenTime = score
-                push(["screen_time": score])
+                // End of the demographics section — one write for the whole section.
+                supa.recordCheckpoint(.demographics, merging: demographicsFields)
                 next()
             }
         case .meetYou:
@@ -285,6 +289,7 @@ struct OnboardingView: View {
             SpanScreen { stats in
                 data.span = stats
                 pushScores()
+                supa.recordCheckpoint(.fitTest)
                 next()
             }
         case .explainSpan:
@@ -310,43 +315,62 @@ struct OnboardingView: View {
         case .difficulty:
             DifficultyScreen { value in
                 data.difficulty = value
-                push(["difficulty": value])
                 next()
             }
         case .coach:
-            CoachScreen(onNext: next)
+            CoachScreen { value in
+                data.encouragement = value
+                next()
+            }
         case .exercise:
             ExerciseScreen { value in
                 data.exerciseFreq = value
-                push(["exercise_freq": value])
                 next()
             }
         case .sleep:
             SleepScreen { value in
                 data.sleepHours = value
-                push(["sleep_hours": value])
                 next()
             }
         case .trainingDays:
             TrainingDaysScreen { value in
                 data.trainingDays = value
-                push(["training_days": value])
+                // End of the program-builder section — one write for the whole section.
+                supa.recordCheckpoint(.planBuilt, merging: programFields)
                 next()
             }
         case .planBuild:
             PlanBuildScreen(onNext: next)
         case .projection:
-            ProjectionScreen(result: computeResult(data), onNext: next)
+            ProjectionScreen(result: computeResult(data)) {
+                supa.recordCheckpoint(.reachedPaywall)
+                next()
+            }
         case .paywall:
             PaywallScreen(onClose: complete)
         }
     }
 
-    // MARK: - Persistence (best-effort; RLS-guarded)
+    // MARK: - Persistence (checkpoint-batched; best-effort; RLS-guarded)
 
-    private func push(_ fields: [String: Any]) {
-        guard supa.isSignedIn else { return }
-        Task { try? await supa.upsertProfile(fields) }
+    /// All demographic answers, written together at the section checkpoint.
+    private var demographicsFields: [String: Any] {
+        var f: [String: Any] = ["screen_time": data.screenTime]
+        if let g = data.gender { f["gender"] = g }
+        if let e = data.education { f["education"] = e }
+        if let h = data.heardAbout { f["heard_about"] = h }
+        return f
+    }
+
+    /// All program-builder answers, written together at the section checkpoint.
+    private var programFields: [String: Any] {
+        var f: [String: Any] = [:]
+        if let d = data.difficulty { f["difficulty"] = d }
+        if let e = data.encouragement { f["encouragement"] = e }
+        if let x = data.exerciseFreq { f["exercise_freq"] = x }
+        if let s = data.sleepHours { f["sleep_hours"] = s }
+        if let t = data.trainingDays { f["training_days"] = t }
+        return f
     }
 
     private func pushAssessment() {
@@ -378,9 +402,7 @@ struct OnboardingView: View {
     }
 
     private func complete() {
-        if supa.isSignedIn {
-            Task { try? await supa.upsertProfile(["onboarding_completed": true]) }
-        }
+        supa.recordCheckpoint(.completed)
         onFinished()
     }
 

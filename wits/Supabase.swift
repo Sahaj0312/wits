@@ -39,6 +39,34 @@ struct AuthSession: Codable {
     var isExpired: Bool { Date() >= expiresAt.addingTimeInterval(-60) }
 }
 
+/// Section boundaries in the onboarding flow. We record the furthest one each
+/// user reaches so drop-off can be measured without writing on every screen.
+enum OnboardingCheckpoint: Int, CaseIterable {
+    case accountCreated = 1
+    case birthdate
+    case goals
+    case selfAssessment
+    case demographics
+    case fitTest
+    case planBuilt
+    case reachedPaywall
+    case completed
+
+    var key: String {
+        switch self {
+        case .accountCreated: "account_created"
+        case .birthdate:      "birthdate"
+        case .goals:          "goals"
+        case .selfAssessment: "self_assessment"
+        case .demographics:   "demographics"
+        case .fitTest:        "fit_test"
+        case .planBuilt:      "plan_built"
+        case .reachedPaywall: "reached_paywall"
+        case .completed:      "completed"
+        }
+    }
+}
+
 enum SupabaseError: LocalizedError {
     case message(String)
     case notSignedIn
@@ -209,6 +237,20 @@ final class SupabaseManager {
             prefer: "resolution=merge-duplicates,return=minimal",
             query: [URLQueryItem(name: "on_conflict", value: "user_id,statement_idx")]
         )
+    }
+
+    /// Records the furthest onboarding section reached (fire-and-forget),
+    /// optionally folding in that section's collected data as one write.
+    func recordCheckpoint(_ cp: OnboardingCheckpoint, merging extra: [String: Any] = [:]) {
+        guard isSignedIn else { return }
+        var fields = extra
+        fields["onboarding_checkpoint"] = cp.key
+        fields["onboarding_checkpoint_index"] = cp.rawValue
+        if cp == .completed {
+            fields["onboarding_completed"] = true
+            fields["completed_at"] = ISO8601DateFormatter().string(from: Date())
+        }
+        Task { try? await upsertProfile(fields) }
     }
 
     func saveGameScores(_ rows: [[String: Any]]) async throws {

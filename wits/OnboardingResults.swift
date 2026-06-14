@@ -489,7 +489,7 @@ private struct RadioDot: View {
 // MARK: - Coaching style
 
 struct CoachScreen: View {
-    var onNext: () -> Void
+    var onAnswer: (String) -> Void
 
     private static let styles: [(label: String, sub: String)] = [
         ("high fives", "celebrate my progress and my wins."),
@@ -518,7 +518,7 @@ struct CoachScreen: View {
                         guard picked == nil else { return }
                         picked = i
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
-                            onNext()
+                            onAnswer(style.label)
                         }
                     }
                     .rise(0.16 + Double(i) * 0.08)
