@@ -47,16 +47,18 @@ struct PathKeeperScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("hop \(Text("\(min(trial, Self.totalTrials))").foregroundStyle(Color.witsAccent)) of \(Self.totalTrials)")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk).monospacedDigit()
-                Spacer()
-                Text("\(score) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted).monospacedDigit()
+            if !cfg.isSurvival {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("hop \(Text("\(min(trial, Self.totalTrials))").foregroundStyle(Color.witsAccent)) of \(Self.totalTrials)")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk).monospacedDigit()
+                    Spacer()
+                    Text("\(score) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted).monospacedDigit()
+                }
+                ProgressTrack(fraction: Double(trial - 1) / Double(Self.totalTrials), animated: true)
             }
-            ProgressTrack(fraction: Double(trial - 1) / Double(Self.totalTrials), animated: true)
             Spacer()
             GeometryReader { geo in
                 let gap: CGFloat = 10
@@ -147,9 +149,11 @@ struct PathKeeperScreen: View {
             rightTaps.insert(i)
             tapIndex += 1
             correctTaps += 1; score += 110
+            cfg.report(.hit, points: 110, combo: tapIndex)
             if tapIndex == seq.count { endTrial(perfect: true) }
         } else {
             wrongTap = i
+            cfg.report(.miss)
             endTrial(perfect: false)
         }
     }
@@ -164,7 +168,7 @@ struct PathKeeperScreen: View {
             try? await Task.sleep(for: .milliseconds(ok ? 800 : 1500))
             guard gen == generation else { return }
             len = ok ? min(9, len + 1) : max(2, len - 1)
-            if trial >= Self.totalTrials { finish() } else { trial += 1; startTrial() }
+            if !cfg.isSurvival && trial >= Self.totalTrials { finish() } else { trial += 1; startTrial() }
         }
     }
 

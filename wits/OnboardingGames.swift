@@ -542,7 +542,7 @@ struct TrackerScreen: View {
                 TutorialHint(text: roundPhase == .pick
                     ? "the dots froze. tap the \(config.targets) that were glowing at the start."
                     : "two dots glow, then blend in and wander. follow them with your eyes.")
-            } else {
+            } else if cfg?.isSurvival != true {
                 HStack(alignment: .firstTextBaseline) {
                     Text("round \(Text("\(min(round + 1, Self.rounds.count))").foregroundStyle(Color.witsAccent)) of \(Self.rounds.count)")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
@@ -626,7 +626,9 @@ struct TrackerScreen: View {
             stats.correctPicks += correct
             stats.totalTargets += config.targets
             stats.rounds += 1
-            if correct == config.targets { stats.perfectRounds += 1 }
+            let perfect = correct == config.targets
+            if perfect { stats.perfectRounds += 1 }
+            cfg?.report(perfect ? .hit : .miss, points: correct * 80, combo: stats.perfectRounds)
         }
         roundPhase = .reveal
         let gen = generation
@@ -635,10 +637,10 @@ struct TrackerScreen: View {
             guard gen == generation else { return }
             if isTutorial {
                 phase = .ready
-            } else if round + 1 >= Self.rounds.count {
+            } else if cfg?.isSurvival != true && round + 1 >= Self.rounds.count {
                 finish()
             } else {
-                round += 1
+                round = (round + 1) % Self.rounds.count   // cycle rounds endlessly in survival
                 startRound()
             }
         }
@@ -848,7 +850,7 @@ struct SpanScreen: View {
                 TutorialHint(text: trialPhase == .recall
                     ? "now play it back in reverse — tap the \(ordinal(seq.count)) tile first, the first tile last."
                     : "watch the order. you'll answer backwards.")
-            } else {
+            } else if cfg?.isSurvival != true {
                 HStack(alignment: .firstTextBaseline) {
                     Text("trial \(Text("\(min(trial, Self.totalTrials))").foregroundStyle(Color.witsAccent)) of \(Self.totalTrials)")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
@@ -1011,10 +1013,12 @@ struct SpanScreen: View {
             if !inTutorial {
                 stats.correctTaps += 1
                 stats.score += 120
+                cfg?.report(.hit, points: 120, combo: tapIndex)
             }
             if tapIndex == seq.count { endTrial(perfect: true) }
         } else {
             wrongTap = i
+            if !inTutorial { cfg?.report(.miss) }
             endTrial(perfect: false)
         }
     }
@@ -1040,7 +1044,7 @@ struct SpanScreen: View {
                 return
             }
             span = perfect ? min(7, span + 1) : max(2, span - 1)
-            if trial >= Self.totalTrials {
+            if cfg?.isSurvival != true && trial >= Self.totalTrials {
                 finish()
             } else {
                 trial += 1
