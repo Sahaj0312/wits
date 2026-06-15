@@ -18,9 +18,20 @@ struct SurvivalHost: View {
     let onRunComplete: (Int, Int) -> Void
     let onQuit: () -> Void
 
+    init(game: GameID, seedDifficulty: DifficultyState, stats: GameStats?,
+         onRunComplete: @escaping (Int, Int) -> Void, onQuit: @escaping () -> Void,
+         startImmediately: Bool = false) {
+        self.game = game
+        self.seedDifficulty = seedDifficulty
+        self.stats = stats
+        self.onRunComplete = onRunComplete
+        self.onQuit = onQuit
+        _phase = State(initialValue: startImmediately ? .playing : .card)
+    }
+
     private enum Phase: Equatable { case card, playing, gameOver }
 
-    @State private var phase: Phase = .card
+    @State private var phase: Phase
     @State private var runID = 0
     @State private var lives = 3
     @State private var score = 0

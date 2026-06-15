@@ -10,7 +10,7 @@ import SwiftUI
 
 struct GamesLibraryView: View {
     @Environment(AppModel.self) private var app
-    @State private var freePlay: GameID?
+    @State private var launch: GameID?
     @State private var showPaywall = false
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
@@ -37,14 +37,8 @@ struct GamesLibraryView: View {
             .padding(.bottom, 24)
         }
         .background(Color.witsBg.ignoresSafeArea())
-        .fullScreenCover(item: $freePlay) { g in
-            GameHost(
-                workout: DailyWorkout(day: app.today.day, games: [g]),
-                difficultyFor: app.difficultyFor,
-                onGameResult: { app.recordGameResult($0, source: "free_play") },
-                onWorkoutDone: { _ in freePlay = nil },
-                onQuit: { freePlay = nil }
-            )
+        .fullScreenCover(item: $launch) { g in
+            GameLauncher(game: g)
         }
         .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
     }
@@ -52,7 +46,7 @@ struct GamesLibraryView: View {
     private func card(_ g: GameID) -> some View {
         Button {
             guard g.isLive else { return }
-            if app.entitlement.isExpired { showPaywall = true } else { freePlay = g }
+            if app.entitlement.isExpired { showPaywall = true } else { launch = g }
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: g.symbol)
@@ -75,5 +69,58 @@ struct GamesLibraryView: View {
         }
         .buttonStyle(.plain)
         .disabled(!g.isLive)
+    }
+}
+
+/// Pre-game chooser: the card with Train vs Survival, then runs the chosen mode
+/// in a single full-screen cover (no double card).
+private struct GameLauncher: View {
+    let game: GameID
+    @Environment(AppModel.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    @State private var phase: Phase = .card
+
+    private enum Phase { case card, train, survival }
+
+    var body: some View {
+        switch phase {
+        case .card:
+            GameCard(
+                game: game,
+                stats: app.gameStats[game],
+                primaryTitle: "train",
+                onPlay: { phase = .train },
+                onBack: { dismiss() },
+                onSurvival: { phase = .survival }
+            )
+        case .train:
+            ZStack {
+                Color.witsBg.ignoresSafeArea()
+                makeGameView(game, config: .standard(game, difficulty: app.difficultyFor(game), freePlay: true)) { r in
+                    app.recordGameResult(r, source: "free_play")
+                    dismiss()
+                }
+            }
+            .overlay(alignment: .topLeading) {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(Color.witsFaint)
+                        .padding(12)
+                }
+                .padding(.top, 44)
+            }
+            .onAppear { GameFeel.shared.warmUp() }
+            .onDisappear { GameFeel.shared.teardown() }
+        case .survival:
+            SurvivalHost(
+                game: game,
+                seedDifficulty: app.difficultyFor(game),
+                stats: app.gameStats[game],
+                onRunComplete: { score, trials in app.recordSurvivalRun(game: game, score: score, trials: trials) },
+                onQuit: { dismiss() },
+                startImmediately: true
+            )
+        }
     }
 }
