@@ -36,7 +36,13 @@ enum Entitlement: Equatable {
 enum EntitlementEngine {
     static let trialDays = 3
 
+    /// Hard paywall switch. Off for now — everyone gets full access while
+    /// subscriptions are migrated to RevenueCat. Flip to `true` (and wire the
+    /// RevenueCat entitlement into AppModel.applySubscription) to enforce again.
+    static let paywallEnabled = false
+
     static func evaluate(trialStartedAt: Date?, subscriptionUntil: Date?, now: Date = Date()) -> Entitlement {
+        guard paywallEnabled else { return .subscribed(until: .distantFuture) }
         if let sub = subscriptionUntil, sub > now { return .subscribed(until: sub) }
         if let start = trialStartedAt {
             let end = Calendar.current.date(byAdding: .day, value: trialDays, to: start) ?? start

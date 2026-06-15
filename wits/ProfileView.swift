@@ -18,7 +18,7 @@ struct ProfileView: View {
         switch app.entitlement {
         case .unknown: "—"
         case .trial: "\(app.entitlement.trialDaysLeft)-day trial"
-        case .subscribed: "subscribed"
+        case .subscribed: "full access"
         case .expired: "trial ended"
         }
     }
