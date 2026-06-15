@@ -41,16 +41,18 @@ struct EstimatorScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("round \(Text("\(min(trial, Self.totalTrials))").foregroundStyle(Color.witsAccent)) of \(Self.totalTrials)")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk).monospacedDigit()
-                Spacer()
-                Text("\(score) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted).monospacedDigit()
+            if !cfg.isSurvival {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("round \(Text("\(min(trial, Self.totalTrials))").foregroundStyle(Color.witsAccent)) of \(Self.totalTrials)")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk).monospacedDigit()
+                    Spacer()
+                    Text("\(score) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted).monospacedDigit()
+                }
+                ProgressTrack(fraction: Double(trial - 1) / Double(Self.totalTrials), animated: true)
             }
-            ProgressTrack(fraction: Double(trial - 1) / Double(Self.totalTrials), animated: true)
             Spacer()
             HStack(spacing: 12) {
                 panel(dots: leftDots, side: false)
@@ -131,14 +133,19 @@ struct EstimatorScreen: View {
         guard step == .answer else { return }
         let ok = side == leftBigger
         lastCorrect = ok
-        if ok { right += 1; streak += 1; bestStreak = max(bestStreak, streak); score += 100 * min(5, 1 + streak / 3) }
-        else { wrong += 1; streak = 0 }
+        if ok {
+            right += 1; streak += 1; bestStreak = max(bestStreak, streak); score += 100 * min(5, 1 + streak / 3)
+            cfg.report(.hit, points: 100, combo: streak)
+        } else {
+            wrong += 1; streak = 0
+            cfg.report(.miss)
+        }
         step = .feedback
         let gen = generation
         Task {
-            try? await Task.sleep(for: .milliseconds(700))
+            try? await Task.sleep(for: .milliseconds(cfg.isSurvival ? 450 : 700))
             guard gen == generation else { return }
-            if trial >= Self.totalTrials { finish() } else { trial += 1; newTrial() }
+            if !cfg.isSurvival && trial >= Self.totalTrials { finish() } else { trial += 1; newTrial() }
         }
     }
 

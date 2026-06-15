@@ -191,9 +191,26 @@ final class AppModel {
 
     // MARK: Game / workout events
 
+    var survivalBest: (GameID) -> Int { { [gameStats] id in gameStats[id]?.survivalBest ?? 0 } }
+
+    /// Called when a survival run ends. Records the best + a tagged session, but
+    /// NEVER touches the adaptive staircase (survival must not move difficulty).
+    func recordSurvivalRun(game id: GameID, score: Int, trials: Int) {
+        var st = gameStats[id] ?? GameStats()
+        st.survivalRuns += 1
+        st.survivalBest = max(st.survivalBest, score)
+        gameStats[id] = st
+        saveCache()
+        var r = GameResult(game: id, score: score, accuracy: 0)
+        r.trials = trials
+        r.raw = ["survival": 1]
+        Task { try? await supa.saveSession(r, source: "survival") }
+    }
+
     /// Called as each game in a workout finishes: persist the run + advance the
     /// game's persisted difficulty.
     func recordGameResult(_ result: GameResult, source: String = "workout") {
+        assert(source != "survival", "survival runs must go through recordSurvivalRun (staircase must not move)")
         let id = result.game
         let current = difficulty[id] ?? .seed(for: id)
         let next = advanceDifficulty(for: id, current, accuracy: result.accuracy)

@@ -45,16 +45,18 @@ struct OddOneOutScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk).monospacedDigit()
-                Spacer()
-                Text("\(Int(ceil(timeLeft)))s")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted).monospacedDigit()
+            if !cfg.isSurvival {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk).monospacedDigit()
+                    Spacer()
+                    Text("\(Int(ceil(timeLeft)))s")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted).monospacedDigit()
+                }
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             }
-            ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             Spacer()
             GeometryReader { geo in
                 let gap: CGFloat = 8
@@ -97,10 +99,13 @@ struct OddOneOutScreen: View {
         if i == oddIndex {
             right += 1; streak += 1; bestStreak = max(bestStreak, streak)
             score += 100 * min(5, 1 + streak / 3)
+            cfg.report(.hit, points: 100, combo: streak)
             newRound()
         } else {
             wrong += 1; streak = 0
             wrongTap = i
+            // tapped a tile next to the odd one → "so close"
+            cfg.report(NearMiss.adjacent(i, oddIndex, cols: cols) ? .nearMiss : .miss)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { wrongTap = nil }
         }
     }
@@ -110,7 +115,7 @@ struct OddOneOutScreen: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(40))
             timeLeft = max(0, Self.gameSeconds - Date().timeIntervalSince(start))
-            if timeLeft <= 0 {
+            if !cfg.isSurvival && timeLeft <= 0 {
                 guard !finished else { return }
                 finished = true
                 try? await Task.sleep(for: .milliseconds(300))

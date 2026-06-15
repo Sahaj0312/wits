@@ -18,6 +18,8 @@ struct GameCard: View {
     var primaryTitle: String = "play"
     var onPlay: () -> Void
     var onBack: (() -> Void)? = nil
+    /// When set, shows a second "survival" action.
+    var onSurvival: (() -> Void)? = nil
     /// Optional content above the hero (e.g. workout progress dots).
     var accessory: AnyView? = nil
 
@@ -115,6 +117,9 @@ struct GameCard: View {
                 }
             }
             statRow("total plays", value: "\(stats?.totalPlays ?? 0)")
+            if let sv = stats?.survivalBest, sv > 0 {
+                statRow("survival best", value: "\(sv)")
+            }
         }
     }
 
@@ -134,18 +139,34 @@ struct GameCard: View {
     // MARK: Footer
 
     private var footer: some View {
-        HStack(spacing: 14) {
-            if let onBack {
-                Button(action: onBack) {
-                    HStack(spacing: 5) {
-                        Image(systemName: "chevron.left").font(.system(size: 12, weight: .heavy))
-                        Text("all games").font(.system(size: 13, weight: .bold, design: .rounded))
+        VStack(spacing: 10) {
+            HStack(spacing: 14) {
+                if let onBack {
+                    Button(action: onBack) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "chevron.left").font(.system(size: 12, weight: .heavy))
+                            Text("all games").font(.system(size: 13, weight: .bold, design: .rounded))
+                        }
+                        .foregroundStyle(Color.witsWarm)
+                    }
+                    .buttonStyle(.plain)
+                }
+                Cta(title: primaryTitle, action: onPlay)
+            }
+            if let onSurvival {
+                Button(action: onSurvival) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "flame.fill").font(.system(size: 13, weight: .heavy))
+                        Text("survival — 3 lives, no mercy")
+                            .font(.system(size: 14, weight: .bold, design: .rounded))
                     }
                     .foregroundStyle(Color.witsWarm)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 13)
+                    .background(Color.witsWarm.opacity(0.12), in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
-            Cta(title: primaryTitle, action: onPlay)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.top, 8)

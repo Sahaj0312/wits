@@ -78,23 +78,25 @@ struct TileShiftScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk).monospacedDigit()
-                if multiplier > 1 {
-                    Text("×\(multiplier)")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.witsAccent.opacity(0.14), in: Capsule())
+            if !cfg.isSurvival {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk).monospacedDigit()
+                    if multiplier > 1 {
+                        Text("×\(multiplier)")
+                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsAccent)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                    }
+                    Spacer()
+                    Text("\(Int(ceil(timeLeft)))s")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted).monospacedDigit()
                 }
-                Spacer()
-                Text("\(Int(ceil(timeLeft)))s")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted).monospacedDigit()
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             }
-            ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
 
             Text(round.byColor ? "MATCH THE COLOUR" : "MATCH THE SHAPE")
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
@@ -152,10 +154,12 @@ struct TileShiftScreen: View {
         if ok {
             right += 1; streak += 1; bestStreak = max(bestStreak, streak)
             score += 100 * multiplier
-            window = max(0.8, window - 0.03)
+            window = max(cfg.isSurvival ? 0.65 : 0.8, window - (cfg.isSurvival ? 0.05 : 0.03))
+            cfg.report(.hit, points: 100, combo: streak)
         } else {
             wrong += 1; streak = 0
             window = min(2.4, window + 0.2)
+            cfg.report(.miss)
         }
         feedback = ok
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { feedback = nil }
@@ -166,6 +170,7 @@ struct TileShiftScreen: View {
         guard !finished else { return }
         wrong += 1; streak = 0
         feedback = false
+        cfg.report(.timeout)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { feedback = nil }
         next()
     }
@@ -185,7 +190,7 @@ struct TileShiftScreen: View {
             let elapsed = Date().timeIntervalSince(trialStart)
             windowFrac = max(0, 1 - elapsed / window)
             if elapsed > window { timeout() }
-            if timeLeft <= 0 {
+            if !cfg.isSurvival && timeLeft <= 0 {
                 guard !finished else { return }
                 finished = true
                 try? await Task.sleep(for: .milliseconds(350))

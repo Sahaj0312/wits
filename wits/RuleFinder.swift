@@ -47,18 +47,20 @@ struct RuleFinderScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("puzzle \(Text("\(min(puzzle, Self.total))").foregroundStyle(Color.witsAccent)) of \(Self.total)")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .monospacedDigit()
-                Spacer()
-                Text("\(score) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
+            if !cfg.isSurvival {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("puzzle \(Text("\(min(puzzle, Self.total))").foregroundStyle(Color.witsAccent)) of \(Self.total)")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                        .monospacedDigit()
+                    Spacer()
+                    Text("\(score) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted)
+                        .monospacedDigit()
+                }
+                ProgressTrack(fraction: Double(puzzle - 1) / Double(Self.total), animated: true)
             }
-            ProgressTrack(fraction: Double(puzzle - 1) / Double(Self.total), animated: true)
 
             matrix
             Text("which figure completes the grid?")
@@ -206,13 +208,14 @@ struct RuleFinderScreen: View {
     private func pick(_ opt: Figure) {
         guard picked == nil else { return }
         picked = opt
-        if opt == answer { correct += 1; score += 150 }
+        if opt == answer { correct += 1; score += 150; cfg.report(.hit, points: 150, combo: correct) }
+        else { cfg.report(.miss) }
         generation += 1
         let gen = generation
         Task {
-            try? await Task.sleep(for: .milliseconds(800))
+            try? await Task.sleep(for: .milliseconds(cfg.isSurvival ? 500 : 800))
             guard gen == generation else { return }
-            if puzzle >= Self.total {
+            if !cfg.isSurvival && puzzle >= Self.total {
                 finish()
             } else {
                 puzzle += 1

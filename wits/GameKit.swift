@@ -245,6 +245,8 @@ struct GameStats: Codable {
     var bestScore: Int = 0
     var totalPlays: Int = 0
     var bestStat: Double? = nil
+    var survivalBest: Int = 0      // best survival run score (defaulted → old cache decodes)
+    var survivalRuns: Int = 0
 }
 
 // MARK: - Adaptive difficulty
@@ -301,15 +303,37 @@ struct GameResult: Codable, Equatable {
 
 // MARK: - Config
 
+enum GameMode: String, Codable { case workout, freePlay, survival }
+
+/// A single decision's outcome, emitted by a game in survival so the host can
+/// own lives/combo/score. `points` is the game's base points for that decision.
+struct TrialOutcome: Equatable {
+    enum Kind { case hit, miss, nearMiss, timeout }
+    var kind: Kind
+    var points: Int = 0
+}
+
 /// Parameters handed to a game at launch.
 struct GameConfig {
     var difficulty: DifficultyState
     var targetDurationSec: Double = 45
-    var isFreePlay: Bool = false
+    var mode: GameMode = .workout
     var rewardSeed: UInt64 = 0
+    /// Survival only: the game pushes each decision up; the host owns lives/score.
+    /// In survival, a game runs forever (no self-end) and self-escalates as it goes.
+    var onOutcome: ((TrialOutcome) -> Void)? = nil
+
+    /// Back-compat: existing call sites read `isFreePlay`.
+    var isFreePlay: Bool { mode == .freePlay }
+    var isSurvival: Bool { mode == .survival }
 
     static func standard(_ g: GameID, difficulty: DifficultyState, freePlay: Bool = false) -> GameConfig {
-        GameConfig(difficulty: difficulty, isFreePlay: freePlay)
+        GameConfig(difficulty: difficulty, mode: freePlay ? .freePlay : .workout)
+    }
+
+    static func survival(_ g: GameID, difficulty: DifficultyState,
+                         onOutcome: @escaping (TrialOutcome) -> Void) -> GameConfig {
+        GameConfig(difficulty: difficulty, mode: .survival, onOutcome: onOutcome)
     }
 }
 
