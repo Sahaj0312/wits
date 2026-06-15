@@ -58,6 +58,48 @@ enum RuleFinder: Game {
     }
 }
 
+enum NumberRush: Game {
+    static let id = GameID.numberRush
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(NumberRushScreen(cfg: config, onResult: onComplete))
+    }
+}
+
+enum Estimator: Game {
+    static let id = GameID.estimator
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(EstimatorScreen(cfg: config, onResult: onComplete))
+    }
+}
+
+enum OddOneOut: Game {
+    static let id = GameID.oddOneOut
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(OddOneOutScreen(cfg: config, onResult: onComplete))
+    }
+}
+
+enum TileShift: Game {
+    static let id = GameID.tileShift
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(TileShiftScreen(cfg: config, onResult: onComplete))
+    }
+}
+
+enum LastSeen: Game {
+    static let id = GameID.lastSeen
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(LastSeenScreen(cfg: config, onResult: onComplete))
+    }
+}
+
+enum PathKeeper: Game {
+    static let id = GameID.pathKeeper
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(PathKeeperScreen(cfg: config, onResult: onComplete))
+    }
+}
+
 /// Single dispatch the host uses to launch any game.
 @MainActor
 func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -69,7 +111,12 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .spotSpeed:   SpotSpeed.makeView(config: config, onComplete: onComplete)
     case .matchBack:   MatchBack.makeView(config: config, onComplete: onComplete)
     case .ruleFinder:  RuleFinder.makeView(config: config, onComplete: onComplete)
-    default:           AnyView(ComingSoonGame(id: id, onComplete: onComplete))
+    case .numberRush:  NumberRush.makeView(config: config, onComplete: onComplete)
+    case .estimator:   Estimator.makeView(config: config, onComplete: onComplete)
+    case .oddOneOut:   OddOneOut.makeView(config: config, onComplete: onComplete)
+    case .tileShift:   TileShift.makeView(config: config, onComplete: onComplete)
+    case .lastSeen:    LastSeen.makeView(config: config, onComplete: onComplete)
+    case .pathKeeper:  PathKeeper.makeView(config: config, onComplete: onComplete)
     }
 }
 
