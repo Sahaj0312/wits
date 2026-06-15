@@ -46,23 +46,12 @@ final class AppModel {
     var friends: [FriendInfo] = []
 
     let supa: SupabaseManager
-    let store = Store()
     private let cacheKey = "wits.appstate.v1"
 
     init(supa: SupabaseManager) {
         self.supa = supa
         self.today = WorkoutBuilder.build(for: Date())
         loadCache()
-        store.onExpiry = { [weak self] expiry in self?.applySubscription(until: expiry) }
-    }
-
-    /// Reflect an active StoreKit subscription into the entitlement gate + server.
-    func applySubscription(until: Date?) {
-        guard let until else { return }
-        profile.subscriptionUntil = until
-        recomputeEntitlement()
-        saveCache()
-        Task { try? await supa.upsertProfile(["subscription_until": ISO8601DateFormatter().string(from: until)]) }
     }
 
     // MARK: Lifecycle
@@ -76,7 +65,6 @@ final class AppModel {
         seedFreezesIfNew()
         load = .ready
         Task { await reconcile() }
-        Task { await store.load() }
         Task { await refreshLeague() }
         Task { await refreshSocial() }
     }
