@@ -69,25 +69,27 @@ struct ColorClashScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .monospacedDigit()
-                if multiplier > 1 {
-                    Text("×\(multiplier)")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.witsAccent.opacity(0.14), in: Capsule())
+            if !cfg.isSurvival {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                        .monospacedDigit()
+                    if multiplier > 1 {
+                        Text("×\(multiplier)")
+                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsAccent)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                    }
+                    Spacer()
+                    Text("\(Int(ceil(timeLeft)))s")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted)
+                        .monospacedDigit()
                 }
-                Spacer()
-                Text("\(Int(ceil(timeLeft)))s")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             }
-            ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             Spacer()
             if let trial {
                 VStack(spacing: 6) {
@@ -152,10 +154,12 @@ struct ColorClashScreen: View {
         if ok {
             right += 1; streak += 1; bestStreak = max(bestStreak, streak)
             score += 100 * multiplier
-            window = max(0.6, window - 0.02)
+            window = max(cfg.isSurvival ? 0.5 : 0.6, window - (cfg.isSurvival ? 0.035 : 0.02))
+            cfg.report(.hit, points: 100, combo: streak)
         } else {
             wrong += 1; streak = 0
             window = min(1.6, window + 0.1)
+            cfg.report(.miss)
         }
         feedback = ok
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
@@ -167,6 +171,7 @@ struct ColorClashScreen: View {
         wrong += 1; streak = 0
         window = min(1.6, window + 0.1)
         feedback = false
+        cfg.report(.timeout)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
         nextTrial()
     }
@@ -185,7 +190,7 @@ struct ColorClashScreen: View {
             let elapsed = Date().timeIntervalSince(trialStart)
             windowFrac = max(0, 1 - elapsed / window)
             if elapsed > window { timeout() }
-            if timeLeft <= 0 {
+            if !cfg.isSurvival && timeLeft <= 0 {
                 guard !finished else { return }
                 finished = true
                 try? await Task.sleep(for: .milliseconds(350))

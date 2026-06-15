@@ -272,26 +272,28 @@ struct FlankerScreen: View {
 
     private var playView: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(stats.score)").foregroundStyle(Color.witsAccent)) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .monospacedDigit()
-                if multiplier > 1 {
-                    Text("×\(multiplier)")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.witsAccent.opacity(0.14), in: Capsule())
+            if cfg?.isSurvival != true {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(Text("\(stats.score)").foregroundStyle(Color.witsAccent)) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                        .monospacedDigit()
+                    if multiplier > 1 {
+                        Text("×\(multiplier)")
+                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsAccent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                    }
+                    Spacer()
+                    Text("\(Int(ceil(timeLeft)))s")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted)
+                        .monospacedDigit()
                 }
-                Spacer()
-                Text("\(Int(ceil(timeLeft)))s")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             }
-            ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             Spacer()
             if let trial {
                 trialCard(trial)
@@ -360,11 +362,13 @@ struct FlankerScreen: View {
             streak += 1
             stats.bestStreak = max(stats.bestStreak, streak)
             stats.score += 100 * multiplier
-            window = max(Self.minWindow, window - 0.025)
+            window = max(cfg?.isSurvival == true ? 0.6 : Self.minWindow, window - (cfg?.isSurvival == true ? 0.04 : 0.025))
+            cfg?.report(.hit, points: 100, combo: streak)
         } else {
             stats.wrong += 1
             streak = 0
             window = min(Self.maxWindow, window + 0.12)
+            cfg?.report(.miss)
         }
         feedback = ok
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
@@ -377,6 +381,7 @@ struct FlankerScreen: View {
         streak = 0
         window = min(Self.maxWindow, window + 0.12)
         feedback = false
+        cfg?.report(.timeout)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
         nextTrial()
     }
@@ -397,7 +402,7 @@ struct FlankerScreen: View {
             let elapsed = Date().timeIntervalSince(trialStart)
             windowFrac = max(0, 1 - elapsed / window)
             if elapsed > window { timeout() }
-            if timeLeft <= 0 {
+            if cfg?.isSurvival != true && timeLeft <= 0 {
                 guard !finished else { return }
                 finished = true
                 try? await Task.sleep(for: .milliseconds(350))
