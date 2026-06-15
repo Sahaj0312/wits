@@ -23,6 +23,7 @@ struct GameHost: View {
 
     private enum Stage: Equatable { case playing, bonus, interstitial, summary }
 
+    @Environment(AppModel.self) private var app
     @State private var index = 0
     @State private var stage: Stage = .interstitial
     @State private var results: [GameResult] = []
@@ -43,7 +44,7 @@ struct GameHost: View {
         }
         .animation(.easeOut(duration: 0.25), value: stageKey)
         .overlay(alignment: .topLeading) {
-            if stage != .summary {
+            if stage == .playing {
                 Button(action: onQuit) {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .heavy))
@@ -130,41 +131,20 @@ struct GameHost: View {
         .padding(.horizontal, WitsMetrics.screenPadding)
     }
 
+    @ViewBuilder
     private var interstitial: some View {
-        let next = currentGame
-        let first = index == 0
-        return VStack(spacing: 0) {
-            progressDots.padding(.top, 8)
-            Spacer()
-            VStack(spacing: 14) {
-                Image(systemName: first ? (next?.symbol ?? "bolt.fill") : "checkmark.circle.fill")
-                    .font(.system(size: 42, weight: .heavy))
-                    .foregroundStyle(Color.witsAccent)
-                Text(first ? "first up" : "nice.")
-                    .font(.witsBody(15, weight: .semibold))
-                    .foregroundStyle(Color.witsMuted)
-                if let next {
-                    Text(next.displayName)
-                        .font(.witsDisplay(28))
-                        .foregroundStyle(Color.witsInk)
-                    Text(next.tagline)
-                        .font(.witsBody(15.5))
-                        .foregroundStyle(Color.witsMuted)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .padding(28)
-            .frame(maxWidth: .infinity)
-            .cardSurface()
-            .rise()
-            Spacer()
-            Cta(title: first ? "start" : "continue") {
-                withAnimation { stage = .playing }
-            }
-            .rise(0.12)
+        if let game = currentGame {
+            GameCard(
+                game: game,
+                stats: app.gameStats[game],
+                primaryTitle: index == 0 ? "start" : "play",
+                onPlay: { withAnimation { stage = .playing } },
+                onBack: onQuit,
+                accessory: AnyView(progressDots)
+            )
+        } else {
+            Color.clear.onAppear { stage = .summary }
         }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 12)
     }
 
     private func handle(_ result: GameResult) {

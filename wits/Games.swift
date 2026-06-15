@@ -69,6 +69,7 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .spotSpeed:   SpotSpeed.makeView(config: config, onComplete: onComplete)
     case .matchBack:   MatchBack.makeView(config: config, onComplete: onComplete)
     case .ruleFinder:  RuleFinder.makeView(config: config, onComplete: onComplete)
+    default:           AnyView(ComingSoonGame(id: id, onComplete: onComplete))
     }
 }
 

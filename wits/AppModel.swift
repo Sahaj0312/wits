@@ -33,6 +33,7 @@ final class AppModel {
     var entitlement: Entitlement = .unknown
     var streak = StreakState.empty
     var difficulty: [GameID: DifficultyState] = [:]
+    var gameStats: [GameID: GameStats] = [:]
     var today: DailyWorkout
     var headlineIndex: Double? = nil
     /// Per-day rollups for the progress chart (ascending by day).
@@ -199,6 +200,19 @@ final class AppModel {
         difficulty[id] = next
         var r = result
         r.newDifficulty = next
+
+        var st = gameStats[id] ?? GameStats()
+        st.totalPlays += 1
+        st.bestScore = max(st.bestScore, r.score)
+        if let v = r.raw[id.statKey] {
+            if let cur = st.bestStat {
+                st.bestStat = id.statLowerIsBetter ? min(cur, v) : max(cur, v)
+            } else {
+                st.bestStat = v
+            }
+        }
+        gameStats[id] = st
+
         saveCache()
         Task {
             try? await supa.saveSession(r, source: source)
@@ -336,6 +350,7 @@ final class AppModel {
         var profile: ProfileSnapshot
         var streak: StreakState
         var difficulty: [String: DifficultyState]
+        var gameStats: [String: GameStats]?
         var today: DailyWorkout
         var headlineIndex: Double?
         var progressDays: [DailyProgressRow]
@@ -348,6 +363,7 @@ final class AppModel {
             profile: profile,
             streak: streak,
             difficulty: Dictionary(uniqueKeysWithValues: difficulty.map { ($0.key.rawValue, $0.value) }),
+            gameStats: Dictionary(uniqueKeysWithValues: gameStats.map { ($0.key.rawValue, $0.value) }),
             today: today,
             headlineIndex: headlineIndex,
             progressDays: progressDays,
@@ -365,6 +381,9 @@ final class AppModel {
         profile = state.profile
         streak = state.streak
         difficulty = Dictionary(uniqueKeysWithValues: state.difficulty.compactMap { k, v in
+            GameID(rawValue: k).map { ($0, v) }
+        })
+        gameStats = Dictionary(uniqueKeysWithValues: (state.gameStats ?? [:]).compactMap { k, v in
             GameID(rawValue: k).map { ($0, v) }
         })
         headlineIndex = state.headlineIndex
