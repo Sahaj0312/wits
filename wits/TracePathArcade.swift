@@ -8,6 +8,8 @@
 //
 
 import SwiftUI
+import SpriteKit
+import UIKit
 
 @MainActor
 final class TracePathArcade: ArcadeGame {
@@ -74,6 +76,21 @@ final class TracePathArcade: ArcadeGame {
             return Resolution(kind: .nearMiss, points: 0)
         }
         return Resolution(kind: .miss, points: 0)
+    }
+
+    func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode {
+        let r = e.radius * style.unit
+        let n = SKShapeNode(rectOf: CGSize(width: r * 2, height: r * 2), cornerRadius: r * 0.55)
+        n.strokeColor = .clear; n.zPosition = 1
+        n.fillColor = UIColor(white: 0.85, alpha: 1)
+        n.addSoftShadow(radius: r, style: style, alpha: 0.10)
+        return n
+    }
+
+    func refreshNode(_ node: SKNode, _ e: ArcadeEntity, style: ArcadeStyle) {
+        let lit = e.id == litID
+        (node as? SKShapeNode)?.fillColor = lit ? UIColor(Color.witsAccent) : UIColor(white: 0.85, alpha: 1)
+        node.setScale(lit ? 1.14 : 1.0)
     }
 
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {

@@ -8,6 +8,8 @@
 //
 
 import SwiftUI
+import SpriteKit
+import UIKit
 
 @MainActor
 final class ScrollHuntArcade: ArcadeGame {
@@ -62,6 +64,25 @@ final class ScrollHuntArcade: ArcadeGame {
             return Resolution(kind: .nearMiss, points: 0)
         }
         return Resolution(kind: .miss, points: 0)
+    }
+
+    private func uiColor(for e: ArcadeEntity) -> UIColor {
+        if e.flag {
+            return UIColor(red: Self.base.r + (Self.warm.r - Self.base.r) * delta,
+                           green: Self.base.g + (Self.warm.g - Self.base.g) * delta,
+                           blue: Self.base.b + (Self.warm.b - Self.base.b) * delta, alpha: 1)
+        }
+        return UIColor(red: Self.base.r, green: Self.base.g, blue: Self.base.b, alpha: 1)
+    }
+
+    func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode {
+        let r = e.radius * style.unit
+        let n = SKShapeNode(circleOfRadius: r)
+        n.fillColor = uiColor(for: e)
+        n.strokeColor = .clear
+        n.zPosition = 1
+        n.addSoftShadow(radius: r, style: style, alpha: 0.14)
+        return n
     }
 
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {

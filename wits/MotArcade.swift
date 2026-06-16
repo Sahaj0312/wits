@@ -8,6 +8,8 @@
 //
 
 import SwiftUI
+import SpriteKit
+import UIKit
 
 @MainActor
 final class MotArcade: ArcadeGame {
@@ -63,6 +65,27 @@ final class MotArcade: ArcadeGame {
         setMark(scene, e.id, hit ? 1 : 2)   // a: 1=correct pick, 2=wrong pick
         if picked.count >= targets { phase = .reveal; phaseT = 0 }
         return Resolution(kind: hit ? .hit : .miss, points: 120, entityID: e.id)
+    }
+
+    private func uiColor(for e: ArcadeEntity) -> UIColor {
+        let showTarget = (phase == .mark || phase == .reveal) && e.flag
+        if e.a == 1 { return UIColor(Color.witsAccent) }
+        if e.a == 2 { return UIColor(Color.witsWarm) }
+        if showTarget { return UIColor(Color.witsAccent) }
+        return UIColor(white: 0.72, alpha: 1)
+    }
+
+    func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode {
+        let r = e.radius * style.unit
+        let n = SKShapeNode(circleOfRadius: r)
+        n.strokeColor = .clear; n.zPosition = 1
+        n.fillColor = uiColor(for: e)
+        n.addSoftShadow(radius: r, style: style, alpha: 0.12)
+        return n
+    }
+
+    func refreshNode(_ node: SKNode, _ e: ArcadeEntity, style: ArcadeStyle) {
+        (node as? SKShapeNode)?.fillColor = uiColor(for: e)
     }
 
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {

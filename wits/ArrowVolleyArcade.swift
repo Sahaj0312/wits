@@ -8,6 +8,8 @@
 //
 
 import SwiftUI
+import SpriteKit
+import UIKit
 
 @MainActor
 final class ArrowVolleyArcade: ArcadeGame {
@@ -57,6 +59,36 @@ final class ArrowVolleyArcade: ArcadeGame {
         // wrong: on incongruent the flankers point opposite the centre — that's the trap
         if !e.flag { return Resolution(kind: .nearMiss, points: 0, entityID: e.id) }
         return Resolution(kind: .miss, points: 0, entityID: e.id)
+    }
+
+    private func trianglePath(w: CGFloat, h: CGFloat, pointsRight: Bool) -> CGPath {
+        let p = CGMutablePath()
+        if pointsRight {
+            p.move(to: CGPoint(x: -w/2, y: -h/2)); p.addLine(to: CGPoint(x: w/2, y: 0)); p.addLine(to: CGPoint(x: -w/2, y: h/2))
+        } else {
+            p.move(to: CGPoint(x: w/2, y: -h/2)); p.addLine(to: CGPoint(x: -w/2, y: 0)); p.addLine(to: CGPoint(x: w/2, y: h/2))
+        }
+        p.closeSubpath()
+        return p
+    }
+
+    func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode {
+        let band = style.unit * 0.52
+        let cellW = band / 5
+        let aw = cellW * 0.62, ah = cellW * 0.92
+        let container = SKNode(); container.zPosition = 1
+        let centerRight = e.a == 1
+        for i in 0..<5 {
+            let isCenter = i == 2
+            let pointsRight = isCenter ? centerRight : (e.flag ? centerRight : !centerRight)
+            let tri = SKShapeNode(path: trianglePath(w: aw, h: ah, pointsRight: pointsRight))
+            tri.fillColor = isCenter ? UIColor(Color.witsAccent) : UIColor(white: 0.72, alpha: 1)
+            tri.strokeColor = .clear
+            tri.position = CGPoint(x: CGFloat(i - 2) * cellW, y: 0)
+            if isCenter { tri.addSoftShadow(radius: aw * 0.7, style: style, alpha: 0.2) }
+            container.addChild(tri)
+        }
+        return container
     }
 
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {

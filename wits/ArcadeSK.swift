@@ -19,46 +19,18 @@ struct ArcadeStyle {
     let size: CGSize
     let dab: SKTexture
     let ring: SKTexture
+    let spark: SKTexture
     var unit: CGFloat { min(size.width, size.height) }
     /// unit-space (top-down) → scene point (bottom-up).
     func pt(_ u: CGPoint) -> CGPoint { CGPoint(x: u.x * size.width, y: (1 - u.y) * size.height) }
 }
 
+/// Provided art assets (white-on-transparent for tinting; bg is full colour).
 enum ArcadeTextures {
-    static let dab: SKTexture = {
-        let px: CGFloat = 128
-        let img = UIGraphicsImageRenderer(size: CGSize(width: px, height: px)).image { c in
-            let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                               colors: [UIColor.white.cgColor, UIColor.white.withAlphaComponent(0).cgColor] as CFArray,
-                               locations: [0, 1])!
-            c.cgContext.drawRadialGradient(g, startCenter: CGPoint(x: px/2, y: px/2), startRadius: 0,
-                                           endCenter: CGPoint(x: px/2, y: px/2), endRadius: px/2, options: [])
-        }
-        return SKTexture(image: img)
-    }()
-
-    static let ring: SKTexture = {
-        let px: CGFloat = 256
-        let img = UIGraphicsImageRenderer(size: CGSize(width: px, height: px)).image { c in
-            let ctx = c.cgContext
-            ctx.setStrokeColor(UIColor.white.cgColor)
-            ctx.setLineWidth(px * 0.06)
-            ctx.addEllipse(in: CGRect(x: px*0.12, y: px*0.12, width: px*0.76, height: px*0.76))
-            ctx.strokePath()
-        }
-        return SKTexture(image: img)
-    }()
-
-    /// vertical gradient background.
-    static func gradient(_ size: CGSize, top: UIColor, bottom: UIColor) -> SKTexture {
-        let img = UIGraphicsImageRenderer(size: size).image { c in
-            let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                               colors: [top.cgColor, bottom.cgColor] as CFArray, locations: [0, 1])!
-            c.cgContext.drawLinearGradient(g, start: CGPoint(x: 0, y: 0),
-                                           end: CGPoint(x: 0, y: size.height), options: [])
-        }
-        return SKTexture(image: img)
-    }
+    static let dab = SKTexture(imageNamed: "soft-dab")
+    static let ring = SKTexture(imageNamed: "soft-ring")
+    static let spark = SKTexture(imageNamed: "spark")
+    static let bg = SKTexture(imageNamed: "field-bg")
 }
 
 extension SKNode {
@@ -122,15 +94,20 @@ final class ArcadeSKScene: SKScene {
 
     override func didMove(to view: SKView) {
         guard style == nil else { return }
-        style = ArcadeStyle(size: size, dab: ArcadeTextures.dab, ring: ArcadeTextures.ring)
+        style = ArcadeStyle(size: size, dab: ArcadeTextures.dab, ring: ArcadeTextures.ring, spark: ArcadeTextures.spark)
         model.bounds = size
 
-        // premium light background
-        let bg = SKSpriteNode(texture: ArcadeTextures.gradient(size,
-            top: UIColor(red: 0.96, green: 0.97, blue: 0.99, alpha: 1),
-            bottom: UIColor(red: 0.90, green: 0.92, blue: 0.96, alpha: 1)))
+        // premium light background (provided asset, aspect-filled)
+        let bg = SKSpriteNode(texture: ArcadeTextures.bg)
         bg.position = CGPoint(x: size.width/2, y: size.height/2)
-        bg.size = size; bg.zPosition = -10
+        bg.zPosition = -10
+        let tex = ArcadeTextures.bg.size()
+        if tex.width > 0, tex.height > 0 {
+            let scale = max(size.width / tex.width, size.height / tex.height)
+            bg.size = CGSize(width: tex.width * scale, height: tex.height * scale)
+        } else {
+            bg.size = size
+        }
         addChild(bg)
 
         addChild(fieldLayer)
@@ -146,7 +123,7 @@ final class ArcadeSKScene: SKScene {
 
     override func didChangeSize(_ oldSize: CGSize) {
         guard let style, style.size != size else { return }
-        self.style = ArcadeStyle(size: size, dab: ArcadeTextures.dab, ring: ArcadeTextures.ring)
+        self.style = ArcadeStyle(size: size, dab: ArcadeTextures.dab, ring: ArcadeTextures.ring, spark: ArcadeTextures.spark)
         model.bounds = size
     }
 
@@ -287,16 +264,18 @@ final class ArcadeSKScene: SKScene {
         addChild(ring)
         ring.run(.sequence([.group([.scale(to: 2.4, duration: 0.35), .fadeOut(withDuration: 0.35)]), .removeFromParent()])
         )
-        for _ in 0..<6 {
-            let s = SKSpriteNode(texture: style.dab)
-            s.position = point; s.size = CGSize(width: 12, height: 12)
+        for _ in 0..<8 {
+            let s = SKSpriteNode(texture: style.spark)
+            s.position = point; s.size = CGSize(width: 14, height: 14)
             s.color = color; s.colorBlendFactor = 1; s.zPosition = 30
+            let ang = Double.random(in: 0..<(2 * .pi))
+            s.zRotation = ang - .pi / 2
             addChild(s)
-            let ang = Double.random(in: 0..<(2 * .pi)); let dist = CGFloat.random(in: 30...70)
+            let dist = CGFloat.random(in: 34...80)
             s.run(.sequence([.group([
-                .move(by: CGVector(dx: cos(ang)*dist, dy: sin(ang)*dist), duration: 0.4),
-                .fadeOut(withDuration: 0.4),
-                .scale(to: 0.3, duration: 0.4)]), .removeFromParent()]))
+                .move(by: CGVector(dx: cos(ang)*dist, dy: sin(ang)*dist), duration: 0.45),
+                .fadeOut(withDuration: 0.45),
+                .scale(to: 0.3, duration: 0.45)]), .removeFromParent()]))
         }
     }
 
