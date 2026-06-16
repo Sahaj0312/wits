@@ -273,19 +273,7 @@ struct FlankerScreen: View {
     private var playView: some View {
         VStack(spacing: 12) {
             if cfg?.isSurvival != true {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(Text("\(stats.score)").foregroundStyle(Color.witsAccent)) pts")
-                        .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsInk)
-                        .monospacedDigit()
-                    if multiplier > 1 {
-                        Text("×\(multiplier)")
-                            .font(.system(size: 12, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.witsAccent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
-                    }
+                HStack {
                     Spacer()
                     Text("\(Int(ceil(timeLeft)))s")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
