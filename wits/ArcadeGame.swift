@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import SpriteKit
 
 enum ArcadeInputMode { case tap, swipe, drag, trace }
 
@@ -54,10 +55,34 @@ protocol ArcadeGame: AnyObject {
 
     /// One-line how-to shown briefly at the start.
     var howTo: String { get }
+
+    // MARK: SpriteKit rendering (the live path)
+
+    /// Build the SKNode for a newly-spawned entity (positioned by the scene).
+    func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode
+
+    /// Per-frame appearance refresh for an existing node (recolour, highlight…).
+    func refreshNode(_ node: SKNode, _ e: ArcadeEntity, style: ArcadeStyle)
+
+    /// Add fixed chrome (buckets, lanes, prompts) once when the scene loads.
+    func setupScene(_ scene: SKScene, style: ArcadeStyle)
 }
 
 extension ArcadeGame {
     func preStep(scene: ArcadeScene, dt: Double) {}
     func overlay(scene: ArcadeScene) -> AnyView { AnyView(EmptyView()) }
     func advance(_ s: DifficultyState, accuracy: Double) -> DifficultyState { Staircase.adjust(s, accuracy: accuracy) }
+
+    // default SK rendering: a clean soft-shadowed dot (overridden per game)
+    func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode {
+        let r = e.radius * style.unit
+        let n = SKShapeNode(circleOfRadius: r)
+        n.fillColor = UIColor(Color.witsAccent)
+        n.strokeColor = .clear
+        n.zPosition = 1
+        n.addSoftShadow(radius: r, style: style)
+        return n
+    }
+    func refreshNode(_ node: SKNode, _ e: ArcadeEntity, style: ArcadeStyle) {}
+    func setupScene(_ scene: SKScene, style: ArcadeStyle) {}
 }

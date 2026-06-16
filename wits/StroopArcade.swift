@@ -8,6 +8,8 @@
 //
 
 import SwiftUI
+import SpriteKit
+import UIKit
 
 @MainActor
 final class StroopArcade: ArcadeGame {
@@ -74,6 +76,51 @@ final class StroopArcade: ArcadeGame {
     }
 
     func overlay(scene: ArcadeScene) -> AnyView { AnyView(InkBucketsBar(palette: palette)) }
+
+    // MARK: SpriteKit look (clean minimal premium)
+
+    func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode {
+        guard e.b < palette.count, e.a < palette.count else { return SKNode() }
+        let w = style.unit * 0.5, h = style.unit * 0.18
+        let container = SKNode()
+        container.zPosition = 1
+
+        let shadow = SKSpriteNode(texture: style.dab)
+        shadow.size = CGSize(width: w * 1.25, height: h * 2.4)
+        shadow.color = UIColor(white: 0.1, alpha: 1); shadow.colorBlendFactor = 1
+        shadow.alpha = 0.16; shadow.position = CGPoint(x: 0, y: -h * 0.32); shadow.zPosition = -1
+        container.addChild(shadow)
+
+        let chip = SKShapeNode(rectOf: CGSize(width: w, height: h), cornerRadius: h * 0.36)
+        chip.fillColor = .white; chip.strokeColor = .clear
+        container.addChild(chip)
+
+        let label = SKLabelNode()
+        label.attributedText = NSAttributedString(string: palette[e.b].rawValue, attributes: [
+            .font: roundedUIFont(h * 0.62), .foregroundColor: UIColor(palette[e.a].color)])
+        label.verticalAlignmentMode = .center; label.horizontalAlignmentMode = .center
+        chip.addChild(label)
+        return container
+    }
+
+    func setupScene(_ scene: SKScene, style: ArcadeStyle) {
+        let n = palette.count
+        let w = style.size.width / CGFloat(n)
+        let h: CGFloat = 66
+        for i in 0..<n {
+            let bucket = SKShapeNode(rectOf: CGSize(width: w - 8, height: h), cornerRadius: 16)
+            bucket.fillColor = UIColor(palette[i].color)
+            bucket.strokeColor = UIColor.white.withAlphaComponent(0.55); bucket.lineWidth = 1.5
+            bucket.position = CGPoint(x: w * (CGFloat(i) + 0.5), y: h / 2 + 10)
+            bucket.zPosition = 5
+            // top sheen
+            let sheen = SKShapeNode(rectOf: CGSize(width: w - 16, height: h * 0.4), cornerRadius: 10)
+            sheen.fillColor = UIColor.white.withAlphaComponent(0.18); sheen.strokeColor = .clear
+            sheen.position = CGPoint(x: 0, y: h * 0.22)
+            bucket.addChild(sheen)
+            scene.addChild(bucket)
+        }
+    }
 }
 
 private struct InkBucketsBar: View {
