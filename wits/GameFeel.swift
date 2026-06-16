@@ -227,11 +227,13 @@ final class ToneSynth {
         } catch {
             started = false
         }
+        // Observer fires on the main queue → safe to assume main-actor isolation.
         NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in
-                guard let self, self.started else { return }
+            guard let self else { return }
+            MainActor.assumeIsolated {
+                guard self.started else { return }
                 try? self.engine.start()
             }
         }
