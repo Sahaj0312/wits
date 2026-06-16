@@ -8,6 +8,8 @@
 //
 
 import SwiftUI
+import SpriteKit
+import UIKit
 
 @MainActor
 final class SymbolStreamArcade: ArcadeGame {
@@ -23,6 +25,7 @@ final class SymbolStreamArcade: ArcadeGame {
     private var beatInterval = 1.0
     private var laneY = 0.5
     private var resolvedFront = false  // guard one decision per front symbol
+    private var frontID: Int?
 
     func seed(level: Double, survival: Bool) -> Spawner {
         n = max(1, min(3, 1 + Int(level / 3.5)))
@@ -44,6 +47,7 @@ final class SymbolStreamArcade: ArcadeGame {
             beat -= beatInterval
             emitSymbol(into: scene)
         }
+        frontID = scene.entities.filter { !$0.dead }.max(by: { $0.pos.x < $1.pos.x })?.id
     }
 
     private func emitSymbol(into scene: ArcadeScene) {
@@ -85,6 +89,43 @@ final class SymbolStreamArcade: ArcadeGame {
         let idx = e.b
         let lure = [n - 1, n + 1].contains { k in k >= 1 && idx - k >= 0 && recent[idx - k] == e.a }
         return Resolution(kind: lure ? .nearMiss : .miss, points: 0, entityID: e.id)
+    }
+
+    func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode {
+        let s = style.unit * 0.2
+        let chip = SKShapeNode(rectOf: CGSize(width: s, height: s), cornerRadius: s * 0.26)
+        chip.strokeColor = .clear; chip.zPosition = 1
+        chip.fillColor = UIColor(white: 0.96, alpha: 1)
+        chip.addSoftShadow(radius: s * 0.6, style: style, alpha: 0.14)
+        if e.a < Self.glyphs.count,
+           let img = UIImage(systemName: Self.glyphs[e.a])?.withTintColor(.white, renderingMode: .alwaysOriginal) {
+            let sprite = SKSpriteNode(texture: SKTexture(image: img))
+            sprite.size = CGSize(width: s * 0.62, height: s * 0.62)
+            sprite.color = UIColor(white: 0.2, alpha: 1); sprite.colorBlendFactor = 1
+            sprite.name = "glyph"; sprite.zPosition = 2
+            chip.addChild(sprite)
+        }
+        return chip
+    }
+
+    func refreshNode(_ node: SKNode, _ e: ArcadeEntity, style: ArcadeStyle) {
+        let front = e.id == frontID
+        (node as? SKShapeNode)?.fillColor = front ? UIColor(Color.witsAccent) : UIColor(white: 0.96, alpha: 1)
+        if let g = node.childNode(withName: "glyph") as? SKSpriteNode {
+            g.color = front ? .white : UIColor(white: 0.2, alpha: 1)
+        }
+        node.zPosition = front ? 3 : 1
+    }
+
+    func setupScene(_ scene: SKScene, style: ArcadeStyle) {
+        let badge = SKLabelNode()
+        badge.attributedText = NSAttributedString(string: "\(n)-BACK", attributes: [
+            .font: roundedUIFont(14), .foregroundColor: UIColor(Color.witsAccent)])
+        badge.horizontalAlignmentMode = .left
+        badge.verticalAlignmentMode = .center
+        badge.position = CGPoint(x: 24, y: style.size.height - 104)
+        badge.zPosition = 40
+        scene.addChild(badge)
     }
 
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {
