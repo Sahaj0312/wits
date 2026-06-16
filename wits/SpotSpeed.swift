@@ -39,18 +39,20 @@ struct SpotSpeedScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("spot \(Text("\(min(trial, Self.totalTrials))").foregroundStyle(Color.witsAccent)) of \(Self.totalTrials)")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .monospacedDigit()
-                Spacer()
-                Text("\(score) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
+            if !cfg.isSurvival {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("spot \(Text("\(min(trial, Self.totalTrials))").foregroundStyle(Color.witsAccent)) of \(Self.totalTrials)")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                        .monospacedDigit()
+                    Spacer()
+                    Text("\(score) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted)
+                        .monospacedDigit()
+                }
+                ProgressTrack(fraction: Double(trial - 1) / Double(Self.totalTrials), animated: true)
             }
-            ProgressTrack(fraction: Double(trial - 1) / Double(Self.totalTrials), animated: true)
 
             GeometryReader { geo in
                 let side = min(geo.size.width, geo.size.height)
@@ -217,15 +219,19 @@ struct SpotSpeedScreen: View {
             correct += 1
             score += 100 + max(0, Int((600 - presentationMs) / 4))
             presentationMs = max(80, presentationMs * 0.85)   // faster = harder
+            cfg.report(.hit, points: 100, combo: correct)
         } else {
             presentationMs = min(700, presentationMs * 1.18)
+            // peripheral landed one slot off the target → "so close"
+            let ringNear = (centerAnswer == centerIsCar) && (abs(i - targetSlot) == 1 || abs(i - targetSlot) == Self.slots - 1)
+            cfg.report(ringNear ? .nearMiss : .miss)
         }
         step = .feedback
         let gen = generation
         Task {
-            try? await Task.sleep(for: .milliseconds(900))
+            try? await Task.sleep(for: .milliseconds(cfg.isSurvival ? 450 : 900))
             guard gen == generation else { return }
-            if trial >= Self.totalTrials {
+            if !cfg.isSurvival && trial >= Self.totalTrials {
                 finish()
             } else {
                 trial += 1

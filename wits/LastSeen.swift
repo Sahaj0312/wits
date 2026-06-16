@@ -40,16 +40,18 @@ struct LastSeenScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk).monospacedDigit()
-                Spacer()
-                Text("\(Int(ceil(timeLeft)))s")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted).monospacedDigit()
+            if !cfg.isSurvival {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk).monospacedDigit()
+                    Spacer()
+                    Text("\(Int(ceil(timeLeft)))s")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted).monospacedDigit()
+                }
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             }
-            ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             Spacer()
             let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
             LazyVGrid(columns: columns, spacing: 12) {
@@ -92,12 +94,14 @@ struct LastSeenScreen: View {
         if tapped.contains(iconID) {
             wrong += 1
             flash = (iconID, false)
+            cfg.report(.miss)
         } else {
             tapped.insert(iconID)
             right += 1
             score += 80
             bestRemembered = max(bestRemembered, tapped.count)
             flash = (iconID, true)
+            cfg.report(.hit, points: 80, combo: tapped.count)
             if tapped.count == icons.count {
                 // cleared the set — grow it
                 score += 200
@@ -118,7 +122,7 @@ struct LastSeenScreen: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(40))
             timeLeft = max(0, Self.gameSeconds - Date().timeIntervalSince(start))
-            if timeLeft <= 0 {
+            if !cfg.isSurvival && timeLeft <= 0 {
                 guard !finished else { return }
                 finished = true
                 try? await Task.sleep(for: .milliseconds(300))

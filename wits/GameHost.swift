@@ -43,6 +43,8 @@ struct GameHost: View {
                 .transition(.opacity)
         }
         .animation(.easeOut(duration: 0.25), value: stageKey)
+        .onAppear { GameFeel.shared.warmUp() }
+        .onDisappear { GameFeel.shared.teardown() }
         .overlay(alignment: .topLeading) {
             if stage == .playing {
                 Button(action: onQuit) {

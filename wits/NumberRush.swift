@@ -68,6 +68,7 @@ struct NumberRushScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            if !cfg.isSurvival {
             HStack(alignment: .firstTextBaseline) {
                 Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
                     .font(.system(size: 17, weight: .heavy, design: .rounded))
@@ -85,6 +86,7 @@ struct NumberRushScreen: View {
                     .foregroundStyle(Color.witsMuted).monospacedDigit()
             }
             ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
+            }
             Spacer()
             VStack(spacing: 6) {
                 Text(problem.text)
@@ -134,10 +136,12 @@ struct NumberRushScreen: View {
         if ok {
             right += 1; streak += 1; bestStreak = max(bestStreak, streak)
             score += 100 * multiplier
-            window = max(1.6, window - 0.05)
+            window = max(cfg.isSurvival ? 1.2 : 1.6, window - (cfg.isSurvival ? 0.08 : 0.05))
+            cfg.report(.hit, points: 100, combo: streak)
         } else {
             wrong += 1; streak = 0
             window = min(5.0, window + 0.3)
+            cfg.report(.miss)
         }
         feedback = ok
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { feedback = nil }
@@ -149,6 +153,7 @@ struct NumberRushScreen: View {
         wrong += 1; streak = 0
         window = min(5.0, window + 0.3)
         feedback = false
+        cfg.report(.timeout)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { feedback = nil }
         next()
     }
@@ -166,7 +171,7 @@ struct NumberRushScreen: View {
             let elapsed = Date().timeIntervalSince(trialStart)
             windowFrac = max(0, 1 - elapsed / window)
             if elapsed > window { timeout() }
-            if timeLeft <= 0 {
+            if !cfg.isSurvival && timeLeft <= 0 {
                 guard !finished else { return }
                 finished = true
                 try? await Task.sleep(for: .milliseconds(350))

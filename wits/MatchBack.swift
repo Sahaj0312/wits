@@ -46,17 +46,19 @@ struct MatchBackScreen: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(n)-back").foregroundStyle(Color.witsAccent))")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                Spacer()
-                Text("\(score) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
+            if !cfg.isSurvival {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(Text("\(n)-back").foregroundStyle(Color.witsAccent))")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                    Spacer()
+                    Text("\(score) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted)
+                        .monospacedDigit()
+                }
+                ProgressTrack(fraction: Double(max(0, pos)) / Double(total), animated: true)
             }
-            ProgressTrack(fraction: Double(max(0, pos)) / Double(total), animated: true)
 
             GeometryReader { geo in
                 let gap: CGFloat = 10
@@ -116,23 +118,25 @@ struct MatchBackScreen: View {
     }
 
     private func run() {
-        seq = makeSequence()
         generation += 1
         let gen = generation
         Task {
-            for i in 0..<seq.count {
-                guard gen == generation else { return }
-                pos = i
-                responded = false
-                lit = seq[i]
-                try? await Task.sleep(for: .milliseconds(stimMs))
-                guard gen == generation else { return }
-                lit = nil
-                try? await Task.sleep(for: .milliseconds(gapMs))
-                guard gen == generation else { return }
-                evaluate(i)
-            }
-            finish()
+            repeat {
+                seq = makeSequence()
+                for i in 0..<seq.count {
+                    guard gen == generation else { return }
+                    pos = i
+                    responded = false
+                    lit = seq[i]
+                    try? await Task.sleep(for: .milliseconds(stimMs))
+                    guard gen == generation else { return }
+                    lit = nil
+                    try? await Task.sleep(for: .milliseconds(gapMs))
+                    guard gen == generation else { return }
+                    evaluate(i)
+                }
+            } while cfg.isSurvival && !Task.isCancelled
+            if !cfg.isSurvival { finish() }
         }
     }
 
@@ -146,11 +150,11 @@ struct MatchBackScreen: View {
     private func evaluate(_ i: Int) {
         let isMatch = i >= n && seq[i] == seq[i - n]
         if responded {
-            if isMatch { hits += 1; streak += 1; score += 120 * min(5, 1 + streak / 3) }
-            else { falseAlarms += 1; streak = 0 }
+            if isMatch { hits += 1; streak += 1; score += 120 * min(5, 1 + streak / 3); cfg.report(.hit, points: 120, combo: streak) }
+            else { falseAlarms += 1; streak = 0; cfg.report(.miss) }
         } else {
-            if isMatch { misses += 1; streak = 0 }
-            else { correctRej += 1; score += 20 }
+            if isMatch { misses += 1; streak = 0; cfg.report(.miss) }
+            else { correctRej += 1; score += 20 }   // silent: a non-event every beat
         }
     }
 

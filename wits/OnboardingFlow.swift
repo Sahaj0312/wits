@@ -262,10 +262,10 @@ struct OnboardingView: View {
         case .gauntlet:
             GauntletScreen(onNext: next)
         case .flanker:
-            FlankerScreen { stats in
+            FlankerScreen(onComplete: { stats in
                 data.flanker = stats
                 next()
-            }
+            })
         case .explainFlanker:
             ExplainScreen(
                 test: "arrow storm",
@@ -274,10 +274,10 @@ struct OnboardingView: View {
                 onNext: next
             )
         case .tracker:
-            TrackerScreen { stats in
+            TrackerScreen(onComplete: { stats in
                 data.tracker = stats
                 next()
-            }
+            })
         case .explainTracker:
             ExplainScreen(
                 test: "crowd control",
@@ -286,12 +286,12 @@ struct OnboardingView: View {
                 onNext: next
             )
         case .span:
-            SpanScreen { stats in
+            SpanScreen(onComplete: { stats in
                 data.span = stats
                 pushScores()
                 supa.recordCheckpoint(.fitTest)
                 next()
-            }
+            })
         case .explainSpan:
             ExplainScreen(
                 test: "echo grid",

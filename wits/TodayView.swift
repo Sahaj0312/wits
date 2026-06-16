@@ -170,7 +170,7 @@ struct TodayView: View {
                 .padding(.top, 22)
                 .rise(0.4)
 
-            if case let .trial(_) = app.entitlement {
+            if case .trial = app.entitlement {
                 Text("\(app.entitlement.trialDaysLeft) days left in your free trial")
                     .font(.witsBody(12.5))
                     .foregroundStyle(Color.witsFaint)

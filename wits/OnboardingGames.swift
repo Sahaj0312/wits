@@ -272,26 +272,28 @@ struct FlankerScreen: View {
 
     private var playView: some View {
         VStack(spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(stats.score)").foregroundStyle(Color.witsAccent)) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .monospacedDigit()
-                if multiplier > 1 {
-                    Text("×\(multiplier)")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.witsAccent.opacity(0.14), in: Capsule())
+            if cfg?.isSurvival != true {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(Text("\(stats.score)").foregroundStyle(Color.witsAccent)) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                        .monospacedDigit()
+                    if multiplier > 1 {
+                        Text("×\(multiplier)")
+                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsAccent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                    }
+                    Spacer()
+                    Text("\(Int(ceil(timeLeft)))s")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted)
+                        .monospacedDigit()
                 }
-                Spacer()
-                Text("\(Int(ceil(timeLeft)))s")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             }
-            ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             Spacer()
             if let trial {
                 trialCard(trial)
@@ -360,11 +362,13 @@ struct FlankerScreen: View {
             streak += 1
             stats.bestStreak = max(stats.bestStreak, streak)
             stats.score += 100 * multiplier
-            window = max(Self.minWindow, window - 0.025)
+            window = max(cfg?.isSurvival == true ? 0.6 : Self.minWindow, window - (cfg?.isSurvival == true ? 0.04 : 0.025))
+            cfg?.report(.hit, points: 100, combo: streak)
         } else {
             stats.wrong += 1
             streak = 0
             window = min(Self.maxWindow, window + 0.12)
+            cfg?.report(.miss)
         }
         feedback = ok
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
@@ -377,6 +381,7 @@ struct FlankerScreen: View {
         streak = 0
         window = min(Self.maxWindow, window + 0.12)
         feedback = false
+        cfg?.report(.timeout)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
         nextTrial()
     }
@@ -397,7 +402,7 @@ struct FlankerScreen: View {
             let elapsed = Date().timeIntervalSince(trialStart)
             windowFrac = max(0, 1 - elapsed / window)
             if elapsed > window { timeout() }
-            if timeLeft <= 0 {
+            if cfg?.isSurvival != true && timeLeft <= 0 {
                 guard !finished else { return }
                 finished = true
                 try? await Task.sleep(for: .milliseconds(350))
@@ -537,7 +542,7 @@ struct TrackerScreen: View {
                 TutorialHint(text: roundPhase == .pick
                     ? "the dots froze. tap the \(config.targets) that were glowing at the start."
                     : "two dots glow, then blend in and wander. follow them with your eyes.")
-            } else {
+            } else if cfg?.isSurvival != true {
                 HStack(alignment: .firstTextBaseline) {
                     Text("round \(Text("\(min(round + 1, Self.rounds.count))").foregroundStyle(Color.witsAccent)) of \(Self.rounds.count)")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
@@ -621,7 +626,9 @@ struct TrackerScreen: View {
             stats.correctPicks += correct
             stats.totalTargets += config.targets
             stats.rounds += 1
-            if correct == config.targets { stats.perfectRounds += 1 }
+            let perfect = correct == config.targets
+            if perfect { stats.perfectRounds += 1 }
+            cfg?.report(perfect ? .hit : .miss, points: correct * 80, combo: stats.perfectRounds)
         }
         roundPhase = .reveal
         let gen = generation
@@ -630,10 +637,10 @@ struct TrackerScreen: View {
             guard gen == generation else { return }
             if isTutorial {
                 phase = .ready
-            } else if round + 1 >= Self.rounds.count {
+            } else if cfg?.isSurvival != true && round + 1 >= Self.rounds.count {
                 finish()
             } else {
-                round += 1
+                round = (round + 1) % Self.rounds.count   // cycle rounds endlessly in survival
                 startRound()
             }
         }
@@ -843,7 +850,7 @@ struct SpanScreen: View {
                 TutorialHint(text: trialPhase == .recall
                     ? "now play it back in reverse — tap the \(ordinal(seq.count)) tile first, the first tile last."
                     : "watch the order. you'll answer backwards.")
-            } else {
+            } else if cfg?.isSurvival != true {
                 HStack(alignment: .firstTextBaseline) {
                     Text("trial \(Text("\(min(trial, Self.totalTrials))").foregroundStyle(Color.witsAccent)) of \(Self.totalTrials)")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
@@ -1006,10 +1013,12 @@ struct SpanScreen: View {
             if !inTutorial {
                 stats.correctTaps += 1
                 stats.score += 120
+                cfg?.report(.hit, points: 120, combo: tapIndex)
             }
             if tapIndex == seq.count { endTrial(perfect: true) }
         } else {
             wrongTap = i
+            if !inTutorial { cfg?.report(.miss) }
             endTrial(perfect: false)
         }
     }
@@ -1035,7 +1044,7 @@ struct SpanScreen: View {
                 return
             }
             span = perfect ? min(7, span + 1) : max(2, span - 1)
-            if trial >= Self.totalTrials {
+            if cfg?.isSurvival != true && trial >= Self.totalTrials {
                 finish()
             } else {
                 trial += 1
