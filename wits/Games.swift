@@ -33,7 +33,7 @@ enum EchoGrid: Game {
 enum ColorClash: Game {
     static let id = GameID.colorClash
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(ColorClashScreen(cfg: config, onResult: onComplete))
+        AnyView(ArcadeGameView(cfg: config, game: StroopArcade(), onResult: onComplete))
     }
 }
 
