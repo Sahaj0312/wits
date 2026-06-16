@@ -130,7 +130,9 @@ final class HapticBox {
 enum Wave: Sendable { case sine, square, triangle, sawtooth }
 
 /// A single playing tone — value type the audio render callback advances.
-private struct Voice: Sendable {
+/// `nonisolated` because the project defaults types to @MainActor, but this is
+/// touched on the realtime audio thread.
+private nonisolated struct Voice: Sendable {
     var phase: Double = 0
     let startFreq: Double
     let endFreq: Double
@@ -168,7 +170,7 @@ private struct Voice: Sendable {
 }
 
 /// Lock-guarded pool of active voices. Safe to touch from the audio thread.
-private final class VoicePool: @unchecked Sendable {
+private nonisolated final class VoicePool: @unchecked Sendable {
     private let lock = OSAllocatedUnfairLock(initialState: [Voice]())
 
     func add(_ v: Voice) {
@@ -228,8 +230,10 @@ final class ToneSynth {
         NotificationCenter.default.addObserver(
             forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
         ) { [weak self] _ in
-            guard let self, self.started else { return }
-            try? self.engine.start()
+            Task { @MainActor in
+                guard let self, self.started else { return }
+                try? self.engine.start()
+            }
         }
     }
 
