@@ -12,7 +12,7 @@ import SwiftUI
 enum ArrowStorm: Game {
     static let id = GameID.arrowStorm
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(ArcadeSpriteHost(cfg: config, game: ArrowVolleyArcade(), onResult: onComplete))
+        AnyView(FlankerScreen(cfg: config, onResult: onComplete))
     }
 }
 
