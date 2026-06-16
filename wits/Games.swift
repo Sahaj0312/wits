@@ -12,28 +12,28 @@ import SwiftUI
 enum ArrowStorm: Game {
     static let id = GameID.arrowStorm
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(FlankerScreen(cfg: config, onResult: onComplete))
+        AnyView(ArcadeGameView(cfg: config, game: ArrowVolleyArcade(), onResult: onComplete))
     }
 }
 
 enum CrowdControl: Game {
     static let id = GameID.crowdControl
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(TrackerScreen(cfg: config, onResult: onComplete))
+        AnyView(ArcadeGameView(cfg: config, game: MotArcade(), onResult: onComplete))
     }
 }
 
 enum EchoGrid: Game {
     static let id = GameID.echoGrid
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(SpanScreen(cfg: config, onResult: onComplete))
+        AnyView(ArcadeGameView(cfg: config, game: TracePathArcade(id: .echoGrid, reverse: true), onResult: onComplete))
     }
 }
 
 enum ColorClash: Game {
     static let id = GameID.colorClash
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(ColorClashScreen(cfg: config, onResult: onComplete))
+        AnyView(ArcadeGameView(cfg: config, game: StroopArcade(), onResult: onComplete))
     }
 }
 
@@ -47,7 +47,7 @@ enum SpotSpeed: Game {
 enum MatchBack: Game {
     static let id = GameID.matchBack
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(MatchBackScreen(cfg: config, onResult: onComplete))
+        AnyView(ArcadeGameView(cfg: config, game: SymbolStreamArcade(), onResult: onComplete))
     }
 }
 
@@ -75,7 +75,7 @@ enum Estimator: Game {
 enum OddOneOut: Game {
     static let id = GameID.oddOneOut
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(OddOneOutScreen(cfg: config, onResult: onComplete))
+        AnyView(ArcadeGameView(cfg: config, game: ScrollHuntArcade(), onResult: onComplete))
     }
 }
 
@@ -96,7 +96,7 @@ enum LastSeen: Game {
 enum PathKeeper: Game {
     static let id = GameID.pathKeeper
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(PathKeeperScreen(cfg: config, onResult: onComplete))
+        AnyView(ArcadeGameView(cfg: config, game: TracePathArcade(id: .pathKeeper, reverse: false), onResult: onComplete))
     }
 }
 
