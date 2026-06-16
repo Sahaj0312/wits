@@ -78,10 +78,16 @@ final class TracePathArcade: ArcadeGame {
 
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {
         let lit = e.id == litID
-        let fill: Color = lit ? .witsAccent : Color.witsInk.opacity(0.08)
-        ctx.fill(Path(roundedRect: rect, cornerRadius: rect.width * 0.28), with: .color(fill))
+        let path = Path(roundedRect: rect, cornerRadius: rect.width * 0.3)
         if lit {
-            ctx.stroke(Path(roundedRect: rect, cornerRadius: rect.width * 0.28), with: .color(.witsAccent), lineWidth: 3)
+            var g = ctx
+            g.addFilter(.shadow(color: Color.witsAccent.opacity(0.9), radius: rect.width * 0.5))
+            g.fill(path, with: .color(.witsAccent))
+            ctx.fill(Path(ellipseIn: rect.insetBy(dx: rect.width * 0.3, dy: rect.height * 0.3)),
+                     with: .color(.white.opacity(0.7)))
+        } else {
+            ctx.fill(path, with: .color(.white.opacity(0.12)))
+            ctx.stroke(path, with: .color(.white.opacity(0.18)), lineWidth: 1)
         }
     }
 

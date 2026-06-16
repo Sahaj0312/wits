@@ -90,15 +90,14 @@ final class SymbolStreamArcade: ArcadeGame {
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {
         guard e.a < Self.glyphs.count else { return }
         let front = scene.entities.filter { !$0.dead }.max(by: { $0.pos.x < $1.pos.x })?.id == e.id
-        let bg = Path(roundedRect: rect.insetBy(dx: rect.width * 0.08, dy: rect.height * 0.08), cornerRadius: rect.width * 0.2)
-        ctx.fill(bg, with: .color(front ? Color.witsAccent.opacity(0.18) : Color.witsTint))
+        let box = rect.insetBy(dx: rect.width * 0.06, dy: rect.height * 0.06)
         if front {
-            ctx.stroke(bg, with: .color(.witsAccent), lineWidth: 2)
+            ctx.chip(box, fill: .witsAccent, corner: box.width * 0.24, glow: .witsAccent)
+            ctx.symbol(Self.glyphs[e.a], in: box, size: rect.width * 0.42, color: .white)
+        } else {
+            ctx.chip(box, fill: Color(white: 0.92), corner: box.width * 0.24)
+            ctx.symbol(Self.glyphs[e.a], in: box, size: rect.width * 0.42, color: Color(white: 0.2))
         }
-        let img = Text(Image(systemName: Self.glyphs[e.a]))
-            .font(.system(size: rect.width * 0.42, weight: .heavy))
-            .foregroundStyle(Color.witsInk)
-        ctx.draw(img, at: CGPoint(x: rect.midX, y: rect.midY))
     }
 
     func overlay(scene: ArcadeScene) -> AnyView {

@@ -57,14 +57,15 @@ struct ArcadeGameView: View {
                         .font(.system(size: 17, weight: .heavy, design: .rounded)).monospacedDigit()
                         .foregroundStyle(Color.witsMuted)
                 }
+                .padding(.horizontal, WitsMetrics.screenPadding)
                 ProgressTrack(fraction: max(0, timeLeft / cfg.targetDurationSec), animated: false)
                     .padding(.horizontal, WitsMetrics.screenPadding)
             }
 
             GeometryReader { geo in
                 ZStack {
-                    RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-                        .fill(Color.witsCard)
+                    ArcadeArena()
+                        .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
                         .shadow(color: .witsShadow, radius: 10, y: 6)
 
                     field(size: geo.size)

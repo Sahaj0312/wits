@@ -63,10 +63,14 @@ final class StroopArcade: ArcadeGame {
 
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {
         guard e.b < palette.count, e.a < palette.count else { return }
+        // a dark glossy chip carries the word, with a glow in its ink colour
+        let chip = CGRect(x: rect.midX - rect.width * 1.05, y: rect.midY - rect.height * 0.5,
+                          width: rect.width * 2.1, height: rect.height)
+        ctx.chip(chip, fill: Color(white: 0.12), corner: chip.height * 0.32, glow: palette[e.a].color)
         let text = Text(palette[e.b].rawValue)
-            .font(.system(size: rect.width * 0.46, weight: .heavy, design: .rounded))
+            .font(.system(size: rect.height * 0.5, weight: .heavy, design: .rounded))
             .foregroundStyle(palette[e.a].color)
-        ctx.draw(text, at: CGPoint(x: rect.midX, y: rect.midY))
+        ctx.draw(text, at: CGPoint(x: chip.midX, y: chip.midY))
     }
 
     func overlay(scene: ArcadeScene) -> AnyView { AnyView(InkBucketsBar(palette: palette)) }
@@ -77,20 +81,30 @@ private struct InkBucketsBar: View {
     var body: some View {
         VStack(spacing: 0) {
             Spacer()
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 ForEach(Array(palette.enumerated()), id: \.offset) { _, c in
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(c.color.opacity(0.9))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 56)
-                        .overlay(
-                            Image(systemName: "tray.fill")
-                                .font(.system(size: 18, weight: .heavy))
-                                .foregroundStyle(.white.opacity(0.85))
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            LinearGradient(colors: [c.color, c.color.opacity(0.78)],
+                                           startPoint: .top, endPoint: .bottom)
                         )
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 64)
+                        .overlay(alignment: .top) {
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(.white.opacity(0.18))
+                                .frame(height: 22)
+                                .padding(3)
+                        }
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(.white.opacity(0.5), lineWidth: 1.5)
+                        )
+                        .shadow(color: c.color.opacity(0.6), radius: 10, y: 0)
                 }
             }
-            .padding(6)
+            .padding(.horizontal, 8)
+            .padding(.bottom, 8)
         }
         .allowsHitTesting(false)
     }

@@ -12,7 +12,9 @@ struct ContentView: View {
     @Environment(AppModel.self) private var app
 
     var body: some View {
-        if hasCompletedOnboarding {
+        if let g = ProcessInfo.processInfo.environment["WITS_GAME"], let id = GameID(rawValue: g) {
+            DebugGameHarness(id: id)            // dev-only: SIMCTL_CHILD_WITS_GAME=<id>
+        } else if hasCompletedOnboarding {
             switch app.load {
             case .ready:
                 RootShell()
@@ -25,6 +27,17 @@ struct ContentView: View {
                 hasCompletedOnboarding = true
                 app.bootstrap()
             }
+        }
+    }
+}
+
+/// Dev-only: launch straight into one game for screenshots/feel testing.
+struct DebugGameHarness: View {
+    let id: GameID
+    var body: some View {
+        ZStack {
+            Color.witsBg.ignoresSafeArea()
+            makeGameView(id, config: .standard(id, difficulty: .seed(for: id), freePlay: true)) { _ in }
         }
     }
 }

@@ -67,12 +67,13 @@ final class MotArcade: ArcadeGame {
 
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {
         let showTarget = (phase == .mark || phase == .reveal) && e.flag
+        let glow = showTarget || e.a == 1 || e.a == 2
         let fill: Color
         if e.a == 1 { fill = .witsAccent }
         else if e.a == 2 { fill = .witsWarm }
         else if showTarget { fill = .witsAccent }
-        else { fill = Color.witsInk.opacity(0.34) }
-        ctx.fill(Path(ellipseIn: rect), with: .color(fill))
+        else { fill = Color(white: 0.78) }
+        ctx.orb(rect, color: fill, glow: glow ? 0.85 : 0.0)
         if phase == .reveal && e.flag && e.a == 0 {   // missed target → ring
             ctx.stroke(Path(ellipseIn: rect.insetBy(dx: -4, dy: -4)), with: .color(.witsAccent), lineWidth: 2.5)
         }

@@ -73,6 +73,6 @@ final class ScrollHuntArcade: ArcadeGame {
         } else {
             c = Color(red: Self.base.r, green: Self.base.g, blue: Self.base.b)
         }
-        ctx.fill(Path(ellipseIn: rect), with: .color(c))
+        ctx.orb(rect, color: c, glow: e.flag ? 0.85 : 0.5)
     }
 }

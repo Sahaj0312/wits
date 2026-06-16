@@ -81,7 +81,13 @@ final class ArrowVolleyArcade: ArcadeGame {
                 p.addLine(to: CGPoint(x: cell.maxX, y: cell.maxY))
             }
             p.closeSubpath()
-            ctx.fill(p, with: .color(isCenter ? .witsAccent : Color.witsInk.opacity(0.32)))
+            if isCenter {
+                var g = ctx
+                g.addFilter(.shadow(color: Color.witsAccent.opacity(0.9), radius: cell.width * 0.5))
+                g.fill(p, with: .color(.witsAccent))
+            } else {
+                ctx.fill(p, with: .color(.white.opacity(0.34)))
+            }
         }
     }
 }
