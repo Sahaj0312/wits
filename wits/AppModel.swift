@@ -13,6 +13,7 @@ import SwiftUI
 import Observation
 
 struct ProfileSnapshot: Codable, Equatable {
+    var displayName: String? = nil
     var birthdate: Date? = nil
     var goals: [String] = []
     var trainingDays: Int = 5
@@ -38,9 +39,9 @@ final class AppModel {
     var headlineIndex: Double? = nil
     /// Per-day rollups for the progress chart (ascending by day).
     var progressDays: [DailyProgressRow] = []
-    var league: LeagueResult? = nil
-    private var leagueWeekStart: String?
-    private var leagueWeekXP = 0
+    /// Cumulative lifetime XP — the currency that ranks you against friends.
+    /// Earned by training; computed server-side over full history.
+    var xp: Int = 0
     var percentile: Int? = nil
     var percentileMessage: String? = nil
     var friendCode: String? = nil
@@ -66,32 +67,42 @@ final class AppModel {
         seedFreezesIfNew()
         load = .ready
         Task { await reconcile() }
-        Task { await refreshLeague() }
         Task { await refreshSocial() }
     }
 
-    // MARK: Leagues
-
-    func refreshLeague() async {
-        guard supa.isSignedIn else { return }
-        guard let data = try? await supa.callFunction("league-join"),
-              let res = try? JSONDecoder().decode(LeagueResult.self, from: data) else { return }
-        league = res
-        leagueWeekStart = res.week_start
-        leagueWeekXP = res.standings.first(where: { $0.isMe })?.xp ?? leagueWeekXP
-        saveCache()
-    }
-
-    // MARK: Social (percentile + friends)
+    // MARK: Social (xp + percentile + friends)
 
     func refreshSocial() async {
         guard supa.isSignedIn else { return }
+        await refreshXP()
         if let d = try? await supa.callFunction("social", body: ["action": "percentile"]),
            let r = try? JSONDecoder().decode(PercentileResp.self, from: d), r.hasData {
             percentile = r.percentile
             percentileMessage = r.message
         }
         await refreshFriends()
+    }
+
+    /// Pull the user's cumulative XP (computed server-side over full history).
+    func refreshXP() async {
+        guard supa.isSignedIn else { return }
+        if let d = try? await supa.callFunction("social", body: ["action": "xp"]),
+           let r = try? JSONDecoder().decode(XPResp.self, from: d) {
+            xp = r.xp
+            saveCache()
+        }
+    }
+
+    /// Set the user's display name (shown to friends). Updates locally + remotely.
+    @discardableResult
+    func setDisplayName(_ name: String) async -> Bool {
+        let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(24))
+        guard !trimmed.isEmpty else { return false }
+        profile.displayName = trimmed
+        saveCache()
+        guard supa.isSignedIn else { return true }
+        try? await supa.upsertProfile(["display_name": trimmed])
+        return true
     }
 
     func loadFriendCode() async {
@@ -116,18 +127,6 @@ final class AppModel {
         if let d = try? await supa.callFunction("social", body: ["action": "friendList"]),
            let r = try? JSONDecoder().decode(FriendListResp.self, from: d) {
             friends = r.friends
-        }
-    }
-
-    /// Add weekly league XP (from a finished workout) and re-rank.
-    func addLeagueXP(_ points: Int) {
-        guard points > 0, let lid = league?.league_id else { return }
-        leagueWeekXP += points
-        saveCache()
-        let xp = leagueWeekXP
-        Task {
-            try? await supa.upsertLeagueXP(leagueID: lid, xp: xp)
-            await refreshLeague()
         }
     }
 
@@ -260,11 +259,12 @@ final class AppModel {
     func finishWorkout(_ results: [GameResult]) {
         today.results = results
         streak = StreakEngine.recordActivity(streak, today: Date())
-        addLeagueXP(max(1, results.reduce(0) { $0 + $1.score } / 100))
 
         let domainScores = Self.domainScores(from: results)
         let headline = Self.headline(from: domainScores)
         headlineIndex = headline
+        // optimistic XP bump so the number moves immediately; reconciled server-side.
+        xp += 100 + Int(headline.rounded())
 
         // reflect the day locally for the chart without waiting on the network
         let dayKey = SupabaseManager.dayString(Date())
@@ -286,6 +286,7 @@ final class AppModel {
                                                 gamesPlayed: results.count,
                                                 headlineIndex: headline,
                                                 domainScores: domainScores)
+            await refreshXP()
         }
     }
 
@@ -295,6 +296,7 @@ final class AppModel {
         guard supa.isSignedIn else { return }
 
         if let p = try? await supa.fetchProfile() {
+            profile.displayName = p.display_name ?? profile.displayName
             profile.birthdate = Self.parseDate(p.birthdate)
             profile.goals = p.goals ?? profile.goals
             profile.trainingDays = p.training_days ?? profile.trainingDays
@@ -371,8 +373,7 @@ final class AppModel {
         var today: DailyWorkout
         var headlineIndex: Double?
         var progressDays: [DailyProgressRow]
-        var leagueWeekStart: String?
-        var leagueWeekXP: Int?
+        var xp: Int?
     }
 
     private func saveCache() {
@@ -384,8 +385,7 @@ final class AppModel {
             today: today,
             headlineIndex: headlineIndex,
             progressDays: progressDays,
-            leagueWeekStart: leagueWeekStart,
-            leagueWeekXP: leagueWeekXP
+            xp: xp
         )
         if let data = try? JSONEncoder().encode(state) {
             UserDefaults.standard.set(data, forKey: cacheKey)
@@ -405,8 +405,7 @@ final class AppModel {
         })
         headlineIndex = state.headlineIndex
         progressDays = state.progressDays
-        leagueWeekStart = state.leagueWeekStart
-        leagueWeekXP = state.leagueWeekXP ?? 0
+        xp = state.xp ?? 0
         // keep cached workout only if it's still today's
         if Calendar.current.isDate(state.today.day, inSameDayAs: Date()) {
             today = state.today
@@ -433,10 +432,14 @@ final class AppModel {
 // MARK: - Social decode models
 
 struct FriendInfo: Decodable {
+    var name: String
+    var xp: Int
     var streak: Int
     var trainedToday: Bool
     var friendStreak: Int
 }
+
+struct XPResp: Decodable { var xp: Int }
 
 struct PercentileResp: Decodable {
     var hasData: Bool

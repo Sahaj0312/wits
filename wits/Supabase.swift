@@ -84,6 +84,7 @@ enum SupabaseError: LocalizedError {
 // MARK: - Read row models (PostgREST → Decodable)
 
 struct ProfileRow: Decodable {
+    var display_name: String?
     var birthdate: String?
     var goals: [String]?
     var training_days: Int?
@@ -116,23 +117,6 @@ struct StreakRow: Decodable {
     var longest_streak: Int?
     var last_active_day: String?
     var freezes: Int?
-}
-
-struct LeagueStanding: Codable, Identifiable {
-    var rank: Int
-    var xp: Int
-    var isMe: Bool
-    var id: Int { rank }
-}
-
-struct LeagueResult: Codable {
-    var league_id: String
-    var tier: Int
-    var week_start: String
-    var size: Int
-    var promote: Int
-    var relegate: Int
-    var standings: [LeagueStanding]
 }
 
 // MARK: - Manager
@@ -201,6 +185,16 @@ final class SupabaseManager {
             authed: false
         )
         try persist(decodeTokenResponse(data))
+
+        // Apple only returns the user's name on the FIRST authorization. Capture it
+        // now as the display name so friends see a real name, not a code.
+        if let nameComponents = credential.fullName {
+            let formatter = PersonNameComponentsFormatter()
+            let name = formatter.string(from: nameComponents).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty {
+                try? await upsertProfile(["display_name": String(name.prefix(24))])
+            }
+        }
     }
 
     // MARK: Google (web OAuth via ASWebAuthenticationSession)
@@ -425,16 +419,6 @@ final class SupabaseManager {
             URLQueryItem(name: "limit", value: "1"),
         ])
         return try JSONDecoder().decode([StreakRow].self, from: data).first
-    }
-
-    func upsertLeagueXP(leagueID: String, xp: Int) async throws {
-        guard let id = userID else { throw SupabaseError.notSignedIn }
-        let row: [String: Any] = ["league_id": leagueID, "user_id": id, "xp": xp]
-        try await restWrite(
-            table: "league_members", body: [row],
-            prefer: "resolution=merge-duplicates,return=minimal",
-            query: [URLQueryItem(name: "on_conflict", value: "league_id,user_id")]
-        )
     }
 
     /// POST to an edge function with the user's bearer token.

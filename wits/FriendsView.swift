@@ -102,9 +102,10 @@ struct FriendsSheet: View {
                 .frame(width: 38, height: 38)
                 .background(Color.witsAccent.opacity(0.14), in: Circle())
             VStack(alignment: .leading, spacing: 2) {
-                Text("wits friend")
+                Text(f.name)
                     .font(.system(size: 15, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.witsInk)
+                    .lineLimit(1)
                 Text(f.trainedToday ? "trained today" : "hasn't trained today")
                     .font(.system(size: 12.5, weight: .medium, design: .rounded))
                     .foregroundStyle(f.trainedToday ? Color.witsAccent : Color.witsMuted)

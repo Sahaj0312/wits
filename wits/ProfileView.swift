@@ -13,6 +13,7 @@ struct ProfileView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showReminder = false
     @State private var showFriends = false
+    @State private var showName = false
 
     private var entitlementLabel: String {
         switch app.entitlement {
@@ -45,6 +46,11 @@ struct ProfileView: View {
                     stat(value: "\(app.streak.freezes)", label: "freezes")
                 }
 
+                Button { showName = true } label: {
+                    infoRow(icon: "person.fill", title: "your name",
+                            value: app.profile.displayName?.isEmpty == false ? app.profile.displayName! : "add")
+                }
+                .buttonStyle(.plain)
                 Button { showReminder = true } label: {
                     infoRow(icon: "bell.fill", title: "daily reminder", value: reminderLabel)
                 }
@@ -84,6 +90,10 @@ struct ProfileView: View {
         .sheet(isPresented: $showFriends) {
             FriendsSheet()
         }
+        .sheet(isPresented: $showName) {
+            NameSettingsSheet()
+                .presentationDetents([.height(240)])
+        }
     }
 
     private func stat(value: String, label: String) -> some View {
@@ -119,5 +129,55 @@ struct ProfileView: View {
         }
         .padding(14)
         .cardSurface()
+    }
+}
+
+/// Small editor for the user's display name — the name friends see in the ranking.
+struct NameSettingsSheet: View {
+    @Environment(AppModel.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    @State private var name = ""
+    @State private var working = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("your name")
+                .font(.witsDisplay(24))
+                .foregroundStyle(Color.witsInk)
+            Text("this is what your friends see next to your score.")
+                .font(.witsBody(13.5))
+                .foregroundStyle(Color.witsMuted)
+
+            TextField("your name", text: $name)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .padding(.horizontal, 14).padding(.vertical, 13)
+                .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            Button {
+                Task { await save() }
+            } label: {
+                Text(working ? "…" : "save")
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 14)
+                    .background(Color.witsAccent, in: Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+        }
+        .padding(WitsMetrics.screenPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .background(Color.witsBg.ignoresSafeArea())
+        .onAppear { name = app.profile.displayName ?? "" }
+    }
+
+    private func save() async {
+        working = true
+        await app.setDisplayName(name)
+        working = false
+        dismiss()
     }
 }
