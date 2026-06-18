@@ -97,9 +97,10 @@ final class ArcadeSKScene: SKScene {
         style = ArcadeStyle(size: size, dab: ArcadeTextures.dab, ring: ArcadeTextures.ring, spark: ArcadeTextures.spark)
         model.bounds = size
 
-        // Background: crowd control uses the themed app background (matching arrow
+        // Background: these games use the themed app background (matching arrow
         // storm's clean look); other arcade games use the provided light field art.
-        if game.id == .crowdControl {
+        let themedBackgroundGames: Set<GameID> = [.crowdControl, .echoGrid, .pathKeeper]
+        if themedBackgroundGames.contains(game.id) {
             backgroundColor = UIColor(Color.witsBg)
         } else {
             // premium light background (provided asset, aspect-filled)

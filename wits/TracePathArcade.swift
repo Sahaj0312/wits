@@ -82,14 +82,14 @@ final class TracePathArcade: ArcadeGame {
         let r = e.radius * style.unit
         let n = SKShapeNode(rectOf: CGSize(width: r * 2, height: r * 2), cornerRadius: r * 0.55)
         n.strokeColor = .clear; n.zPosition = 1
-        n.fillColor = UIColor(white: 0.85, alpha: 1)
+        n.fillColor = UIColor(Color.witsCard)
         n.addSoftShadow(radius: r, style: style, alpha: 0.10)
         return n
     }
 
     func refreshNode(_ node: SKNode, _ e: ArcadeEntity, style: ArcadeStyle) {
         let lit = e.id == litID
-        (node as? SKShapeNode)?.fillColor = lit ? UIColor(Color.witsAccent) : UIColor(white: 0.85, alpha: 1)
+        (node as? SKShapeNode)?.fillColor = lit ? UIColor(Color.witsAccent) : UIColor(Color.witsCard)
         node.setScale(lit ? 1.14 : 1.0)
     }
 
@@ -124,10 +124,18 @@ final class TracePathArcade: ArcadeGame {
     private func placeNodes(_ scene: ArcadeScene) {
         scene.reset()
         let cols = 4, rows = 4
+        // Unit coords normalize x to width and y to height; on a tall field that
+        // makes equal fractions look stretched vertically. Use the same *pixel* gap
+        // for rows as columns (a true square grid), centered.
+        let aspect = scene.bounds.height > 0 ? scene.bounds.width / scene.bounds.height : 390.0 / 700.0
+        let stepX = 0.2                    // unit-x gap between columns (unchanged)
+        let stepY = stepX * aspect         // matching pixel gap between rows
+        let startX = 0.5 - stepX * Double(cols - 1) / 2
+        let startY = 0.5 - stepY * Double(rows - 1) / 2
         for r in 0..<rows {
             for c in 0..<cols {
-                let x = 0.2 + Double(c) / Double(cols - 1) * 0.6
-                let y = 0.18 + Double(r) / Double(rows - 1) * 0.64
+                let x = startX + Double(c) * stepX
+                let y = startY + Double(r) * stepY
                 scene.add(ArcadeEntity(id: scene.newID(), pos: CGPoint(x: x, y: y), vel: .zero,
                                        radius: 0.075, kind: 1, b: r * cols + c))
             }
