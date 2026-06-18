@@ -131,6 +131,10 @@ final class SupabaseManager {
     var isSignedIn: Bool { session != nil }
     var userID: String? { session?.userID }
 
+    /// Name Apple hands back on first sign-in — used only to prefill the
+    /// onboarding username step. Apple returns this exactly once.
+    var suggestedName: String?
+
     private let keychainKey = "wits.supabase.session"
     private var appleCoordinator: AppleSignInCoordinator?
     private var webAuthCoordinator: WebAuthCoordinator?
@@ -186,14 +190,12 @@ final class SupabaseManager {
         )
         try persist(decodeTokenResponse(data))
 
-        // Apple only returns the user's name on the FIRST authorization. Capture it
-        // now as the display name so friends see a real name, not a code.
+        // Apple only returns the user's name on the FIRST authorization. Stash it
+        // to prefill the onboarding username step; the user confirms/edits there.
         if let nameComponents = credential.fullName {
             let formatter = PersonNameComponentsFormatter()
             let name = formatter.string(from: nameComponents).trimmingCharacters(in: .whitespacesAndNewlines)
-            if !name.isEmpty {
-                try? await upsertProfile(["display_name": String(name.prefix(24))])
-            }
+            if !name.isEmpty { suggestedName = String(name.prefix(24)) }
         }
     }
 

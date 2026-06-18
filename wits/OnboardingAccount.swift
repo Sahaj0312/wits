@@ -215,6 +215,59 @@ struct AuthScreen: View {
     }
 }
 
+// MARK: - Username
+
+struct UsernameScreen: View {
+    var suggested: String?
+    var onNext: (String) -> Void
+
+    @State private var username = ""
+
+    private var trimmed: String { username.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var valid: Bool { trimmed.count >= 2 }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Wordmark()
+                .padding(.bottom, 30)
+            Text("pick a username")
+                .font(.witsDisplay(30))
+                .foregroundStyle(Color.witsInk)
+                .rise()
+            Text("this is the name your friends see on the activity board. it doesn't have to be unique.")
+                .font(.witsBody(16))
+                .foregroundStyle(Color.witsMuted)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
+                .rise(0.08)
+
+            FieldCard {
+                TextField("your username", text: $username)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled()
+                    .font(.witsBody(17, weight: .semibold))
+                    .onChange(of: username) { _, new in
+                        username = String(new.prefix(24))
+                    }
+            }
+            .rise(0.16)
+
+            Spacer()
+            Cta(title: "continue", dimmed: !valid) {
+                guard valid else { return }
+                onNext(trimmed)
+            }
+            .rise(0.28)
+            .padding(.top, 16)
+        }
+        .padding(.horizontal, WitsMetrics.screenPadding)
+        .padding(.vertical, 12)
+        .onAppear {
+            if username.isEmpty, let suggested, !suggested.isEmpty { username = suggested }
+        }
+    }
+}
+
 // MARK: - Date of birth
 
 struct BirthdateScreen: View {

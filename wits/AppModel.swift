@@ -93,18 +93,6 @@ final class AppModel {
         }
     }
 
-    /// Set the user's display name (shown to friends). Updates locally + remotely.
-    @discardableResult
-    func setDisplayName(_ name: String) async -> Bool {
-        let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(24))
-        guard !trimmed.isEmpty else { return false }
-        profile.displayName = trimmed
-        saveCache()
-        guard supa.isSignedIn else { return true }
-        try? await supa.upsertProfile(["display_name": trimmed])
-        return true
-    }
-
     func loadFriendCode() async {
         guard supa.isSignedIn else { return }
         if let d = try? await supa.callFunction("social", body: ["action": "friendCode"]),

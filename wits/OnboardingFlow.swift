@@ -15,7 +15,7 @@ let onboardingQuizTotal = 11.0
 
 enum OnboardingStep: Hashable {
     // 1 — account creation
-    case hook, auth, birthdate
+    case hook, auth, username, birthdate
     // 2 — goals & personalization
     case welcome, goals, calibrate
     // 3 — self-assessment
@@ -38,7 +38,7 @@ enum OnboardingStep: Hashable {
 
     static let flow: [OnboardingStep] = [
         .hook,
-        .auth, .birthdate,
+        .auth, .username, .birthdate,
         .welcome, .goals, .calibrate,
         .likert(0), .likert(1), .likert(2), .stat, .likert(3), .likert(4), .likert(5),
         .aboutYou, .gender, .education, .attribution, .screenTime,
@@ -78,6 +78,7 @@ struct SpanStats {
 
 struct OnboardingData {
     // account / demographics
+    var username: String?
     var birthdate: Date?
     var gender: String?
     var education: String?
@@ -206,6 +207,13 @@ struct OnboardingView: View {
                 supa.recordCheckpoint(.accountCreated)
                 next()
             })
+        case .username:
+            UsernameScreen(suggested: supa.suggestedName) { name in
+                data.username = name
+                supa.suggestedName = nil
+                Task { try? await supa.upsertProfile(["display_name": name]) }
+                next()
+            }
         case .birthdate:
             BirthdateScreen { date in
                 data.birthdate = date
