@@ -79,8 +79,10 @@ private struct GameLauncher: View {
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
     @State private var phase: Phase = .card
+    @State private var lastResult: GameResult?
+    @State private var attempt = 0   // bump to force a fresh game instance on replay
 
-    private enum Phase { case card, train, survival }
+    private enum Phase { case card, train, survival, result }
 
     var body: some View {
         switch phase {
@@ -109,8 +111,10 @@ private struct GameLauncher: View {
                 Color.witsBg.ignoresSafeArea()
                 makeGameView(game, config: .standard(game, difficulty: app.difficultyFor(game), freePlay: true)) { r in
                     app.recordGameResult(r, source: "free_play")
-                    dismiss()
+                    lastResult = r
+                    withAnimation(.easeOut(duration: 0.2)) { phase = .result }
                 }
+                .id(attempt)
             }
             .overlay(alignment: .topLeading) {
                 Button { dismiss() } label: {
@@ -123,6 +127,13 @@ private struct GameLauncher: View {
             }
             .onAppear { GameFeel.shared.warmUp() }
             .onDisappear { GameFeel.shared.teardown() }
+        case .result:
+            GameResultView(
+                game: game,
+                result: lastResult,
+                onReplay: { attempt += 1; withAnimation(.easeOut(duration: 0.2)) { phase = .train } },
+                onDone: { dismiss() }
+            )
         case .survival:
             SurvivalHost(
                 game: game,
@@ -132,6 +143,76 @@ private struct GameLauncher: View {
                 onQuit: { dismiss() },
                 startImmediately: true
             )
+        }
+    }
+}
+
+/// End-of-game screen for free play: score + accuracy, then replay or exit.
+private struct GameResultView: View {
+    let game: GameID
+    let result: GameResult?
+    var onReplay: () -> Void
+    var onDone: () -> Void
+
+    private var accuracyPct: Int? {
+        guard let r = result, r.trials > 0 else { return nil }
+        return Int((r.accuracy * 100).rounded())
+    }
+    private var bestStreak: Int? {
+        guard let v = result?.raw["bestStreak"], v > 0 else { return nil }
+        return Int(v)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            VStack(spacing: 8) {
+                Image(systemName: game.symbol)
+                    .font(.system(size: 34, weight: .heavy))
+                    .foregroundStyle(Color.witsAccent)
+                Text(game.displayName)
+                    .font(.witsBody(15, weight: .semibold))
+                    .foregroundStyle(Color.witsMuted)
+                Text("\(result?.score ?? 0)")
+                    .font(.system(size: 64, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsInk)
+                    .monospacedDigit()
+                Text("points")
+                    .font(.witsBody(13, weight: .semibold))
+                    .foregroundStyle(Color.witsMuted)
+                if accuracyPct != nil || bestStreak != nil {
+                    HStack(spacing: 26) {
+                        if let a = accuracyPct { stat("\(a)%", "accuracy") }
+                        if let s = bestStreak { stat("\(s)", "best streak") }
+                    }
+                    .padding(.top, 8)
+                }
+            }
+            .padding(28)
+            .frame(maxWidth: .infinity)
+            .cardSurface()
+            .rise()
+            Spacer()
+            Cta(title: "play again", action: onReplay)
+                .rise(0.1)
+            QuietButton(title: "back to games", action: onDone)
+                .padding(.top, 6)
+        }
+        .padding(.horizontal, WitsMetrics.screenPadding)
+        .padding(.vertical, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.witsBg.ignoresSafeArea())
+    }
+
+    private func stat(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsAccent)
+                .monospacedDigit()
+            Text(label)
+                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.witsMuted)
         }
     }
 }
