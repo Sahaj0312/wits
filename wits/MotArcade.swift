@@ -17,7 +17,7 @@ final class MotArcade: ArcadeGame {
     let inputMode: ArcadeInputMode = .tap
     let howTo = "remember the glowing dots, track them, then tap them when they stop"
 
-    private enum Phase { case mark, move, pick, reveal }
+    private enum Phase { case mark, move, pick, reveal, regroup }
     private var phase: Phase = .mark
     private var placed = false
     private var phaseT = 0.0
@@ -27,6 +27,8 @@ final class MotArcade: ArcadeGame {
     private var picked: Set<Int> = []
     private let markDur = 1.4
     private var moveDur = 5.0
+    private let revealDur = 1.4
+    private let regroupDur = 0.45   // empty beat so old dots fade out before new ones appear
     private let margin = 0.07
 
     func seed(level: Double, survival: Bool) -> Spawner {
@@ -51,7 +53,11 @@ final class MotArcade: ArcadeGame {
         case .pick:
             break
         case .reveal:
-            if phaseT > 1.4 { startRound(scene) }
+            // clear the field first; the renderer fades the old dots out gracefully.
+            if phaseT >= revealDur { scene.reset(); phase = .regroup; phaseT = 0 }
+        case .regroup:
+            // brief empty beat, then the new round's dots pop in cleanly.
+            if phaseT >= regroupDur { spawnDots(scene) }
         }
     }
 
@@ -106,6 +112,12 @@ final class MotArcade: ArcadeGame {
 
     private func startRound(_ scene: ArcadeScene) {
         scene.reset()
+        spawnDots(scene)
+    }
+
+    /// Lay out a fresh set of dots and enter the mark phase. Assumes the field is
+    /// already clear (first round, or after the regroup beat).
+    private func spawnDots(_ scene: ArcadeScene) {
         picked = []
         var rng = SystemRandomNumberGenerator()
         for i in 0..<dots {
