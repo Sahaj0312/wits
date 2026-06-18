@@ -18,10 +18,13 @@ struct GamesLibraryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("games")
-                    .font(.witsDisplay(30))
-                    .foregroundStyle(Color.witsInk)
-                    .padding(.top, 8)
+                VStack(alignment: .leading, spacing: 2) {
+                    WitsBrandMark()
+                    Text("games")
+                        .font(.witsDisplay(30))
+                        .foregroundStyle(Color.witsInk)
+                }
+                .padding(.top, 8)
                 Text("train any skill on its own. your daily workout mixes these for you.")
                     .font(.witsBody(15))
                     .foregroundStyle(Color.witsMuted)

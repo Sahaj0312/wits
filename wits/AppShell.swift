@@ -62,10 +62,13 @@ struct ActivityTab: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                Text("activity")
-                    .font(.witsDisplay(30))
-                    .foregroundStyle(Color.witsInk)
-                    .padding(.top, 8)
+                VStack(alignment: .leading, spacing: 2) {
+                    WitsBrandMark()
+                    Text("activity")
+                        .font(.witsDisplay(30))
+                        .foregroundStyle(Color.witsInk)
+                }
+                .padding(.top, 8)
 
                 HStack(spacing: 12) {
                     metric(value: "\(app.streak.current)", label: "day streak")

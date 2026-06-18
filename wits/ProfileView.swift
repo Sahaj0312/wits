@@ -34,10 +34,13 @@ struct ProfileView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                Text("you")
-                    .font(.witsDisplay(30))
-                    .foregroundStyle(Color.witsInk)
-                    .padding(.top, 8)
+                VStack(alignment: .leading, spacing: 2) {
+                    WitsBrandMark()
+                    Text("you")
+                        .font(.witsDisplay(30))
+                        .foregroundStyle(Color.witsInk)
+                }
+                .padding(.top, 8)
 
                 HStack(spacing: 12) {
                     stat(value: "\(app.streak.current)", label: "current streak")

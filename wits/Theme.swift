@@ -120,6 +120,17 @@ struct Wordmark: View {
     }
 }
 
+/// Small accent "wits" brandmark — sits above each page's title so the brand is
+/// present on every screen.
+struct WitsBrandMark: View {
+    var body: some View {
+        Text("wits")
+            .font(.system(size: 14, weight: .heavy, design: .rounded))
+            .foregroundStyle(Color.witsAccent)
+            .kerning(0.5)
+    }
+}
+
 // MARK: - CTA
 
 private struct PressScale: ButtonStyle {
