@@ -9,18 +9,25 @@
 import SwiftUI
 
 struct RootShell: View {
+    @State private var tab = 0
+
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             TodayView()
                 .tabItem { Label("today", systemImage: "bolt.fill") }
+                .tag(0)
             ActivityTab()
                 .tabItem { Label("activity", systemImage: "chart.line.uptrend.xyaxis") }
+                .tag(1)
             GamesLibraryView()
                 .tabItem { Label("games", systemImage: "square.grid.2x2.fill") }
+                .tag(2)
             ProfileView()
                 .tabItem { Label("you", systemImage: "person.fill") }
+                .tag(3)
         }
         .tint(.witsAccent)
+        .sensoryFeedback(.selection, trigger: tab)
     }
 }
 
