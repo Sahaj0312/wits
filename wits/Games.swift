@@ -75,7 +75,7 @@ enum Estimator: Game {
 enum OddOneOut: Game {
     static let id = GameID.oddOneOut
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(ArcadeSpriteHost(cfg: config, game: ScrollHuntArcade(), onResult: onComplete))
+        AnyView(OddOneOutScreen(cfg: config, onResult: onComplete))
     }
 }
 
