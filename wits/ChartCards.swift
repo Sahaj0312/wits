@@ -9,7 +9,8 @@
 import SwiftUI
 import Charts
 
-struct HeadlineChart: View {
+/// A bare score-over-time line (no card chrome) — shown when a metric bar expands.
+struct TrendLine: View {
     let points: [SeriesPoint]
 
     private var yDomain: ClosedRange<Double> {
@@ -45,8 +46,136 @@ struct HeadlineChart: View {
                 AxisValueLabel().foregroundStyle(Color.witsFaint)
             }
         }
-        .frame(height: 180)
-        .padding(16)
+        .frame(height: 150)
+    }
+}
+
+/// A horizontal score bar that opens a full trend page when tapped.
+struct MetricBar: View {
+    let label: String
+    let value: Double            // 0…100 current
+    let series: [SeriesPoint]
+    var emphasized = false       // the overall "brain score" bar
+
+    var body: some View {
+        NavigationLink {
+            MetricDetailView(title: label, value: value, series: series)
+        } label: {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(spacing: 8) {
+                    Text(label)
+                        .font(.system(size: emphasized ? 15.5 : 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                    Spacer()
+                    Text("\(Int(value))")
+                        .font(.system(size: emphasized ? 17 : 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsAccent)
+                        .monospacedDigit()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .heavy))
+                        .foregroundStyle(Color.witsFaint)
+                }
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.witsLine)
+                        Capsule().fill(Color.witsAccent)
+                            .frame(width: max(6, geo.size.width * value / 100))
+                    }
+                }
+                .frame(height: emphasized ? 12 : 8)
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity)
+            .overlay(
+                RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                    .strokeBorder(emphasized ? Color.witsAccent.opacity(0.5) : .clear, lineWidth: 1.5)
+            )
+            .cardSurface()
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Full-page trend for a single metric (brain score or one skill).
+struct MetricDetailView: View {
+    let title: String
+    let value: Double
+    let series: [SeriesPoint]
+
+    private var best: Double? { series.map(\.value).max() }
+    private var avg: Double? {
+        series.isEmpty ? nil : series.map(\.value).reduce(0, +) / Double(series.count)
+    }
+    private var change: Double? {
+        guard let f = series.first?.value, let l = series.last?.value, series.count >= 2 else { return nil }
+        return l - f
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                VStack(alignment: .leading, spacing: 2) {
+                    WitsBrandMark()
+                    Text(title)
+                        .font(.witsDisplay(30))
+                        .foregroundStyle(Color.witsInk)
+                }
+                .padding(.top, 8)
+
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("\(Int(value))")
+                        .font(.system(size: 56, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsAccent)
+                        .monospacedDigit()
+                    Text("/ 100")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundStyle(Color.witsMuted)
+                }
+
+                Text("over time")
+                    .font(.witsBody(15, weight: .bold))
+                    .foregroundStyle(Color.witsMuted)
+                if series.count >= 2 {
+                    TrendLine(points: series)
+                        .frame(height: 240)
+                        .padding(16)
+                        .cardSurface()
+                } else {
+                    Text("your trend will appear here as you train across more days.")
+                        .font(.witsBody(15))
+                        .foregroundStyle(Color.witsMuted)
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .cardSurface()
+                }
+
+                if !series.isEmpty {
+                    HStack(spacing: 12) {
+                        stat("\(Int(best ?? value))", "best")
+                        stat("\(Int(avg ?? value))", "average")
+                        stat(change.map { "\($0 >= 0 ? "+" : "")\(Int($0))" } ?? "—", "change")
+                    }
+                }
+            }
+            .padding(.horizontal, WitsMetrics.screenPadding)
+            .padding(.bottom, 24)
+        }
+        .background(Color.witsBg.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func stat(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.system(size: 22, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsAccent)
+                .monospacedDigit()
+            Text(label)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(Color.witsMuted)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
         .cardSurface()
     }
 }
@@ -177,43 +306,5 @@ struct LifestyleCard: View {
             }
             .frame(height: 34, alignment: .bottom)
         }
-    }
-}
-
-struct DomainBars: View {
-    let scores: [CognitiveDomain: Double]
-
-    private var rows: [(domain: CognitiveDomain, value: Double)] {
-        CognitiveDomain.allCases.compactMap { d in scores[d].map { (d, $0) } }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(rows, id: \.domain) { row in
-                VStack(alignment: .leading, spacing: 5) {
-                    HStack {
-                        Text(row.domain.label)
-                            .font(.system(size: 13.5, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.witsInk)
-                        Spacer()
-                        Text("\(Int(row.value))")
-                            .font(.system(size: 13.5, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.witsAccent)
-                            .monospacedDigit()
-                    }
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Capsule().fill(Color.witsLine)
-                            Capsule().fill(Color.witsAccent)
-                                .frame(width: max(6, geo.size.width * row.value / 100))
-                        }
-                    }
-                    .frame(height: 8)
-                }
-            }
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity)
-        .cardSurface()
     }
 }

@@ -406,7 +406,20 @@ struct OnboardingView: View {
             rows.append(["game": "echo grid", "score": s.score, "percentile": result.tests[2].pct,
                          "accuracy": accuracy(s.correctTaps, s.totalTaps)])
         }
-        Task { try? await supa.saveGameScores(rows) }
+        // Seed the activity baseline from the fit test so the dashboard starts with
+        // real numbers (focus / multitasking / memory) instead of an empty state.
+        let domains: [String: Double] = [
+            CognitiveDomain.focus.rawValue: Double(result.tests[0].pct),
+            CognitiveDomain.multitasking.rawValue: Double(result.tests[1].pct),
+            CognitiveDomain.memory.rawValue: Double(result.tests[2].pct),
+        ]
+        let headline = (domains.values.reduce(0, +) / Double(domains.count) * 10).rounded() / 10
+        let day = Self.dateString(Date())
+        Task {
+            try? await supa.saveGameScores(rows)
+            try? await supa.upsertDailyProgress(day: day, workoutDone: true, gamesPlayed: 3,
+                                                headlineIndex: headline, domainScores: domains)
+        }
     }
 
     private func complete() {

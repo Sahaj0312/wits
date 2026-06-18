@@ -47,6 +47,24 @@ struct ActivityTab: View {
     private var headlinePoints: [SeriesPoint] { ProgressMath.headlineSeries(app.progressDays) }
     private var domainScores: [CognitiveDomain: Double] { ProgressMath.latestDomainScores(app.progressDays) }
     private var heroScore: Double? { ProgressMath.headline(app.progressDays) }
+    private var domainRows: [(domain: CognitiveDomain, value: Double)] {
+        CognitiveDomain.allCases.compactMap { d in domainScores[d].map { (d, $0) } }
+    }
+
+    /// Single headline number, top-right.
+    private var brainScoreBadge: some View {
+        VStack(spacing: 1) {
+            Text(heroScore.map { "\(Int($0))" } ?? "—")
+                .font(.system(size: 34, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsAccent)
+                .monospacedDigit()
+            Text("brain score")
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.witsMuted)
+        }
+        .padding(.horizontal, 16).padding(.vertical, 10)
+        .background(Color.witsAccent.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
 
     /// You + your friends, ranked by lifetime XP. Highest first; you're
     /// highlighted in place so you can see where you stand.
@@ -60,32 +78,35 @@ struct ActivityTab: View {
     }
 
     var body: some View {
+        NavigationStack {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                VStack(alignment: .leading, spacing: 2) {
-                    WitsBrandMark()
-                    Text("activity")
-                        .font(.witsDisplay(30))
-                        .foregroundStyle(Color.witsInk)
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        WitsBrandMark()
+                        Text("activity")
+                            .font(.witsDisplay(30))
+                            .foregroundStyle(Color.witsInk)
+                    }
+                    Spacer()
+                    brainScoreBadge
                 }
                 .padding(.top, 8)
 
-                HStack(spacing: 12) {
-                    metric(value: "\(app.streak.current)", label: "day streak")
-                    metric(value: "\(app.xp)", label: "xp")
-                    metric(value: heroScore.map { "\(Int($0))" } ?? "—", label: "wits score")
-                }
-
-                section("your brain is improving")
-                if headlinePoints.count >= 2 {
-                    HeadlineChart(points: headlinePoints)
+                if domainScores.isEmpty {
+                    emptyCard("finish a workout to see your brain score and skill breakdown.")
                 } else {
-                    emptyCard("finish a couple of workouts to start your improvement chart. with a few days of data, you'll see how your scores trend.")
-                }
-
-                if !domainScores.isEmpty {
-                    section("by skill")
                     DomainRadarChart(scores: domainScores)
+
+                    section("your scores")
+                    VStack(spacing: 10) {
+                        MetricBar(label: "overall", value: heroScore ?? 0,
+                                  series: headlinePoints, emphasized: true)
+                        ForEach(domainRows, id: \.domain) { row in
+                            MetricBar(label: row.domain.label, value: row.value,
+                                      series: ProgressMath.domainSeries(app.progressDays, row.domain))
+                        }
+                    }
                 }
 
                 if !app.checkins.isEmpty {
@@ -126,7 +147,9 @@ struct ActivityTab: View {
             .padding(.bottom, 24)
         }
         .background(Color.witsBg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
         .task { await app.refreshFriends() }
+        }
     }
 
     @ViewBuilder
@@ -191,20 +214,5 @@ struct ActivityTab: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardSurface()
-    }
-
-    private func metric(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 26, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsAccent)
-                .monospacedDigit()
-            Text(label)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.witsMuted)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 18)
-        .cardSurface()
     }
 }

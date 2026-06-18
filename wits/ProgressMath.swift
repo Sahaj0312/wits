@@ -50,6 +50,16 @@ enum ProgressMath {
         }
     }
 
+    /// Smoothed score over time for a single domain (only days it was trained).
+    static func domainSeries(_ days: [DailyProgressRow], _ domain: CognitiveDomain) -> [SeriesPoint] {
+        let pairs: [(Date, Double)] = sortedDays(days).compactMap { row in
+            guard let v = row.domain_scores?[domain.rawValue], let d = row.dayDate else { return nil }
+            return (d, v)
+        }
+        let smooth = ewma(pairs.map { $0.1 })
+        return zip(pairs, smooth).map { SeriesPoint(day: $0.0, value: $1.rounded()) }
+    }
+
     /// Latest smoothed score per domain (for the per-domain bars).
     static func latestDomainScores(_ days: [DailyProgressRow]) -> [CognitiveDomain: Double] {
         let rows = sortedDays(days)
