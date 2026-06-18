@@ -222,6 +222,10 @@ final class AppModel {
             try? await supa.saveSession(r, source: source)
             try? await supa.upsertDifficulty(game: id, next)
         }
+
+        // Free play counts toward your stats too (streak, XP, wits score, chart).
+        // Workout games are rolled up together by finishWorkout instead.
+        if source == "free_play" { recordDayActivity([result]) }
     }
 
     // MARK: Daily challenge (surprise extra game → earns a streak freeze)
@@ -246,34 +250,49 @@ final class AppModel {
     /// Called once the full workout completes: tick the streak + roll up the day.
     func finishWorkout(_ results: [GameResult]) {
         today.results = results
+        recordDayActivity(results)
+    }
+
+    /// Fold a set of just-played games into today's rollup: tick the streak,
+    /// accumulate domain scores, refresh the wits score + improvement chart, and
+    /// earn XP. Shared by the daily workout and free play so both move your stats.
+    private func recordDayActivity(_ results: [GameResult]) {
+        guard !results.isEmpty else { return }
         streak = StreakEngine.recordActivity(streak, today: Date())
 
-        let domainScores = Self.domainScores(from: results)
-        let headline = Self.headline(from: domainScores)
-        headlineIndex = headline
-        // optimistic XP bump so the number moves immediately; reconciled server-side.
-        xp += 100 + Int(headline.rounded())
-
-        // reflect the day locally for the chart without waiting on the network
         let dayKey = SupabaseManager.dayString(Date())
+        let existing = progressDays.first(where: { $0.day == dayKey })
+        let wasDoneToday = existing?.workout_done == true
+
+        // accumulate today's domain scores so multiple sessions build the picture
+        var domains = existing?.domain_scores ?? [:]
+        for (k, v) in Self.domainScores(from: results) { domains[k] = v }
+        let headline = Self.headline(from: domains)
+        headlineIndex = headline
+        let played = (existing?.games_played ?? 0) + results.count
+
         if let i = progressDays.firstIndex(where: { $0.day == dayKey }) {
             progressDays[i].workout_done = true
-            progressDays[i].games_played = results.count
+            progressDays[i].games_played = played
             progressDays[i].headline_index = headline
-            progressDays[i].domain_scores = domainScores
+            progressDays[i].domain_scores = domains
         } else {
             progressDays.append(DailyProgressRow(day: dayKey, workout_done: true,
-                                                 games_played: results.count,
+                                                 games_played: played,
                                                  headline_index: headline,
-                                                 domain_scores: domainScores))
+                                                 domain_scores: domains))
         }
+        // first activity of the day earns the base XP instantly; later games just
+        // refine the score. The server reconciles to the authoritative per-day total.
+        if !wasDoneToday { xp += 100 + Int(headline.rounded()) }
+
         saveCache()
         Task {
             try? await supa.upsertStreak(streak)
             try? await supa.upsertDailyProgress(day: dayKey, workoutDone: true,
-                                                gamesPlayed: results.count,
+                                                gamesPlayed: played,
                                                 headlineIndex: headline,
-                                                domainScores: domainScores)
+                                                domainScores: domains)
             await refreshXP()
         }
     }
