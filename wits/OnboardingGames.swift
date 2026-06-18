@@ -588,6 +588,7 @@ struct TrackerScreen: View {
             )
             .animation(.easeInOut(duration: 0.45), value: pulse)
             .animation(.easeOut(duration: 0.15), value: dot.picked)
+            .transition(.scale(scale: 0.6).combined(with: .opacity))
     }
 
     private func tapBoard(_ location: CGPoint, in size: CGSize) {
@@ -665,17 +666,25 @@ struct TrackerScreen: View {
             } while attempts < 40 && seeded.contains(where: { hypot($0.pos.x - pos.x, $0.pos.y - pos.y) < 0.16 })
             let angle = Double.random(in: 0..<(2 * .pi), using: &rng)
             seeded.append(Dot(
-                id: i,
+                id: gen * 100 + i,   // unique per round → dots fade in/out, never teleport
                 pos: pos,
                 vel: CGVector(dx: Darwin.cos(angle) * c.speed, dy: Darwin.sin(angle) * c.speed),
                 isTarget: i < c.targets
             ))
         }
-        dots = seeded.shuffled()
-        roundPhase = .mark
-        pulse = false
+        let fresh = seeded.shuffled()
 
         Task {
+            // fade the previous round's dots out, pause, then fade the new set in
+            if !dots.isEmpty {
+                withAnimation(.easeOut(duration: 0.25)) { dots = [] }
+                try? await Task.sleep(for: .milliseconds(320))
+                guard gen == generation else { return }
+            }
+            roundPhase = .mark
+            pulse = false
+            withAnimation(.easeOut(duration: 0.3)) { dots = fresh }
+
             // mark: pulse the targets
             var markLeft = Self.markSeconds
             while markLeft > 0 {
