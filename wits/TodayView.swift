@@ -117,7 +117,7 @@ struct TodayView: View {
                     Text("surprise challenge")
                         .font(.system(size: 15.5, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.witsInk)
-                    Text("one round of \(g.displayName) · earns a streak freeze")
+                    Text("one round of \(g.displayName) · a quick bonus")
                         .font(.system(size: 13, weight: .medium, design: .rounded))
                         .foregroundStyle(Color.witsMuted)
                 }
@@ -156,11 +156,6 @@ struct TodayView: View {
                 .font(.system(size: 16, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.witsInk)
                 .monospacedDigit()
-            if app.streak.freezes > 0 {
-                Image(systemName: "snowflake")
-                    .font(.system(size: 12, weight: .heavy))
-                    .foregroundStyle(Color.witsAccent)
-            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)

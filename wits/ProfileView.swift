@@ -45,7 +45,7 @@ struct ProfileView: View {
                 HStack(spacing: 12) {
                     stat(value: "\(app.streak.current)", label: "current streak")
                     stat(value: "\(app.streak.longest)", label: "longest")
-                    stat(value: "\(app.streak.freezes)", label: "freezes")
+                    stat(value: "\(app.xp)", label: "xp")
                 }
 
                 Button { showReminder = true } label: {

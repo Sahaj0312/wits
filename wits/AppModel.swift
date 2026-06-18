@@ -80,7 +80,6 @@ final class AppModel {
         rebuildTodayIfNeeded()
         recomputeEntitlement()
         refreshReminderSchedule()
-        seedFreezesIfNew()
         load = .ready
         Task { await reconcile() }
         Task { await refreshSocial() }
@@ -164,19 +163,11 @@ final class AppModel {
         }
     }
 
-    /// New users start with two streak freezes to clear the fragile 7-day hump.
-    private func seedFreezesIfNew() {
-        guard !UserDefaults.standard.bool(forKey: "wits.freezesSeeded") else { return }
-        if streak.lastActiveDay == nil { streak.freezes = max(streak.freezes, 2) }
-        UserDefaults.standard.set(true, forKey: "wits.freezesSeeded")
-        saveCache()
-    }
-
-    /// Foreground / midnight: resolve streak grace and refresh the day's workout.
+    /// Foreground / midnight: break the streak if a day was missed, refresh the day.
     func startOfDayRollover() {
-        let r = StreakEngine.rollover(streak, today: Date())
-        if r.state != streak {
-            streak = r.state
+        let next = StreakEngine.rollover(streak, today: Date())
+        if next != streak {
+            streak = next
             Task { try? await supa.upsertStreak(streak) }
         }
         rebuildTodayIfNeeded()
@@ -274,7 +265,7 @@ final class AppModel {
         if source == "free_play" { recordDayActivity([result]) }
     }
 
-    // MARK: Daily challenge (surprise extra game → earns a streak freeze)
+    // MARK: Daily challenge (surprise extra game)
 
     var dailyChallengeGame: GameID? {
         RewardEngine.dailyChallenge(seed: RewardEngine.daySeed(Calendar.current.startOfDay(for: Date())))
@@ -288,9 +279,7 @@ final class AppModel {
         recordGameResult(result, source: "challenge")
         guard !dailyChallengeDone else { return }
         UserDefaults.standard.set(true, forKey: challengeKey)
-        streak.freezes = min(3, streak.freezes + 1)
         saveCache()
-        Task { try? await supa.upsertStreak(streak) }
     }
 
     /// Called as each game of today's workout finishes. Persists per-game so the
@@ -389,8 +378,7 @@ final class AppModel {
         if let s = try? await supa.fetchStreak() {
             streak = StreakState(current: s.current_streak ?? 0,
                                  longest: s.longest_streak ?? 0,
-                                 lastActiveDay: Self.parseDate(s.last_active_day),
-                                 freezes: s.freezes ?? 0)
+                                 lastActiveDay: Self.parseDate(s.last_active_day))
         }
 
         let since = SupabaseManager.dayString(Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date())

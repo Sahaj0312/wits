@@ -116,7 +116,6 @@ struct StreakRow: Decodable {
     var current_streak: Int?
     var longest_streak: Int?
     var last_active_day: String?
-    var freezes: Int?
 }
 
 struct CheckInRow: Decodable {
@@ -401,7 +400,6 @@ final class SupabaseManager {
         var row: [String: Any] = [
             "user_id": id,
             "current_streak": s.current, "longest_streak": s.longest,
-            "freezes": s.freezes,
             "updated_at": Self.iso.string(from: Date()),
         ]
         if let last = s.lastActiveDay { row["last_active_day"] = Self.dayString(last) }
