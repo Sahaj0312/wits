@@ -47,7 +47,7 @@ enum SpotSpeed: Game {
 enum MatchBack: Game {
     static let id = GameID.matchBack
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(ArcadeSpriteHost(cfg: config, game: SymbolStreamArcade(), onResult: onComplete))
+        AnyView(MatchBackScreen(cfg: config, onResult: onComplete))
     }
 }
 

@@ -2,9 +2,10 @@
 //  MatchBack.swift
 //  wits
 //
-//  N-back — a working-memory classic. A cell lights up each beat; tap MATCH when
-//  the current cell is the same as the one n steps back. Adaptive: n rises with
-//  level (1-back → 2-back → 3-back).
+//  Match-back — a working-memory task made approachable. Coloured symbols flow by
+//  one at a time; tap MATCH when the current symbol is the same as the one a few
+//  cards back. Starts at 1-back ("same as the one just before") so the rule is
+//  obvious, then n rises with level. Per-card feedback teaches the rule.
 //
 
 import SwiftUI
@@ -13,16 +14,29 @@ struct MatchBackScreen: View {
     var cfg: GameConfig
     var onResult: (GameResult) -> Void
 
-    private static let cells = 9          // 3x3
+    private static let symbols = ["star.fill", "heart.fill", "bolt.fill", "leaf.fill",
+                                  "moon.fill", "drop.fill", "flame.fill", "bell.fill"]
+    private static let colors: [Color] = [
+        Color(red: 0.95, green: 0.74, blue: 0.16),   // star  — amber
+        Color(red: 0.91, green: 0.30, blue: 0.42),   // heart — rose
+        Color(red: 0.55, green: 0.45, blue: 0.95),   // bolt  — violet
+        Color(red: 0.16, green: 0.70, blue: 0.46),   // leaf  — green
+        Color(red: 0.20, green: 0.52, blue: 0.95),   // moon  — blue
+        Color(red: 0.20, green: 0.74, blue: 0.86),   // drop  — cyan
+        Color(red: 0.95, green: 0.45, blue: 0.27),   // flame — orange
+        Color(red: 0.85, green: 0.36, blue: 0.78),   // bell  — magenta
+    ]
+
     private let n: Int
     private let total: Int
-    private let stimMs = 750
-    private let gapMs = 450
+    private let intervalMs: Int
+    private let feedbackMs = 260
 
     @State private var seq: [Int] = []
     @State private var pos = -1
-    @State private var lit: Int?
+    @State private var current: Int?
     @State private var responded = false
+    @State private var feedback: Bool?       // green = correct decision, red = wrong
     @State private var tapFlash = false
     @State private var hits = 0
     @State private var misses = 0
@@ -38,19 +52,33 @@ struct MatchBackScreen: View {
         self.cfg = cfg
         self.onResult = onResult
         let level = cfg.difficulty.level
-        self.n = max(1, min(3, 1 + Int(level / 3.5)))
+        self.n = max(1, min(3, 1 + Int(level / 4)))
         self.total = 18 + n
+        self.intervalMs = max(900, Int(1350 - level * 45))
     }
 
     private var decisions: Int { hits + misses + falseAlarms + correctRej }
+    private var multiplier: Int { min(5, 1 + streak / 3) }
+
+    private var instruction: String {
+        n == 1 ? "tap MATCH when a symbol is the same as the one just before it"
+               : "tap MATCH when a symbol is the same as the one \(n) cards back"
+    }
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             if !cfg.isSurvival {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("\(Text("\(n)-back").foregroundStyle(Color.witsAccent))")
+                    Text("\(n)-back")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsInk)
+                        .foregroundStyle(Color.witsAccent)
+                    if multiplier > 1 {
+                        Text("×\(multiplier)")
+                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsAccent)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                    }
                     Spacer()
                     Text("\(score) pts")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
@@ -60,41 +88,50 @@ struct MatchBackScreen: View {
                 ProgressTrack(fraction: Double(max(0, pos)) / Double(total), animated: true)
             }
 
-            GeometryReader { geo in
-                let gap: CGFloat = 10
-                let s = (min(geo.size.width, geo.size.height) - gap * 2) / 3
-                VStack(spacing: gap) {
-                    ForEach(0..<3, id: \.self) { r in
-                        HStack(spacing: gap) {
-                            ForEach(0..<3, id: \.self) { c in
-                                let idx = r * 3 + c
-                                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                    .fill(lit == idx ? Color.witsAccent : Color.witsTint)
-                                    .frame(width: s, height: s)
-                                    .animation(.easeOut(duration: 0.1), value: lit)
-                            }
-                        }
-                    }
+            Spacer()
+
+            // One big card, one symbol at a time — clear focal point, never empty.
+            ZStack {
+                if let s = current, s < Self.symbols.count {
+                    Image(systemName: Self.symbols[s])
+                        .font(.system(size: 104, weight: .heavy))
+                        .foregroundStyle(Self.colors[s])
+                        .transition(.scale(scale: 0.7).combined(with: .opacity))
+                        .id(pos)
                 }
-                .frame(width: geo.size.width, height: geo.size.height)
-                .cardSurface()
             }
+            .frame(maxWidth: .infinity)
+            .frame(height: 260)
+            .cardSurface()
+            .overlay(
+                RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                    .strokeBorder(feedback == true ? Color.witsAccent
+                                  : feedback == false ? Color.witsWarm : .clear, lineWidth: 3)
+            )
+            .animation(.easeOut(duration: 0.18), value: pos)
+
+            Text(instruction)
+                .font(.witsBody(13))
+                .foregroundStyle(Color.witsFaint)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+
+            Spacer()
 
             Button { tapMatch() } label: {
-                Text("match")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .background(tapFlash ? Color.witsAccent : Color.witsInk.opacity(0.85), in: Capsule())
-                    .animation(.easeOut(duration: 0.12), value: tapFlash)
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .heavy))
+                    Text("match")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 18)
+                .background(tapFlash ? Color.witsAccent : Color.witsInk.opacity(0.88), in: Capsule())
+                .animation(.easeOut(duration: 0.12), value: tapFlash)
             }
             .buttonStyle(.plain)
-
-            Text("tap when the square matches the one \(n) step\(n > 1 ? "s" : "") ago")
-                .font(.witsBody(12.5))
-                .foregroundStyle(Color.witsFaint)
-                .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.top, 24)
@@ -109,9 +146,9 @@ struct MatchBackScreen: View {
                 s.append(s[i - n])                       // planned match
             } else if i >= n {
                 let avoid = s[i - n]
-                s.append((0..<Self.cells).filter { $0 != avoid }.randomElement()!)
+                s.append((0..<Self.symbols.count).filter { $0 != avoid }.randomElement()!)
             } else {
-                s.append(Int.random(in: 0..<Self.cells))
+                s.append(Int.random(in: 0..<Self.symbols.count))
             }
         }
         return s
@@ -127,13 +164,12 @@ struct MatchBackScreen: View {
                     guard gen == generation else { return }
                     pos = i
                     responded = false
-                    lit = seq[i]
-                    try? await Task.sleep(for: .milliseconds(stimMs))
-                    guard gen == generation else { return }
-                    lit = nil
-                    try? await Task.sleep(for: .milliseconds(gapMs))
+                    feedback = nil
+                    withAnimation { current = seq[i] }
+                    try? await Task.sleep(for: .milliseconds(intervalMs))
                     guard gen == generation else { return }
                     evaluate(i)
+                    try? await Task.sleep(for: .milliseconds(feedbackMs))
                 }
             } while cfg.isSurvival && !Task.isCancelled
             if !cfg.isSurvival { finish() }
@@ -150,12 +186,13 @@ struct MatchBackScreen: View {
     private func evaluate(_ i: Int) {
         let isMatch = i >= n && seq[i] == seq[i - n]
         if responded {
-            if isMatch { hits += 1; streak += 1; score += 120 * min(5, 1 + streak / 3); cfg.report(.hit, points: 120, combo: streak) }
+            if isMatch { hits += 1; streak += 1; score += 120 * multiplier; cfg.report(.hit, points: 120, combo: streak) }
             else { falseAlarms += 1; streak = 0; cfg.report(.miss) }
         } else {
             if isMatch { misses += 1; streak = 0; cfg.report(.miss) }
             else { correctRej += 1; score += 20 }   // silent: a non-event every beat
         }
+        feedback = (responded == isMatch)
     }
 
     private func finish() {
