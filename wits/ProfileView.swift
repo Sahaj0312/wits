@@ -36,7 +36,7 @@ struct ProfileView: View {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 2) {
                     WitsBrandMark()
-                    Text("you")
+                    Text(app.profile.displayName?.isEmpty == false ? app.profile.displayName! : "you")
                         .font(.witsDisplay(30))
                         .foregroundStyle(Color.witsInk)
                 }
