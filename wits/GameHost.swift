@@ -29,6 +29,21 @@ struct GameHost: View {
     @State private var results: [GameResult] = []
     @State private var bonusValue: Int?
 
+    init(workout: DailyWorkout,
+         difficultyFor: @escaping (GameID) -> DifficultyState,
+         onGameResult: @escaping (GameResult) -> Void,
+         onWorkoutDone: @escaping ([GameResult]) -> Void,
+         onQuit: @escaping () -> Void) {
+        self.workout = workout
+        self.difficultyFor = difficultyFor
+        self.onGameResult = onGameResult
+        self.onWorkoutDone = onWorkoutDone
+        self.onQuit = onQuit
+        // resume: pick up after any games already completed today
+        _index = State(initialValue: min(workout.results.count, workout.games.count))
+        _results = State(initialValue: workout.results)
+    }
+
     private var currentGame: GameID? {
         index < workout.games.count ? workout.games[index] : nil
     }

@@ -247,6 +247,22 @@ final class AppModel {
         Task { try? await supa.upsertStreak(streak) }
     }
 
+    /// Called as each game of today's workout finishes. Persists per-game so the
+    /// workout can be resumed from the next game if the user backs out partway.
+    /// The full day rollup (streak/XP/score) still happens once in finishWorkout.
+    func recordWorkoutGame(_ result: GameResult) {
+        recordGameResult(result)                 // difficulty / stats / session (source "workout")
+        if today.results.count < today.games.count {
+            today.results.append(result)
+        }
+        saveCache()
+        // last game done → roll up the day now (streak/XP/score), so completion is
+        // credited even if the user closes the app on the summary screen.
+        if today.results.count >= today.games.count {
+            finishWorkout(today.results)
+        }
+    }
+
     /// Called once the full workout completes: tick the streak + roll up the day.
     func finishWorkout(_ results: [GameResult]) {
         today.results = results

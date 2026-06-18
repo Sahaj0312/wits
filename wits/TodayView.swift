@@ -49,9 +49,9 @@ struct TodayView: View {
             GameHost(
                 workout: app.today,
                 difficultyFor: app.difficultyFor,
-                onGameResult: { app.recordGameResult($0) },
-                onWorkoutDone: { results in
-                    app.finishWorkout(results)
+                onGameResult: { app.recordWorkoutGame($0) },
+                onWorkoutDone: { _ in
+                    // rollup already happened as the final game completed; just close.
                     playing = false
                     // first value moment → offer reminders (once)
                     if !notifPrimerAsked && !app.profile.notificationsEnabled {
@@ -146,12 +146,16 @@ struct TodayView: View {
     }
 
     private var workoutCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let doneCount = app.today.results.count
+        let total = app.today.games.count
+        let inProgress = doneCount > 0 && doneCount < total
+        return VStack(alignment: .leading, spacing: 0) {
             Text("today's workout")
                 .font(.witsDisplay(30))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("\(app.today.games.count) games · about three minutes")
+            Text(inProgress ? "\(doneCount) of \(total) done · pick up where you left off"
+                            : "\(total) games · about three minutes")
                 .font(.witsBody(15.5))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 8)
@@ -159,12 +163,13 @@ struct TodayView: View {
 
             VStack(spacing: 10) {
                 ForEach(Array(app.today.games.enumerated()), id: \.offset) { i, g in
-                    gameRow(g).rise(0.14 + Double(i) * 0.07)
+                    gameRow(g, done: i < doneCount).rise(0.14 + Double(i) * 0.07)
                 }
             }
             .padding(.top, 20)
 
-            Cta(title: app.entitlement.isExpired ? "subscribe to keep training" : "start workout") {
+            Cta(title: app.entitlement.isExpired ? "subscribe to keep training"
+                     : inProgress ? "resume workout" : "start workout") {
                 if app.entitlement.isExpired { showPaywall = true } else { playing = true }
             }
                 .padding(.top, 22)
@@ -181,7 +186,7 @@ struct TodayView: View {
         }
     }
 
-    private func gameRow(_ g: GameID) -> some View {
+    private func gameRow(_ g: GameID, done: Bool) -> some View {
         HStack(spacing: 14) {
             Image(systemName: g.symbol)
                 .font(.system(size: 17, weight: .heavy))
@@ -197,13 +202,20 @@ struct TodayView: View {
                     .foregroundStyle(Color.witsMuted)
             }
             Spacer(minLength: 0)
-            Text(g.domain.label)
-                .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.witsFaint)
+            if done {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 20, weight: .heavy))
+                    .foregroundStyle(Color.witsAccent)
+            } else {
+                Text(g.domain.label)
+                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.witsFaint)
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardSurface()
+        .opacity(done ? 0.6 : 1)
     }
 
     private var doneCard: some View {
