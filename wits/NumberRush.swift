@@ -2,8 +2,9 @@
 //  NumberRush.swift
 //  wits
 //
-//  Arithmetic under time pressure. Solve each equation before its deadline.
-//  Adaptive: the per-question window tightens and operands grow with level.
+//  Arithmetic under time pressure. Type each answer on the keypad before its
+//  deadline — no multiple choice, so there's nothing to guess. Adaptive: the
+//  per-question window tightens and operands grow with level.
 //
 
 import SwiftUI
@@ -18,10 +19,10 @@ struct NumberRushScreen: View {
         let id = UUID()
         let text: String
         let answer: Int
-        let options: [Int]
     }
 
     @State private var problem: Problem
+    @State private var entry = ""
     @State private var window: Double
     @State private var windowFrac = 1.0
     @State private var trialStart = Date()
@@ -40,7 +41,7 @@ struct NumberRushScreen: View {
         self.cfg = cfg
         self.onResult = onResult
         self.level = cfg.difficulty.level
-        _window = State(initialValue: max(2.0, 5.0 - cfg.difficulty.level * 0.3))
+        _window = State(initialValue: max(2.5, 6.0 - cfg.difficulty.level * 0.3))
         _problem = State(initialValue: Self.make(level: cfg.difficulty.level))
     }
 
@@ -57,50 +58,54 @@ struct NumberRushScreen: View {
         case "×": a = Int.random(in: 2...(3 + Int(level))); b = Int.random(in: 2...(3 + Int(level))); answer = a * b
         default: answer = a + b
         }
-        var opts = Set<Int>()
-        while opts.count < 3 {
-            let d = answer + Int.random(in: -6...6)
-            if d >= 0 && d != answer { opts.insert(d) }
-        }
-        opts.insert(answer)
-        return Problem(text: "\(a) \(op) \(b)", answer: answer, options: Array(opts).shuffled())
+        return Problem(text: "\(a) \(op) \(b)", answer: answer)
     }
 
     var body: some View {
         VStack(spacing: 12) {
             if !cfg.isSurvival {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk).monospacedDigit()
-                if multiplier > 1 {
-                    Text("×\(multiplier)")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
-                        .padding(.horizontal, 8).padding(.vertical, 3)
-                        .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk).monospacedDigit()
+                    if multiplier > 1 {
+                        Text("×\(multiplier)")
+                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsAccent)
+                            .padding(.horizontal, 8).padding(.vertical, 3)
+                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                    }
+                    Spacer()
+                    Text("\(Int(ceil(timeLeft)))s")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted).monospacedDigit()
                 }
-                Spacer()
-                Text("\(Int(ceil(timeLeft)))s")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted).monospacedDigit()
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
             }
-            ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
-            }
+
             Spacer()
-            VStack(spacing: 6) {
-                Text(problem.text)
-                    .font(.system(size: 52, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .frame(maxWidth: .infinity).frame(height: 140)
-                    .cardSurface()
-                    .id(problem.id)
-                    .transition(.scale(scale: 0.92).combined(with: .opacity))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-                            .strokeBorder(feedback == true ? Color.witsAccent : feedback == false ? Color.witsWarm : .clear, lineWidth: 2.5)
-                            .padding(-14)
-                    )
+
+            VStack(spacing: 10) {
+                // equation + the answer the player is typing, on one card
+                HStack(spacing: 12) {
+                    Text("\(problem.text) =")
+                        .font(.system(size: 40, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                    Text(entry.isEmpty ? "?" : entry)
+                        .font(.system(size: 40, weight: .heavy, design: .rounded))
+                        .foregroundStyle(entry.isEmpty ? Color.witsFaint : Color.witsAccent)
+                        .monospacedDigit()
+                }
+                .frame(maxWidth: .infinity).frame(height: 130)
+                .cardSurface()
+                .id(problem.id)
+                .transition(.scale(scale: 0.94).combined(with: .opacity))
+                .overlay(
+                    RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                        .strokeBorder(feedback == true ? Color.witsAccent : feedback == false ? Color.witsWarm : .clear, lineWidth: 2.5)
+                        .padding(-14)
+                )
+
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.witsLine)
                     GeometryReader { geo in
@@ -108,39 +113,78 @@ struct NumberRushScreen: View {
                             .frame(width: max(0, geo.size.width * windowFrac))
                     }
                 }
-                .frame(width: 130, height: 4).padding(.top, 14)
+                .frame(width: 130, height: 4).padding(.top, 6)
             }
+
             Spacer()
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                ForEach(problem.options, id: \.self) { opt in
-                    Button { answer(opt) } label: {
-                        Text("\(opt)")
-                            .font(.system(size: 22, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.witsInk)
-                            .frame(maxWidth: .infinity).padding(.vertical, 18)
-                            .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.top, 16)
+
+            keypad
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.top, 24).padding(.bottom, 12)
         .task { await run() }
     }
 
-    private func answer(_ choice: Int) {
+    private var keypad: some View {
+        let rows = [["1", "2", "3"], ["4", "5", "6"], ["7", "8", "9"], ["⌫", "0", "✓"]]
+        return VStack(spacing: 10) {
+            ForEach(rows, id: \.self) { row in
+                HStack(spacing: 10) {
+                    ForEach(row, id: \.self) { key in keyButton(key) }
+                }
+            }
+        }
+    }
+
+    private func keyButton(_ key: String) -> some View {
+        let isSubmit = key == "✓"
+        let isBack = key == "⌫"
+        return Button { press(key) } label: {
+            Group {
+                if isSubmit {
+                    Image(systemName: "checkmark").font(.system(size: 22, weight: .heavy))
+                } else if isBack {
+                    Image(systemName: "delete.left.fill").font(.system(size: 20, weight: .heavy))
+                } else {
+                    Text(key).font(.system(size: 26, weight: .heavy, design: .rounded))
+                }
+            }
+            .foregroundStyle(isSubmit ? .white : Color.witsInk)
+            .frame(maxWidth: .infinity).frame(height: 58)
+            .background(isSubmit ? Color.witsAccent : Color.witsTint,
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func press(_ key: String) {
         guard !finished else { return }
-        let ok = choice == problem.answer
+        switch key {
+        case "⌫": if !entry.isEmpty { entry.removeLast() }
+        case "✓": commit()
+        default:
+            guard entry.count < 4 else { return }
+            entry += key
+            // auto-advance the moment the typed value is correct
+            if Int(entry) == problem.answer { resolve(correct: true) }
+        }
+    }
+
+    private func commit() {
+        guard let v = Int(entry) else { return }
+        resolve(correct: v == problem.answer)
+    }
+
+    private func resolve(correct ok: Bool) {
+        guard !finished else { return }
         if ok {
             right += 1; streak += 1; bestStreak = max(bestStreak, streak)
             score += 100 * multiplier
-            window = max(cfg.isSurvival ? 1.2 : 1.6, window - (cfg.isSurvival ? 0.08 : 0.05))
+            window = max(cfg.isSurvival ? 1.6 : 2.0, window - (cfg.isSurvival ? 0.08 : 0.05))
             cfg.report(.hit, points: 100, combo: streak)
         } else {
             wrong += 1; streak = 0
-            window = min(5.0, window + 0.3)
+            window = min(6.0, window + 0.3)
             cfg.report(.miss)
         }
         feedback = ok
@@ -151,7 +195,7 @@ struct NumberRushScreen: View {
     private func timeout() {
         guard !finished else { return }
         wrong += 1; streak = 0
-        window = min(5.0, window + 0.3)
+        window = min(6.0, window + 0.3)
         feedback = false
         cfg.report(.timeout)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { feedback = nil }
@@ -159,6 +203,7 @@ struct NumberRushScreen: View {
     }
 
     private func next() {
+        entry = ""
         withAnimation(.easeOut(duration: 0.13)) { problem = Self.make(level: level) }
         trialStart = Date(); windowFrac = 1
     }
