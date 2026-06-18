@@ -97,18 +97,24 @@ final class ArcadeSKScene: SKScene {
         style = ArcadeStyle(size: size, dab: ArcadeTextures.dab, ring: ArcadeTextures.ring, spark: ArcadeTextures.spark)
         model.bounds = size
 
-        // premium light background (provided asset, aspect-filled)
-        let bg = SKSpriteNode(texture: ArcadeTextures.bg)
-        bg.position = CGPoint(x: size.width/2, y: size.height/2)
-        bg.zPosition = -10
-        let tex = ArcadeTextures.bg.size()
-        if tex.width > 0, tex.height > 0 {
-            let scale = max(size.width / tex.width, size.height / tex.height)
-            bg.size = CGSize(width: tex.width * scale, height: tex.height * scale)
+        // Background: crowd control uses the themed app background (matching arrow
+        // storm's clean look); other arcade games use the provided light field art.
+        if game.id == .crowdControl {
+            backgroundColor = UIColor(Color.witsBg)
         } else {
-            bg.size = size
+            // premium light background (provided asset, aspect-filled)
+            let bg = SKSpriteNode(texture: ArcadeTextures.bg)
+            bg.position = CGPoint(x: size.width/2, y: size.height/2)
+            bg.zPosition = -10
+            let tex = ArcadeTextures.bg.size()
+            if tex.width > 0, tex.height > 0 {
+                let scale = max(size.width / tex.width, size.height / tex.height)
+                bg.size = CGSize(width: tex.width * scale, height: tex.height * scale)
+            } else {
+                bg.size = size
+            }
+            addChild(bg)
         }
-        addChild(bg)
 
         addChild(fieldLayer)
         game.setupScene(self, style: style)
