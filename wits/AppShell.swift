@@ -85,7 +85,12 @@ struct ActivityTab: View {
 
                 if !domainScores.isEmpty {
                     section("by skill")
-                    DomainBars(scores: domainScores)
+                    DomainRadarChart(scores: domainScores)
+                }
+
+                if !app.checkins.isEmpty {
+                    section("lifestyle")
+                    LifestyleCard(checkins: app.checkins)
                 }
 
                 if let msg = app.percentileMessage {

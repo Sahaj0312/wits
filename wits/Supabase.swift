@@ -119,6 +119,12 @@ struct StreakRow: Decodable {
     var freezes: Int?
 }
 
+struct CheckInRow: Decodable {
+    var day: String
+    var mood: Int?
+    var sleep: Int?
+}
+
 // MARK: - Manager
 
 @Observable
@@ -369,6 +375,25 @@ final class SupabaseManager {
             prefer: "resolution=merge-duplicates,return=minimal",
             query: [URLQueryItem(name: "on_conflict", value: "user_id,day")]
         )
+    }
+
+    func upsertCheckIn(day: String, mood: Int, sleep: Int) async throws {
+        guard let id = userID else { throw SupabaseError.notSignedIn }
+        let row: [String: Any] = ["user_id": id, "day": day, "mood": mood, "sleep": sleep]
+        try await restWrite(
+            table: "daily_checkin", body: [row],
+            prefer: "resolution=merge-duplicates,return=minimal",
+            query: [URLQueryItem(name: "on_conflict", value: "user_id,day")]
+        )
+    }
+
+    func fetchCheckins(since day: String) async throws -> [CheckInRow] {
+        let data = try await restRead(table: "daily_checkin", query: [
+            URLQueryItem(name: "select", value: "day,mood,sleep"),
+            URLQueryItem(name: "day", value: "gte.\(day)"),
+            URLQueryItem(name: "order", value: "day.asc"),
+        ])
+        return try JSONDecoder().decode([CheckInRow].self, from: data)
     }
 
     func upsertStreak(_ s: StreakState) async throws {

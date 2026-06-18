@@ -12,6 +12,20 @@
 import SwiftUI
 import Observation
 
+/// A daily lifestyle check-in answered before the workout. mood 1…5 (low→great),
+/// sleep is a bucket index 0…4 mapping to [≤5, 6, 7, 8, 9+] hours.
+struct DailyCheckIn: Codable, Equatable, Identifiable {
+    var day: String
+    var mood: Int
+    var sleep: Int
+    var id: String { day }
+
+    static let sleepLabels = ["≤5", "6", "7", "8", "9+"]
+    var sleepLabel: String { Self.sleepLabels[min(max(sleep, 0), 4)] }
+    /// Representative hours for averaging/plotting.
+    var sleepHours: Double { [5, 6, 7, 8, 9][min(max(sleep, 0), 4)] }
+}
+
 struct ProfileSnapshot: Codable, Equatable {
     var displayName: String? = nil
     var birthdate: Date? = nil
@@ -46,6 +60,8 @@ final class AppModel {
     var percentileMessage: String? = nil
     var friendCode: String? = nil
     var friends: [FriendInfo] = []
+    /// Recent daily lifestyle check-ins (ascending by day), for the activity charts.
+    var checkins: [DailyCheckIn] = []
 
     let supa: SupabaseManager
     private let cacheKey = "wits.appstate.v1"
@@ -68,6 +84,36 @@ final class AppModel {
         load = .ready
         Task { await reconcile() }
         Task { await refreshSocial() }
+    }
+
+    // MARK: Daily check-in (mood + sleep)
+
+    /// User can turn the pre-workout check-in off ("stop these check-ins").
+    var checkinsDisabled: Bool {
+        get { UserDefaults.standard.bool(forKey: "wits.checkinsDisabled") }
+        set { UserDefaults.standard.set(newValue, forKey: "wits.checkinsDisabled") }
+    }
+
+    var todayCheckIn: DailyCheckIn? {
+        let key = SupabaseManager.dayString(Date())
+        return checkins.first { $0.day == key }
+    }
+    var isCheckInDoneToday: Bool { todayCheckIn != nil }
+
+    private var checkinSkipKey: String { "wits.checkinSkipped." + SupabaseManager.dayString(Date()) }
+    var checkinSkippedToday: Bool { UserDefaults.standard.bool(forKey: checkinSkipKey) }
+    func skipCheckInToday() { UserDefaults.standard.set(true, forKey: checkinSkipKey) }
+
+    /// Whether to show the check-in before starting today's workout.
+    var needsCheckIn: Bool { !checkinsDisabled && !isCheckInDoneToday && !checkinSkippedToday }
+
+    func recordCheckIn(mood: Int, sleep: Int) {
+        let key = SupabaseManager.dayString(Date())
+        let entry = DailyCheckIn(day: key, mood: mood, sleep: sleep)
+        if let i = checkins.firstIndex(where: { $0.day == key }) { checkins[i] = entry }
+        else { checkins.append(entry) }
+        saveCache()
+        Task { try? await supa.upsertCheckIn(day: key, mood: mood, sleep: sleep) }
     }
 
     // MARK: Social (xp + percentile + friends)
@@ -352,6 +398,12 @@ final class AppModel {
             progressDays = rows
             headlineIndex = rows.last?.headline_index ?? headlineIndex
         }
+        if let rows = try? await supa.fetchCheckins(since: since) {
+            checkins = rows.compactMap { r in
+                guard let m = r.mood, let s = r.sleep else { return nil }
+                return DailyCheckIn(day: r.day, mood: m, sleep: s)
+            }
+        }
 
         recomputeEntitlement()
         rebuildTodayIfNeeded()
@@ -397,6 +449,7 @@ final class AppModel {
         var headlineIndex: Double?
         var progressDays: [DailyProgressRow]
         var xp: Int?
+        var checkins: [DailyCheckIn]?
     }
 
     private func saveCache() {
@@ -408,7 +461,8 @@ final class AppModel {
             today: today,
             headlineIndex: headlineIndex,
             progressDays: progressDays,
-            xp: xp
+            xp: xp,
+            checkins: checkins
         )
         if let data = try? JSONEncoder().encode(state) {
             UserDefaults.standard.set(data, forKey: cacheKey)
@@ -429,6 +483,7 @@ final class AppModel {
         headlineIndex = state.headlineIndex
         progressDays = state.progressDays
         xp = state.xp ?? 0
+        checkins = state.checkins ?? []
         // keep cached workout only if it's still today's
         if Calendar.current.isDate(state.today.day, inSameDayAs: Date()) {
             today = state.today
