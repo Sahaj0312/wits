@@ -93,6 +93,17 @@ private struct GameLauncher: View {
                 onBack: { dismiss() },
                 onSurvival: { phase = .survival }
             )
+            .overlay(alignment: .topLeading) {
+                Button { dismiss() } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .padding(10)
+                        .background(.black.opacity(0.28), in: Circle())
+                }
+                .padding(.top, 44)
+                .padding(.leading, 12)
+            }
         case .train:
             ZStack {
                 Color.witsBg.ignoresSafeArea()
