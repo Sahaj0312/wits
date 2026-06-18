@@ -15,13 +15,14 @@ import UIKit
 final class TracePathArcade: ArcadeGame {
     let id: GameID
     let reverse: Bool
-    let inputMode: ArcadeInputMode = .trace
-    var howTo: String { reverse ? "watch the path, then trace it BACKWARDS" : "watch the path, then trace it in order" }
+    let inputMode: ArcadeInputMode = .tap
+    var howTo: String { reverse ? "watch the path, then tap it BACKWARDS" : "watch the path, then tap it in order" }
 
     private enum Phase { case show, awaitTrace, reveal }
     private var phase: Phase = .show
     private var placed = false
     private var seq: [Int] = []          // node ids in presentation order
+    private var entered: [Int] = []      // node ids the player has tapped, in order
     private var litID: Int?
     private var litCursor = 0
     private var phaseT = 0.0
@@ -62,20 +63,33 @@ final class TracePathArcade: ArcadeGame {
     func postStep(scene: ArcadeScene, dt: Double) -> [Resolution] { [] }
 
     func resolve(_ action: ArcadeAction, scene: ArcadeScene) -> Resolution? {
-        guard phase == .awaitTrace, case let .trace(ids) = action else { return nil }
+        guard phase == .awaitTrace, case let .tap(p) = action else { return nil }
+        guard let e = scene.nearest(to: p, maxDist: 0.085, where: { $0.kind == 1 }),
+              !entered.contains(e.id) else { return nil }
+
+        entered.append(e.id)
+        setMark(scene, e.id, 1)            // light the tile so taps visibly register
+
+        // wait until the player has tapped the full sequence
+        guard entered.count >= seq.count else { return nil }
+
         let expected = reverse ? Array(seq.reversed()) : seq
         phase = .reveal; phaseT = 0
-        let correct = zip(ids, expected).reduce(0) { $0 + ($1.0 == $1.1 ? 1 : 0) }
-        if ids.count == expected.count && correct == expected.count {
+        let correct = zip(entered, expected).reduce(0) { $0 + ($1.0 == $1.1 ? 1 : 0) }
+        if correct == expected.count {
             span = min(8, span + 1)
             return Resolution(kind: .hit, points: 60 * expected.count)
         }
         span = max(2, span - 1)
         // one transposition leaves all-but-two correct
-        if ids.count == expected.count && correct >= expected.count - 2 {
+        if correct >= expected.count - 2 {
             return Resolution(kind: .nearMiss, points: 0)
         }
         return Resolution(kind: .miss, points: 0)
+    }
+
+    private func setMark(_ scene: ArcadeScene, _ id: Int, _ v: Int) {
+        if let i = scene.entities.firstIndex(where: { $0.id == id }) { scene.entities[i].a = v }
     }
 
     func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode {
@@ -89,8 +103,12 @@ final class TracePathArcade: ArcadeGame {
 
     func refreshNode(_ node: SKNode, _ e: ArcadeEntity, style: ArcadeStyle) {
         let lit = e.id == litID
-        (node as? SKShapeNode)?.fillColor = lit ? UIColor(Color.witsAccent) : UIColor(Color.witsCard)
-        node.setScale(lit ? 1.14 : 1.0)
+        let selected = e.a == 1
+        let color: UIColor = lit ? UIColor(Color.witsAccent)
+            : selected ? UIColor(Color.witsAccent).withAlphaComponent(0.6)
+            : UIColor(Color.witsCard)
+        (node as? SKShapeNode)?.fillColor = color
+        node.setScale(lit || selected ? 1.14 : 1.0)
     }
 
     func draw(_ e: ArcadeEntity, into ctx: inout GraphicsContext, rect: CGRect, scene: ArcadeScene) {
@@ -111,7 +129,7 @@ final class TracePathArcade: ArcadeGame {
     func overlay(scene: ArcadeScene) -> AnyView {
         AnyView(VStack {
             Spacer()
-            Text(phase == .awaitTrace ? (reverse ? "trace it backwards" : "trace it in order")
+            Text(phase == .awaitTrace ? (reverse ? "tap it backwards" : "tap it in order")
                  : phase == .reveal ? "" : "watch")
                 .font(.witsBody(13, weight: .semibold))
                 .foregroundStyle(Color.witsFaint)
@@ -145,6 +163,8 @@ final class TracePathArcade: ArcadeGame {
     private func startRound(_ scene: ArcadeScene) {
         let ids = scene.entities.filter { $0.kind == 1 }.map(\.id).shuffled()
         seq = Array(ids.prefix(span))
+        entered = []
+        for i in scene.entities.indices { scene.entities[i].a = 0 }   // clear prior selection
         litCursor = 0; phaseT = 0; litID = nil
         phase = .show
     }

@@ -177,8 +177,9 @@ final class ArcadeSKScene: SKScene {
         label.zPosition = 100
 
         let plate = SKShapeNode(rectOf: CGSize(width: size.width * 0.82, height: 90), cornerRadius: 18)
-        plate.fillColor = UIColor.white.withAlphaComponent(0.92)
-        plate.strokeColor = .clear
+        plate.fillColor = UIColor(Color.witsCard)
+        plate.strokeColor = UIColor(Color.witsLine)
+        plate.lineWidth = 1
         plate.position = CGPoint(x: size.width/2, y: size.height/2)
         plate.zPosition = 99
         plate.addChild(label)
