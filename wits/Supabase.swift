@@ -422,6 +422,12 @@ final class SupabaseManager {
         return try JSONDecoder().decode([ProfileRow].self, from: data).first
     }
 
+    /// Whether the signed-in account already finished onboarding (server-side), so
+    /// a returning user who signed out doesn't get sent through it again.
+    func isOnboardingComplete() async -> Bool {
+        (try? await fetchProfile())?.onboarding_completed == true
+    }
+
     func fetchDifficulty() async throws -> [DifficultyRow] {
         let data = try await restRead(table: "game_difficulty", query: [
             URLQueryItem(name: "select", value: "*"),

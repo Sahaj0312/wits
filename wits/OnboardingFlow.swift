@@ -204,8 +204,15 @@ struct OnboardingView: View {
             HookScreen(onNext: next)
         case .auth:
             AuthScreen(onAuthed: {
-                supa.recordCheckpoint(.accountCreated)
-                next()
+                Task {
+                    // returning user (already onboarded on the server) → go straight in
+                    if await supa.isOnboardingComplete() {
+                        onFinished()
+                    } else {
+                        supa.recordCheckpoint(.accountCreated)
+                        next()
+                    }
+                }
             })
         case .username:
             UsernameScreen(suggested: supa.suggestedName) { name in
