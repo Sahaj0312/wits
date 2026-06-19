@@ -16,11 +16,11 @@ struct RootShell: View {
             TodayView()
                 .tabItem { Label("today", systemImage: "bolt.fill") }
                 .tag(0)
-            ActivityTab()
-                .tabItem { Label("activity", systemImage: "chart.line.uptrend.xyaxis") }
-                .tag(1)
             GamesLibraryView()
                 .tabItem { Label("games", systemImage: "square.grid.2x2.fill") }
+                .tag(1)
+            ActivityTab()
+                .tabItem { Label("activity", systemImage: "chart.line.uptrend.xyaxis") }
                 .tag(2)
             ProfileView()
                 .tabItem { Label("you", systemImage: "person.fill") }
