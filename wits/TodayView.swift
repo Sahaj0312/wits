@@ -33,11 +33,23 @@ struct TodayView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
-                if app.isWorkoutDoneToday {
-                    doneCard.padding(.top, 22)
-                } else {
-                    workoutCard.padding(.top, 22)
+                Text(app.isWorkoutDoneToday ? "done for today — see you tomorrow"
+                                            : "your journey")
+                    .font(.witsBody(13.5, weight: .semibold))
+                    .foregroundStyle(Color.witsMuted)
+                    .padding(.top, 20)
+
+                WorkoutPathView(onStart: beginWorkout)
+                    .padding(.top, 6)
+
+                if case .trial = app.entitlement {
+                    Text("\(app.entitlement.trialDaysLeft) days left in your free trial")
+                        .font(.witsBody(12.5))
+                        .foregroundStyle(Color.witsFaint)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 8)
                 }
+
                 if let g = app.dailyChallengeGame, !app.dailyChallengeDone {
                     challengeCard(g).padding(.top, 14)
                 }
@@ -165,98 +177,10 @@ struct TodayView: View {
         .shadow(color: .witsShadow, radius: 8, y: 4)
     }
 
-    private var workoutCard: some View {
-        let doneCount = app.today.results.count
-        let total = app.today.games.count
-        let inProgress = doneCount > 0 && doneCount < total
-        return VStack(alignment: .leading, spacing: 0) {
-            Text("today's workout")
-                .font(.witsDisplay(30))
-                .foregroundStyle(Color.witsInk)
-                .rise()
-            Text(inProgress ? "\(doneCount) of \(total) done · pick up where you left off"
-                            : "\(total) games · about three minutes")
-                .font(.witsBody(15.5))
-                .foregroundStyle(Color.witsMuted)
-                .padding(.top, 8)
-                .rise(0.06)
-
-            VStack(spacing: 10) {
-                ForEach(Array(app.today.games.enumerated()), id: \.offset) { i, g in
-                    gameRow(g, done: i < doneCount).rise(0.14 + Double(i) * 0.07)
-                }
-            }
-            .padding(.top, 20)
-
-            Cta(title: app.entitlement.isExpired ? "subscribe to keep training"
-                     : inProgress ? "resume workout" : "start workout") {
-                if app.entitlement.isExpired { showPaywall = true }
-                else if app.needsCheckIn { showCheckIn = true }
-                else { playing = true }
-            }
-                .padding(.top, 22)
-                .rise(0.4)
-
-            if case .trial = app.entitlement {
-                Text("\(app.entitlement.trialDaysLeft) days left in your free trial")
-                    .font(.witsBody(12.5))
-                    .foregroundStyle(Color.witsFaint)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 12)
-                    .rise(0.46)
-            }
-        }
-    }
-
-    private func gameRow(_ g: GameID, done: Bool) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: g.symbol)
-                .font(.system(size: 17, weight: .heavy))
-                .foregroundStyle(Color.witsAccent)
-                .frame(width: 42, height: 42)
-                .background(Color.witsAccent.opacity(0.14), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(g.displayName)
-                    .font(.system(size: 15.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                Text(g.tagline)
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-            }
-            Spacer(minLength: 0)
-            if done {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 20, weight: .heavy))
-                    .foregroundStyle(Color.witsAccent)
-            } else {
-                Text(g.domain.label)
-                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.witsFaint)
-            }
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardSurface()
-        .opacity(done ? 0.6 : 1)
-    }
-
-    private var doneCard: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 46, weight: .heavy))
-                .foregroundStyle(Color.witsAccent)
-            Text("done for today")
-                .font(.witsDisplay(28))
-                .foregroundStyle(Color.witsInk)
-            Text("you trained today and your streak is safe. come back tomorrow for a fresh workout — no need to grind.")
-                .font(.witsBody(15.5))
-                .foregroundStyle(Color.witsMuted)
-                .multilineTextAlignment(.center)
-            QuietButton(title: "play again anyway") { playing = true }
-        }
-        .padding(28)
-        .frame(maxWidth: .infinity)
-        .cardSurface()
-        .rise()
+    /// Tapped the live node on the path → start / resume today's workout.
+    private func beginWorkout() {
+        if app.entitlement.isExpired { showPaywall = true }
+        else if app.needsCheckIn { showCheckIn = true }
+        else { playing = true }
     }
 }
