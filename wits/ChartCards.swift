@@ -25,13 +25,16 @@ struct TrendLine: View {
             AreaMark(x: .value("day", p.day), y: .value("score", p.value))
                 .interpolationMethod(.catmullRom)
                 .foregroundStyle(
-                    LinearGradient(colors: [Color.witsAccent.opacity(0.28), Color.witsAccent.opacity(0.02)],
+                    LinearGradient(colors: [Color.witsAccent.opacity(0.22), Color.witsAccent.opacity(0.01)],
                                    startPoint: .top, endPoint: .bottom)
                 )
             LineMark(x: .value("day", p.day), y: .value("score", p.value))
                 .interpolationMethod(.catmullRom)
                 .lineStyle(StrokeStyle(lineWidth: 3))
                 .foregroundStyle(Color.witsAccent)
+            PointMark(x: .value("day", p.day), y: .value("score", p.value))
+                .foregroundStyle(Color.witsAccent)
+                .symbolSize(points.count <= 8 ? 36 : 0)
         }
         .chartYScale(domain: yDomain)
         .chartXAxis {
@@ -46,7 +49,7 @@ struct TrendLine: View {
                 AxisValueLabel().foregroundStyle(Color.witsFaint)
             }
         }
-        .frame(height: 150)
+        .frame(height: 180)          // firm height so the plot can't grow to fill the page
     }
 }
 
@@ -137,9 +140,11 @@ struct MetricDetailView: View {
                     .foregroundStyle(Color.witsMuted)
                 if series.count >= 2 {
                     TrendLine(points: series)
-                        .frame(height: 240)
                         .padding(16)
-                        .cardSurface()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.witsCard, in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+                        .shadow(color: .witsShadow, radius: 10, y: 6)
                 } else {
                     Text("your trend will appear here as you train across more days.")
                         .font(.witsBody(15))
