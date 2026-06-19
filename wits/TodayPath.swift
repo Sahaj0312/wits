@@ -63,7 +63,6 @@ struct WorkoutPathView: View {
                 selected = nil
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onStart() }
             })
-            .presentationDetents([.medium, .large])
         }
     }
 
@@ -231,6 +230,20 @@ struct DayDetailSheet: View {
         let f = DateFormatter(); f.dateFormat = "EEEE, MMM d"; return f
     }()
 
+    /// Exact content height so the sheet fits everything with no scroll / no gap.
+    private var sheetHeight: CGFloat {
+        var h: CGFloat = 22 + 62          // top pad + title block (title + status)
+        if brainScore != nil { h += 16 + 32 }
+        h += 16 + 20                      // "the workout" label
+        h += 16 + CGFloat(games.count) * 64 + CGFloat(max(0, games.count - 1)) * 10
+        switch node.state {
+        case .today, .inProgress: h += 16 + 52   // action button
+        case .locked: h += 16 + 20               // unlock note
+        default: break
+        }
+        return h + 24 + 28                // bottom pad + drag indicator/inset
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
@@ -249,7 +262,7 @@ struct DayDetailSheet: View {
                             .foregroundStyle(Color.witsFaint)
                     }
                 }
-                .padding(.top, 8)
+                .padding(.top, 22)
 
                 if let score = brainScore {
                     HStack(spacing: 6) {
@@ -278,7 +291,10 @@ struct DayDetailSheet: View {
             .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.bottom, 24)
         }
+        .scrollBounceBehavior(.basedOnSize)
         .background(Color.witsBg.ignoresSafeArea())
+        .presentationDetents([.height(sheetHeight)])
+        .presentationDragIndicator(.visible)
     }
 
     @ViewBuilder
