@@ -26,6 +26,15 @@ struct DailyCheckIn: Codable, Equatable, Identifiable {
     var sleepHours: Double { [5, 6, 7, 8, 9][min(max(sleep, 0), 4)] }
 }
 
+/// A game actually played on a given day, with the difficulty level it ran at —
+/// the record behind the day-detail recap ("you played these, at these levels").
+struct PlayedGame: Codable, Equatable {
+    var game: GameID
+    var level: Double          // 0…10 staircase level for that run
+    var accuracy: Double
+    var score: Int
+}
+
 struct ProfileSnapshot: Codable, Equatable {
     var displayName: String? = nil
     var birthdate: Date? = nil
@@ -62,6 +71,10 @@ final class AppModel {
     var friends: [FriendInfo] = []
     /// Recent daily lifestyle check-ins (ascending by day), for the activity charts.
     var checkins: [DailyCheckIn] = []
+    /// Actual workout games played per day (key yyyy-MM-dd, local), with the level
+    /// played — reconstructed from game_sessions so a past day's recap shows the
+    /// real lineup and difficulty, not a rotation guess.
+    var playedByDay: [String: [PlayedGame]] = [:]
 
     let supa: SupabaseManager
     private let cacheKey = "wits.appstate.v1"
@@ -70,6 +83,11 @@ final class AppModel {
         self.supa = supa
         self.today = WorkoutBuilder.build(for: Date())
         loadCache()
+        // Cache is now hydrated → tune today's lineup to the user's weak spots,
+        // unless cache restored a workout already underway today.
+        if !(Calendar.current.isDate(today.day, inSameDayAs: Date()) && !today.results.isEmpty) {
+            today = WorkoutBuilder.build(for: Date(), priorities: todayPriorities)
+        }
     }
 
     // MARK: Lifecycle
@@ -179,6 +197,27 @@ final class AppModel {
         { [difficulty] id in difficulty[id] ?? .seed(for: id) }
     }
 
+    /// Per-domain "needs training" weights driving today's lineup — weakest and
+    /// most-neglected domains rank highest. Empty until the user has history, at
+    /// which point the workout builder tilts toward what's lagging.
+    var todayPriorities: [CognitiveDomain: Double] {
+        ProgressMath.domainPriorities(progressDays, asOf: Date())
+    }
+
+    /// The games played on `day`, with the level each ran at, for the recap sheet.
+    /// Today prefers live results (covers runs not yet synced to the server);
+    /// past days come from the reconstructed `playedByDay`.
+    func playedGames(on day: Date) -> [PlayedGame] {
+        if Calendar.current.isDateInToday(day), !today.results.isEmpty {
+            return today.results.map {
+                PlayedGame(game: $0.game,
+                           level: $0.newDifficulty?.level ?? difficultyFor($0.game).level,
+                           accuracy: $0.accuracy, score: $0.score)
+            }
+        }
+        return playedByDay[SupabaseManager.dayString(day)] ?? []
+    }
+
     // MARK: Reminders
 
     /// Turn the daily reminder on/off and persist the choice. Caller must have
@@ -233,7 +272,7 @@ final class AppModel {
 
     /// Called as each game in a workout finishes: persist the run + advance the
     /// game's persisted difficulty.
-    func recordGameResult(_ result: GameResult, source: String = "workout") {
+    func recordGameResult(_ result: GameResult, source: String = "workout", workoutID: String? = nil) {
         assert(source != "survival", "survival runs must go through recordSurvivalRun (staircase must not move)")
         let id = result.game
         let current = difficulty[id] ?? .seed(for: id)
@@ -256,7 +295,7 @@ final class AppModel {
 
         saveCache()
         Task {
-            try? await supa.saveSession(r, source: source)
+            try? await supa.saveSession(r, source: source, workoutID: workoutID)
             try? await supa.upsertDifficulty(game: id, next)
         }
 
@@ -286,7 +325,9 @@ final class AppModel {
     /// workout can be resumed from the next game if the user backs out partway.
     /// The full day rollup (streak/XP/score) still happens once in finishWorkout.
     func recordWorkoutGame(_ result: GameResult) {
-        recordGameResult(result)                 // difficulty / stats / session (source "workout")
+        // Stamp the run with today's prescribed-workout id so the day's recap can
+        // show this exact lineup, distinct from free play / replays.
+        recordGameResult(result, source: "workout", workoutID: today.id.uuidString)
         if today.results.count < today.games.count {
             today.results.append(result)
         }
@@ -395,6 +436,33 @@ final class AppModel {
                 return DailyCheckIn(day: r.day, mood: m, sleep: s)
             }
         }
+        if let rows = try? await supa.fetchSessions(since: since) {
+            // Bucket workout runs per local day (oldest → newest), carrying the
+            // workout_id that ties each run to a specific prescribed workout.
+            typealias Run = (played: PlayedGame, workoutID: String?)
+            var byDay: [String: [Run]] = [:]
+            for row in rows where row.source == "workout" {
+                guard let g = GameID(rawValue: row.game),
+                      let d = Self.parseServerTimestamp(row.started_at) else { continue }
+                let played = PlayedGame(game: g,
+                                        level: row.difficulty ?? g.seedLevel,
+                                        accuracy: row.accuracy ?? 0,
+                                        score: row.score ?? 0)
+                byDay[SupabaseManager.dayString(d), default: []].append((played, row.workout_id))
+            }
+            playedByDay = byDay.mapValues { runs in
+                // Prefer the exact prescribed workout: scope to the most recent
+                // workout_id of the day. Fall back to a size-capped dedupe only
+                // for legacy runs that predate workout_id stamping.
+                let scoped: [Run]
+                if let latest = runs.last(where: { $0.workoutID != nil })?.workoutID {
+                    scoped = runs.filter { $0.workoutID == latest }
+                } else {
+                    scoped = runs
+                }
+                return Self.dailyLineup(scoped.map(\.played))
+            }
+        }
 
         recomputeEntitlement()
         rebuildTodayIfNeeded()
@@ -406,10 +474,15 @@ final class AppModel {
                                                  subscriptionUntil: profile.subscriptionUntil)
     }
 
+    /// Refresh today's lineup from the latest weakness signal. Safe to call on
+    /// every bootstrap / rollover / reconcile: it rebuilds when the day has
+    /// turned over, and otherwise re-tunes today's games to the newest progress
+    /// data — but only while the workout hasn't been started, so an in-progress
+    /// or completed session is never reshuffled underneath the user.
     private func rebuildTodayIfNeeded() {
-        if !Calendar.current.isDate(today.day, inSameDayAs: Date()) {
-            today = WorkoutBuilder.build(for: Date())
-        }
+        let isToday = Calendar.current.isDate(today.day, inSameDayAs: Date())
+        if isToday && !today.results.isEmpty { return }
+        today = WorkoutBuilder.build(for: Date(), priorities: todayPriorities)
     }
 
     // MARK: Derived scores
@@ -420,6 +493,21 @@ final class AppModel {
     static func domainScore(accuracy: Double, level: Double) -> Double {
         let cap = 50 + min(10, max(0, level)) * 5     // achievable max at this level
         return min(100, accuracy * cap)
+    }
+
+    /// Collapse a day's workout runs (chronological) into the prescribed lineup:
+    /// walk newest → oldest, keep the latest run of each distinct game, cap at the
+    /// workout size, then restore play order. Drops replays and earlier attempts
+    /// so the recap shows the day's workout, not every game touched that day.
+    static func dailyLineup(_ runs: [PlayedGame]) -> [PlayedGame] {
+        var seen = Set<GameID>()
+        var picked: [PlayedGame] = []
+        for run in runs.reversed() where !seen.contains(run.game) {
+            seen.insert(run.game)
+            picked.append(run)
+            if picked.count >= WorkoutBuilder.size { break }
+        }
+        return picked.reversed()
     }
 
     func domainScores(from results: [GameResult]) -> [String: Double] {
@@ -457,6 +545,7 @@ final class AppModel {
         var progressDays: [DailyProgressRow]
         var xp: Int?
         var checkins: [DailyCheckIn]?
+        var playedByDay: [String: [PlayedGame]]?
     }
 
     private func saveCache() {
@@ -469,7 +558,8 @@ final class AppModel {
             headlineIndex: headlineIndex,
             progressDays: progressDays,
             xp: xp,
-            checkins: checkins
+            checkins: checkins,
+            playedByDay: playedByDay
         )
         if let data = try? JSONEncoder().encode(state) {
             UserDefaults.standard.set(data, forKey: cacheKey)
@@ -491,6 +581,7 @@ final class AppModel {
         progressDays = state.progressDays
         xp = state.xp ?? 0
         checkins = state.checkins ?? []
+        playedByDay = state.playedByDay ?? [:]
         // keep cached workout only if it's still today's
         if Calendar.current.isDate(state.today.day, inSameDayAs: Date()) {
             today = state.today
@@ -511,6 +602,24 @@ final class AppModel {
             if let d = f.date(from: s) { return d }
         }
         return nil
+    }
+
+    /// Parse a PostgREST timestamptz, which comes back space-separated with a
+    /// short "+00" offset (e.g. "2026-06-18 02:51:17+00") that the ISO parsers
+    /// above reject. Normalises the offset to "+0000" before decoding.
+    private static func parseServerTimestamp(_ s: String?) -> Date? {
+        guard let s else { return nil }
+        var t = s
+        if t.range(of: #"[+-]\d{2}$"#, options: .regularExpression) != nil { t += "00" }
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        for fmt in ["yyyy-MM-dd HH:mm:ss.SSSSSSZ", "yyyy-MM-dd HH:mm:ssZ",
+                    "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZ", "yyyy-MM-dd'T'HH:mm:ssZ"] {
+            f.dateFormat = fmt
+            if let d = f.date(from: t) { return d }
+        }
+        return parseDate(s)
     }
 }
 

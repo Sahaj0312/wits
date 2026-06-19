@@ -202,16 +202,44 @@ struct DayDetailSheet: View {
     let node: WorkoutPathView.DayNode
     var start: () -> Void
 
-    private var games: [GameID] { WorkoutBuilder.build(for: node.date).games }
+    /// One game in the day's lineup, plus the level it ran at (for completed
+    /// runs) so the recap shows progression.
+    private struct LineupRow: Identifiable {
+        let id = UUID()
+        let game: GameID
+        let level: Double?
+        let done: Bool
+    }
+
+    private var rows: [LineupRow] {
+        switch node.state {
+        case .today, .inProgress, .doneToday:
+            // Today's weakness-tuned lineup lives on the model; mark the games
+            // already played and tag each with the level it ran at.
+            let results = app.today.results
+            return app.today.games.map { g in
+                let r = results.first { $0.game == g }
+                return LineupRow(game: g, level: r?.newDifficulty?.level, done: r != nil)
+            }
+        case .done, .missed:
+            // Past day → the real games + levels, reconstructed from sessions.
+            // Fall back to a rotation preview only for days with no record.
+            let played = app.playedGames(on: node.date)
+            if !played.isEmpty {
+                return played.map { LineupRow(game: $0.game, level: $0.level, done: node.state == .done) }
+            }
+            return WorkoutBuilder.build(for: node.date).games.map {
+                LineupRow(game: $0, level: nil, done: node.state == .done)
+            }
+        case .locked:
+            // Future day — a preview of what's coming up (weak spots unknown yet).
+            return WorkoutBuilder.build(for: node.date).games.map {
+                LineupRow(game: $0, level: nil, done: false)
+            }
+        }
+    }
     private var dayProgress: DailyProgressRow? {
         app.progressDays.first { $0.day == SupabaseManager.dayString(node.date) }
-    }
-    private var doneCount: Int {
-        switch node.state {
-        case .today, .inProgress: return app.today.results.count
-        case .done, .doneToday: return games.count
-        default: return 0
-        }
     }
     private var brainScore: Int? { dayProgress?.headline_index.map { Int($0.rounded()) } }
 
@@ -235,7 +263,7 @@ struct DayDetailSheet: View {
         var h: CGFloat = 22 + 62          // top pad + title block (title + status)
         if brainScore != nil { h += 16 + 32 }
         h += 16 + 20                      // "the workout" label
-        h += 16 + CGFloat(games.count) * 64 + CGFloat(max(0, games.count - 1)) * 10
+        h += 16 + CGFloat(rows.count) * 64 + CGFloat(max(0, rows.count - 1)) * 10
         switch node.state {
         case .today, .inProgress: h += 16 + 52   // action button
         case .locked: h += 16 + 20               // unlock note
@@ -280,8 +308,8 @@ struct DayDetailSheet: View {
                     .padding(.top, 2)
 
                 VStack(spacing: 10) {
-                    ForEach(Array(games.enumerated()), id: \.offset) { i, g in
-                        gameRow(g, done: i < doneCount, locked: node.state == .locked)
+                    ForEach(rows) { row in
+                        gameRow(row.game, level: row.level, done: row.done, locked: node.state == .locked)
                     }
                 }
 
@@ -314,7 +342,7 @@ struct DayDetailSheet: View {
         }
     }
 
-    private func gameRow(_ g: GameID, done: Bool, locked: Bool) -> some View {
+    private func gameRow(_ g: GameID, level: Double?, done: Bool, locked: Bool) -> some View {
         HStack(spacing: 14) {
             Image(systemName: g.symbol)
                 .font(.system(size: 16, weight: .heavy))
@@ -331,6 +359,14 @@ struct DayDetailSheet: View {
                     .foregroundStyle(Color.witsMuted)
             }
             Spacer(minLength: 0)
+            if let level {
+                Text(String(format: "lvl %.1f", level))
+                    .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsAccent)
+                    .monospacedDigit()
+                    .padding(.horizontal, 8).padding(.vertical, 4)
+                    .background(Color.witsAccent.opacity(0.14), in: Capsule())
+            }
             if done {
                 Image(systemName: "checkmark.circle.fill")
                     .font(.system(size: 19, weight: .heavy))

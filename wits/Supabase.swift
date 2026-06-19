@@ -118,6 +118,18 @@ struct StreakRow: Decodable {
     var last_active_day: String?
 }
 
+/// One recorded run, for reconstructing a past day's exact lineup + the level
+/// each game was played at. `difficulty` is the 0…10 staircase level for the run.
+struct SessionRow: Decodable {
+    var game: String
+    var source: String
+    var difficulty: Double?
+    var accuracy: Double?
+    var score: Int?
+    var started_at: String?
+    var workout_id: String?
+}
+
 struct CheckInRow: Decodable {
     var day: String
     var mood: Int?
@@ -325,7 +337,9 @@ final class SupabaseManager {
     private static let iso = ISO8601DateFormatter()
 
     /// One row per scored run in the main app (supersedes game_scores).
-    func saveSession(_ r: GameResult, source: String) async throws {
+    /// `workoutID` ties a run to the specific prescribed daily workout it belongs
+    /// to, so a day's recap can show that exact lineup (vs. free play / replays).
+    func saveSession(_ r: GameResult, source: String, workoutID: String? = nil) async throws {
         guard let id = userID else { throw SupabaseError.notSignedIn }
         var row: [String: Any] = [
             "user_id": id,
@@ -337,6 +351,7 @@ final class SupabaseManager {
             "trials": r.trials,
             "started_at": Self.iso.string(from: r.startedAt),
         ]
+        if let workoutID { row["workout_id"] = workoutID }
         if let t = r.threshold { row["threshold"] = t }
         if let rt = r.medianRTms { row["median_rt_ms"] = rt }
         if let d = r.newDifficulty?.level { row["difficulty"] = d }
@@ -442,6 +457,17 @@ final class SupabaseManager {
             URLQueryItem(name: "order", value: "day.asc"),
         ])
         return try JSONDecoder().decode([DailyProgressRow].self, from: data)
+    }
+
+    /// All recorded runs since `day` (yyyy-MM-dd), oldest first. Used to rebuild
+    /// each past day's actual games + the level played.
+    func fetchSessions(since day: String) async throws -> [SessionRow] {
+        let data = try await restRead(table: "game_sessions", query: [
+            URLQueryItem(name: "select", value: "game,source,difficulty,accuracy,score,started_at,workout_id"),
+            URLQueryItem(name: "started_at", value: "gte.\(day)T00:00:00"),
+            URLQueryItem(name: "order", value: "started_at.asc"),
+        ])
+        return try JSONDecoder().decode([SessionRow].self, from: data)
     }
 
     func fetchStreak() async throws -> StreakRow? {
