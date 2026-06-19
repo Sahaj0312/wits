@@ -15,8 +15,9 @@ struct WorkoutPathView: View {
     var onStart: () -> Void
 
     @State private var pulse = false
+    @State private var selected: DayNode?
 
-    private let spacing: CGFloat = 92
+    private let spacing: CGFloat = 84
     private let futurePreview = 12   // a long road ahead, like the duolingo map
 
     struct DayNode: Identifiable {
@@ -32,9 +33,9 @@ struct WorkoutPathView: View {
         let count = nodes.count
         let cur = currentIndex(nodes)
         GeometryReader { geo in
-            let amp = min(118, geo.size.width * 0.3)
+            let amp = min(70, geo.size.width * 0.18)
             let pos: (Int) -> CGPoint = { i in
-                CGPoint(x: geo.size.width / 2 + CGFloat(sin(Double(i) * .pi / 3.2)) * amp,
+                CGPoint(x: geo.size.width / 2 + CGFloat(sin(Double(i) * 2 * .pi / 5)) * amp,
                         y: CGFloat(i) * spacing + spacing / 2)
             }
             let pts = nodes.indices.map { pos($0) }
@@ -56,6 +57,13 @@ struct WorkoutPathView: View {
         .frame(height: CGFloat(count) * spacing)
         .onAppear {
             withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) { pulse = true }
+        }
+        .sheet(item: $selected) { node in
+            DayDetailSheet(node: node, start: {
+                selected = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { onStart() }
+            })
+            .presentationDetents([.medium, .large])
         }
     }
 
@@ -85,35 +93,30 @@ struct WorkoutPathView: View {
 
     // MARK: Node
 
-    @ViewBuilder
     private func node_view(_ node: DayNode) -> some View {
-        switch node.state {
-        case .today, .inProgress:
-            Button(action: onStart) { liveNode(node) }.buttonStyle(.plain)
-        default:
-            staticNode(node)
-        }
+        Button { selected = node } label: { nodeBody(node) }
+            .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private func nodeBody(_ node: DayNode) -> some View {
+        if node.state == .today || node.state == .inProgress { liveNode(node) }
+        else { staticNode(node) }
     }
 
     private func liveNode(_ node: DayNode) -> some View {
-        let resuming = node.state == .inProgress
-        return VStack(spacing: 7) {
+        VStack(spacing: 7) {
             ZStack {
                 Circle().fill(Color.witsAccent.opacity(0.25))
                     .frame(width: 100, height: 100)
                     .scaleEffect(pulse ? 1.12 : 0.92)
                     .opacity(pulse ? 0.0 : 0.7)
                 Circle().fill(Color.witsAccent)
-                    .frame(width: 78, height: 78)
+                    .frame(width: 80, height: 80)
                     .shadow(color: .witsAccent.opacity(0.5), radius: 12, y: 4)
-                VStack(spacing: -2) {
-                    Text("day").font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.85))
-                    Text("\(node.day)").font(.system(size: 26, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-                }
+                dayLabel(node.day, number: 25, fg: .white)
             }
-            Text(resuming ? "resume · \(app.today.results.count)/\(app.today.games.count)" : "start")
+            Text(node.state == .inProgress ? "resume · \(app.today.results.count)/\(app.today.games.count)" : "start")
                 .font(.system(size: 12.5, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.witsAccent)
                 .padding(.horizontal, 12).padding(.vertical, 5)
@@ -127,28 +130,28 @@ struct WorkoutPathView: View {
             Circle().fill(st.fill)
                 .frame(width: st.size, height: st.size)
                 .overlay(Circle().strokeBorder(node.state == .locked ? Color.witsLine : .clear, lineWidth: 2))
-                .shadow(color: .witsShadow, radius: 5, y: 2)
-            Text("\(node.day)")
-                .font(.system(size: st.size * 0.36, weight: .heavy, design: .rounded))
-                .foregroundStyle(st.fg)
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if node.state == .done || node.state == .doneToday {
-                Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 19, weight: .heavy))
-                    .foregroundStyle(Color.witsAccent)
-                    .background(Circle().fill(Color.witsBg).padding(2))
-                    .offset(x: 3, y: 3)
-            }
+                .shadow(color: st.glow ? .witsAccent.opacity(0.45) : .witsShadow, radius: st.glow ? 10 : 5, y: 3)
+            dayLabel(node.day, number: 19, fg: st.fg)
         }
     }
 
-    private func nodeStyle(_ s: DayNode.State) -> (fill: Color, fg: Color, size: CGFloat) {
+    private func dayLabel(_ n: Int, number: CGFloat, fg: Color) -> some View {
+        VStack(spacing: -2) {
+            Text("day")
+                .font(.system(size: number * 0.5, weight: .bold, design: .rounded))
+                .foregroundStyle(fg.opacity(0.8))
+            Text("\(n)")
+                .font(.system(size: number, weight: .heavy, design: .rounded))
+                .foregroundStyle(fg)
+        }
+    }
+
+    private func nodeStyle(_ s: DayNode.State) -> (fill: Color, fg: Color, size: CGFloat, glow: Bool) {
         switch s {
-        case .done, .doneToday: (Color.witsAccent, .white, 66)
-        case .missed: (Color.witsLine, Color.witsMuted, 58)
-        case .locked: (Color.witsCard, Color.witsFaint, 62)
-        default: (Color.witsCard, Color.witsFaint, 62)
+        case .done, .doneToday: (Color.witsAccent, .white, 66, true)   // completed = highlighted
+        case .missed: (Color.witsLine, Color.witsMuted, 58, false)
+        case .locked: (Color.witsCard, Color.witsFaint, 62, false)
+        default: (Color.witsCard, Color.witsFaint, 62, false)
         }
     }
 
@@ -181,5 +184,144 @@ struct WorkoutPathView: View {
             }
         }
         return out
+    }
+}
+
+// MARK: - Day detail modal
+
+/// Tapping a node opens this: the day's workout — results if completed, the games
+/// to play (with a start/resume button) if it's today, or a locked preview.
+struct DayDetailSheet: View {
+    @Environment(AppModel.self) private var app
+    @Environment(\.dismiss) private var dismiss
+    let node: WorkoutPathView.DayNode
+    var start: () -> Void
+
+    private var games: [GameID] { WorkoutBuilder.build(for: node.date).games }
+    private var dayProgress: DailyProgressRow? {
+        app.progressDays.first { $0.day == SupabaseManager.dayString(node.date) }
+    }
+    private var doneCount: Int {
+        switch node.state {
+        case .today, .inProgress: return app.today.results.count
+        case .done, .doneToday: return games.count
+        default: return 0
+        }
+    }
+    private var brainScore: Int? { dayProgress?.headline_index.map { Int($0.rounded()) } }
+
+    private var statusText: String {
+        switch node.state {
+        case .done: "completed"
+        case .doneToday: "completed today"
+        case .today: "ready to train"
+        case .inProgress: "in progress"
+        case .locked: "locked"
+        case .missed: "missed"
+        }
+    }
+
+    private static let dateFmt: DateFormatter = {
+        let f = DateFormatter(); f.dateFormat = "EEEE, MMM d"; return f
+    }()
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("day \(node.day)")
+                        .font(.witsDisplay(28))
+                        .foregroundStyle(Color.witsInk)
+                    HStack(spacing: 8) {
+                        Text(statusText)
+                            .font(.system(size: 12, weight: .heavy, design: .rounded))
+                            .foregroundStyle(node.state == .locked || node.state == .missed ? Color.witsMuted : Color.witsAccent)
+                            .padding(.horizontal, 10).padding(.vertical, 4)
+                            .background((node.state == .locked || node.state == .missed ? Color.witsMuted : Color.witsAccent).opacity(0.14), in: Capsule())
+                        Text(Self.dateFmt.string(from: node.date))
+                            .font(.witsBody(13))
+                            .foregroundStyle(Color.witsFaint)
+                    }
+                }
+                .padding(.top, 8)
+
+                if let score = brainScore {
+                    HStack(spacing: 6) {
+                        Text("\(score)")
+                            .font(.system(size: 30, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsAccent).monospacedDigit()
+                        Text("brain score that day")
+                            .font(.witsBody(13.5)).foregroundStyle(Color.witsMuted)
+                    }
+                }
+
+                Text(node.state == .locked ? "what's coming up" : "the workout")
+                    .font(.witsBody(14, weight: .bold))
+                    .foregroundStyle(Color.witsMuted)
+                    .padding(.top, 2)
+
+                VStack(spacing: 10) {
+                    ForEach(Array(games.enumerated()), id: \.offset) { i, g in
+                        gameRow(g, done: i < doneCount, locked: node.state == .locked)
+                    }
+                }
+
+                actionView
+                    .padding(.top, 4)
+            }
+            .padding(.horizontal, WitsMetrics.screenPadding)
+            .padding(.bottom, 24)
+        }
+        .background(Color.witsBg.ignoresSafeArea())
+    }
+
+    @ViewBuilder
+    private var actionView: some View {
+        switch node.state {
+        case .today:
+            Cta(title: "start workout", action: start)
+        case .inProgress:
+            Cta(title: "resume workout", action: start)
+        case .locked:
+            Text("unlocks on \(Self.dateFmt.string(from: node.date))")
+                .font(.witsBody(13))
+                .foregroundStyle(Color.witsFaint)
+                .frame(maxWidth: .infinity)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func gameRow(_ g: GameID, done: Bool, locked: Bool) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: g.symbol)
+                .font(.system(size: 16, weight: .heavy))
+                .foregroundStyle(locked ? Color.witsFaint : Color.witsAccent)
+                .frame(width: 40, height: 40)
+                .background((locked ? Color.witsFaint : Color.witsAccent).opacity(0.14),
+                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(g.displayName)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.witsInk)
+                Text(g.domain.label)
+                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.witsMuted)
+            }
+            Spacer(minLength: 0)
+            if done {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 19, weight: .heavy))
+                    .foregroundStyle(Color.witsAccent)
+            } else if locked {
+                Image(systemName: "lock.fill")
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundStyle(Color.witsFaint)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface()
+        .opacity(locked ? 0.7 : 1)
     }
 }
