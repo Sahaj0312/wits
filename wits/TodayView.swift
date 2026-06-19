@@ -58,6 +58,7 @@ struct TodayView: View {
             .padding(.top, 12)
             .padding(.bottom, 28)
         }
+        .scrollIndicators(.hidden)
         .background(Color.witsBg.ignoresSafeArea())
         .fullScreenCover(isPresented: $playing) {
             GameHost(
