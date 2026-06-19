@@ -17,7 +17,7 @@ struct WorkoutPathView: View {
     @State private var pulse = false
     @State private var selected: DayNode?
 
-    private let spacing: CGFloat = 84
+    private let spacing: CGFloat = 92
     private let futurePreview = 12   // a long road ahead, like the duolingo map
 
     struct DayNode: Identifiable {
@@ -105,22 +105,27 @@ struct WorkoutPathView: View {
     }
 
     private func liveNode(_ node: DayNode) -> some View {
-        VStack(spacing: 7) {
-            ZStack {
-                Circle().fill(Color.witsAccent.opacity(0.25))
-                    .frame(width: 100, height: 100)
-                    .scaleEffect(pulse ? 1.12 : 0.92)
-                    .opacity(pulse ? 0.0 : 0.7)
-                Circle().fill(Color.witsAccent)
-                    .frame(width: 80, height: 80)
-                    .shadow(color: .witsAccent.opacity(0.5), radius: 12, y: 4)
-                dayLabel(node.day, number: 25, fg: .white)
-            }
+        // Circle only is centered at the node point; the caption floats below as an
+        // overlay so it doesn't shift the circle up into the previous node.
+        ZStack {
+            Circle().fill(Color.witsAccent.opacity(0.25))
+                .frame(width: 90, height: 90)
+                .scaleEffect(pulse ? 1.12 : 0.92)
+                .opacity(pulse ? 0.0 : 0.7)
+            Circle().fill(Color.witsAccent)
+                .frame(width: 74, height: 74)
+                .shadow(color: .witsAccent.opacity(0.5), radius: 12, y: 4)
+            dayLabel(node.day, number: 24, fg: .white)
+        }
+        .frame(width: 90, height: 90)
+        .overlay(alignment: .bottom) {
             Text(node.state == .inProgress ? "resume · \(app.today.results.count)/\(app.today.games.count)" : "start")
                 .font(.system(size: 12.5, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.witsAccent)
                 .padding(.horizontal, 12).padding(.vertical, 5)
                 .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                .fixedSize()
+                .offset(y: 28)
         }
     }
 
