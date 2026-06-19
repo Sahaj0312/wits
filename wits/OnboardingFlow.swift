@@ -408,10 +408,18 @@ struct OnboardingView: View {
         }
         // Seed the activity baseline from the fit test so the dashboard starts with
         // real numbers (focus / multitasking / memory) instead of an empty state.
+        // Use the same capped scoring as live play (at the games' seed level) so a
+        // strong fit test gives a solid — but not maxed — starting score.
+        let focusAcc = data.flanker.map { accuracy($0.right, $0.right + $0.wrong) } ?? 0.5
+        let multiAcc = data.tracker.map { accuracy($0.correctPicks, $0.totalTargets) } ?? 0.5
+        let memAcc = data.span.map { accuracy($0.correctTaps, $0.totalTaps) } ?? 0.5
         let domains: [String: Double] = [
-            CognitiveDomain.focus.rawValue: Double(result.tests[0].pct),
-            CognitiveDomain.multitasking.rawValue: Double(result.tests[1].pct),
-            CognitiveDomain.memory.rawValue: Double(result.tests[2].pct),
+            CognitiveDomain.focus.rawValue:
+                AppModel.domainScore(accuracy: focusAcc, level: GameID.arrowStorm.seedLevel).rounded(),
+            CognitiveDomain.multitasking.rawValue:
+                AppModel.domainScore(accuracy: multiAcc, level: GameID.crowdControl.seedLevel).rounded(),
+            CognitiveDomain.memory.rawValue:
+                AppModel.domainScore(accuracy: memAcc, level: GameID.echoGrid.seedLevel).rounded(),
         ]
         let headline = (domains.values.reduce(0, +) / Double(domains.count) * 10).rounded() / 10
         let day = Self.dateString(Date())

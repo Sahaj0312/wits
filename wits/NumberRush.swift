@@ -48,17 +48,36 @@ struct NumberRushScreen: View {
     private var multiplier: Int { min(5, 1 + streak / 3) }
 
     private static func make(level: Double) -> Problem {
-        let cap = 6 + Int(level * 2)
-        let ops = level < 3 ? ["+", "−"] : ["+", "−", "×"]
-        let op = ops.randomElement()!
-        var a = Int.random(in: 1...cap), b = Int.random(in: 1...cap)
-        let answer: Int
-        switch op {
-        case "−": if b > a { swap(&a, &b) }; answer = a - b
-        case "×": a = Int.random(in: 2...(3 + Int(level))); b = Int.random(in: 2...(3 + Int(level))); answer = a * b
-        default: answer = a + b
+        let lvl = Int(level)
+
+        // higher levels mix in two-operator expressions (with proper precedence)
+        if level >= 5, Double.random(in: 0..<1) < 0.45 {
+            let a = Int.random(in: 2...(4 + lvl))
+            let b = Int.random(in: 2...(3 + lvl / 2))
+            let c = Int.random(in: 2...(6 + lvl))
+            return Bool.random()
+                ? Problem(text: "\(a) × \(b) + \(c)", answer: a * b + c)
+                : Problem(text: "\(c) + \(a) × \(b)", answer: c + a * b)
         }
-        return Problem(text: "\(a) \(op) \(b)", answer: answer)
+
+        let ops = level < 2 ? ["+", "−"] : level < 5 ? ["+", "−", "×"] : ["+", "−", "×", "÷"]
+        let op = ops.randomElement()!
+        let cap = 8 + lvl * 3
+        switch op {
+        case "−":
+            var a = Int.random(in: 2...cap), b = Int.random(in: 1...cap)
+            if b > a { swap(&a, &b) }
+            return Problem(text: "\(a) − \(b)", answer: a - b)
+        case "×":
+            let a = Int.random(in: 2...(4 + lvl)), b = Int.random(in: 2...(4 + lvl))
+            return Problem(text: "\(a) × \(b)", answer: a * b)
+        case "÷":
+            let d = Int.random(in: 2...9), q = Int.random(in: 2...(3 + lvl))
+            return Problem(text: "\(d * q) ÷ \(d)", answer: q)   // clean integer division
+        default:
+            let a = Int.random(in: 2...cap), b = Int.random(in: 2...cap)
+            return Problem(text: "\(a) + \(b)", answer: a + b)
+        }
     }
 
     var body: some View {

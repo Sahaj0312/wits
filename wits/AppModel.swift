@@ -317,7 +317,7 @@ final class AppModel {
 
         // accumulate today's domain scores so multiple sessions build the picture
         var domains = existing?.domain_scores ?? [:]
-        for (k, v) in Self.domainScores(from: results) { domains[k] = v }
+        for (k, v) in domainScores(from: results) { domains[k] = v }
         let headline = Self.headline(from: domains)
         headlineIndex = headline
         let played = (existing?.games_played ?? 0) + results.count
@@ -409,14 +409,30 @@ final class AppModel {
         }
     }
 
-    // MARK: Derived scores (Phase-1 simple; EWMA/headline pipeline is Phase 2)
+    // MARK: Derived scores
 
-    static func domainScores(from results: [GameResult]) -> [String: Double] {
+    /// Turns accuracy at a difficulty level into a 0…100 skill score. The level
+    /// raises the ceiling (50 at L0 → 100 at L10), so acing an easy game can't max
+    /// the score — you only approach 100 by sustaining accuracy at a high level.
+    static func domainScore(accuracy: Double, level: Double) -> Double {
+        let cap = 50 + min(10, max(0, level)) * 5     // achievable max at this level
+        return min(100, accuracy * cap)
+    }
+
+    func domainScores(from results: [GameResult]) -> [String: Double] {
+        Self.domainScores(from: results, levelFor: { [difficulty] g in
+            difficulty[g]?.level ?? g.seedLevel
+        })
+    }
+
+    static func domainScores(from results: [GameResult],
+                             levelFor: (GameID) -> Double) -> [String: Double] {
         var sums: [String: (Double, Int)] = [:]
         for r in results {
             let key = r.domain.rawValue
+            let sc = domainScore(accuracy: r.accuracy, level: levelFor(r.game))
             let (s, n) = sums[key] ?? (0, 0)
-            sums[key] = (s + r.accuracy * 100, n + 1)
+            sums[key] = (s + sc, n + 1)
         }
         return sums.mapValues { $0.1 > 0 ? ($0.0 / Double($0.1)).rounded() : 0 }
     }
