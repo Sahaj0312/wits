@@ -260,9 +260,9 @@ final class AppModel {
             try? await supa.upsertDifficulty(game: id, next)
         }
 
-        // Free play counts toward your stats too (streak, XP, wits score, chart).
-        // Workout games are rolled up together by finishWorkout instead.
-        if source == "free_play" { recordDayActivity([result]) }
+        // Free play earns XP + moves your wits score, but does NOT advance the
+        // daily streak — that only continues by completing the daily workout.
+        if source == "free_play" { recordDayActivity([result], countsForStreak: false) }
     }
 
     // MARK: Daily challenge (surprise extra game)
@@ -301,15 +301,18 @@ final class AppModel {
     /// Called once the full workout completes: tick the streak + roll up the day.
     func finishWorkout(_ results: [GameResult]) {
         today.results = results
-        recordDayActivity(results)
+        recordDayActivity(results, countsForStreak: true)
     }
 
-    /// Fold a set of just-played games into today's rollup: tick the streak,
-    /// accumulate domain scores, refresh the wits score + improvement chart, and
-    /// earn XP. Shared by the daily workout and free play so both move your stats.
-    private func recordDayActivity(_ results: [GameResult]) {
+    /// Fold a set of just-played games into today's rollup: accumulate domain
+    /// scores, refresh the wits score + improvement chart, and earn XP. The daily
+    /// streak only advances when `countsForStreak` is true — i.e. the full daily
+    /// workout was completed (free play earns XP/score but not the streak).
+    private func recordDayActivity(_ results: [GameResult], countsForStreak: Bool) {
         guard !results.isEmpty else { return }
-        streak = StreakEngine.recordActivity(streak, today: Date())
+        if countsForStreak {
+            streak = StreakEngine.recordActivity(streak, today: Date())
+        }
 
         let dayKey = SupabaseManager.dayString(Date())
         let existing = progressDays.first(where: { $0.day == dayKey })
@@ -339,7 +342,7 @@ final class AppModel {
 
         saveCache()
         Task {
-            try? await supa.upsertStreak(streak)
+            if countsForStreak { try? await supa.upsertStreak(streak) }
             try? await supa.upsertDailyProgress(day: dayKey, workoutDone: true,
                                                 gamesPlayed: played,
                                                 headlineIndex: headline,
