@@ -112,10 +112,11 @@ struct WorkoutPathView: View {
                 .frame(width: 90, height: 90)
                 .scaleEffect(pulse ? 1.12 : 0.92)
                 .opacity(pulse ? 0.0 : 0.7)
-            Circle().fill(Color.witsAccent)
+            Circle().fill(Color.witsCard)
                 .frame(width: 74, height: 74)
-                .shadow(color: .witsAccent.opacity(0.5), radius: 12, y: 4)
-            dayLabel(node.day, number: 24, fg: .white)
+                .overlay(Circle().strokeBorder(Color.witsAccent, lineWidth: 4))
+                .shadow(color: .witsAccent.opacity(0.4), radius: 12, y: 4)
+            dayLabel(node.day, number: 24, fg: .witsAccent)
         }
         .frame(width: 90, height: 90)
         .overlay(alignment: .bottom) {
