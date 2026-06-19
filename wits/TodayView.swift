@@ -140,7 +140,9 @@ struct TodayView: View {
                 Text(greeting)
                     .font(.witsBody(15, weight: .semibold))
                     .foregroundStyle(Color.witsMuted)
-                Wordmark()
+                Text("wits")
+                    .font(.system(size: 21, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsAccent)
             }
             Spacer()
             streakPill
