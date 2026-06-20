@@ -59,10 +59,19 @@ struct WorkoutPathView: View {
                         // later-drawn neighbour can never occlude it.
                         .zIndex(node.state == .today || node.state == .inProgress ? 1 : 0)
                 }
-                Color.clear
-                    .frame(width: 1, height: 1)
-                    .position(pos(cur))
-                    .id(Self.liveScrollID)
+                // Scroll anchor for the live node. We can't reuse `.position`
+                // here: that modifier expands its view to fill the whole ZStack,
+                // so `scrollTo(anchor: .center)` would center the road's midpoint
+                // instead of today. A top-stacked spacer gives the 1×1 marker a
+                // real layout frame at the node's y, so centering lands on today
+                // — and clamps to no-scroll when today sits above screen-center.
+                VStack(spacing: 0) {
+                    Color.clear.frame(width: 1, height: pos(cur).y)
+                    Color.clear.frame(width: 1, height: 1).id(Self.liveScrollID)
+                    Spacer(minLength: 0)
+                }
+                .frame(height: CGFloat(count) * spacing, alignment: .top)
+                .allowsHitTesting(false)
             }
             .frame(width: geo.size.width, height: CGFloat(count) * spacing)
         }
