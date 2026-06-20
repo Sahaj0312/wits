@@ -110,6 +110,9 @@ struct DailyProgressRow: Codable {
     var games_played: Int?
     var headline_index: Double?
     var domain_scores: [String: Double]?
+    /// The prescribed workout lineup for the day (GameID raw values), so a past
+    /// day's recap can show every prescribed game — including ones not completed.
+    var workout_games: [String]?
 }
 
 struct StreakRow: Decodable {
@@ -375,7 +378,8 @@ final class SupabaseManager {
     }
 
     func upsertDailyProgress(day: String, workoutDone: Bool, gamesPlayed: Int,
-                             headlineIndex: Double?, domainScores: [String: Double]) async throws {
+                             headlineIndex: Double?, domainScores: [String: Double],
+                             workoutGames: [String]? = nil) async throws {
         guard let id = userID else { throw SupabaseError.notSignedIn }
         var row: [String: Any] = [
             "user_id": id, "day": day,
@@ -384,6 +388,7 @@ final class SupabaseManager {
             "updated_at": Self.iso.string(from: Date()),
         ]
         if let h = headlineIndex { row["headline_index"] = h }
+        if let workoutGames { row["workout_games"] = workoutGames }
         try await restWrite(
             table: "daily_progress", body: [row],
             prefer: "resolution=merge-duplicates,return=minimal",

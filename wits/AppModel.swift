@@ -204,6 +204,20 @@ final class AppModel {
         ProgressMath.domainPriorities(progressDays, asOf: Date())
     }
 
+    enum DayWorkout { case completed, partial, none }
+
+    /// How much of a day's prescribed workout was actually done — measured from
+    /// games played vs. the prescribed lineup, NOT the `workout_done` activity
+    /// flag. Free play alone is `.none`; finishing every prescribed game is
+    /// `.completed`; anything in between is `.partial`.
+    func workoutStatus(on day: Date) -> DayWorkout {
+        let played = playedGames(on: day).count
+        let row = progressDays.first { $0.day == SupabaseManager.dayString(day) }
+        let total = row?.workout_games?.count ?? WorkoutBuilder.size
+        if total > 0, played >= total { return .completed }
+        return played > 0 ? .partial : .none
+    }
+
     /// The games played on `day`, with the level each ran at, for the recap sheet.
     /// Today prefers live results (covers runs not yet synced to the server);
     /// past days come from the reconstructed `playedByDay`.
@@ -322,8 +336,9 @@ final class AppModel {
     }
 
     /// Called as each game of today's workout finishes. Persists per-game so the
-    /// workout can be resumed from the next game if the user backs out partway.
-    /// The full day rollup (streak/XP/score) still happens once in finishWorkout.
+    /// workout can be resumed from the next game if the user backs out partway,
+    /// and rolls the day up *every* game — so a partly-done workout still records
+    /// its prescribed lineup + progress. The streak only ticks on the final game.
     func recordWorkoutGame(_ result: GameResult) {
         // Stamp the run with today's prescribed-workout id so the day's recap can
         // show this exact lineup, distinct from free play / replays.
@@ -332,24 +347,20 @@ final class AppModel {
             today.results.append(result)
         }
         saveCache()
-        // last game done → roll up the day now (streak/XP/score), so completion is
-        // credited even if the user closes the app on the summary screen.
-        if today.results.count >= today.games.count {
-            finishWorkout(today.results)
-        }
+        // Roll up after each game so progress + the prescribed lineup are saved even
+        // if the user backs out partway. countsForStreak only on the last game.
+        let complete = today.results.count >= today.games.count
+        recordDayActivity([result], countsForStreak: complete, prescribed: today.games)
     }
 
-    /// Called once the full workout completes: tick the streak + roll up the day.
-    func finishWorkout(_ results: [GameResult]) {
-        today.results = results
-        recordDayActivity(results, countsForStreak: true)
-    }
-
-    /// Fold a set of just-played games into today's rollup: accumulate domain
-    /// scores, refresh the wits score + improvement chart, and earn XP. The daily
-    /// streak only advances when `countsForStreak` is true — i.e. the full daily
-    /// workout was completed (free play earns XP/score but not the streak).
-    private func recordDayActivity(_ results: [GameResult], countsForStreak: Bool) {
+    /// Fold a just-played game into today's rollup: accumulate domain scores,
+    /// refresh the wits score + improvement chart, persist the prescribed lineup,
+    /// and earn XP. `workout_done` marks an *active* day (any scored game, incl.
+    /// free play) — the journey decides "completed" from games played vs. the
+    /// prescribed lineup, not from this flag. The streak advances only when
+    /// `countsForStreak` is true (the full daily workout was completed).
+    private func recordDayActivity(_ results: [GameResult], countsForStreak: Bool,
+                                   prescribed: [GameID]? = nil) {
         guard !results.isEmpty else { return }
         if countsForStreak {
             streak = StreakEngine.recordActivity(streak, today: Date())
@@ -357,7 +368,7 @@ final class AppModel {
 
         let dayKey = SupabaseManager.dayString(Date())
         let existing = progressDays.first(where: { $0.day == dayKey })
-        let wasDoneToday = existing?.workout_done == true
+        let firstActivityToday = existing == nil
 
         // accumulate today's domain scores so multiple sessions build the picture
         var domains = existing?.domain_scores ?? [:]
@@ -365,21 +376,25 @@ final class AppModel {
         let headline = Self.headline(from: domains)
         headlineIndex = headline
         let played = (existing?.games_played ?? 0) + results.count
+        // Persist the prescribed lineup (once we know it); keep any earlier value.
+        let lineup = prescribed?.map(\.rawValue) ?? existing?.workout_games
 
         if let i = progressDays.firstIndex(where: { $0.day == dayKey }) {
             progressDays[i].workout_done = true
             progressDays[i].games_played = played
             progressDays[i].headline_index = headline
             progressDays[i].domain_scores = domains
+            progressDays[i].workout_games = lineup
         } else {
             progressDays.append(DailyProgressRow(day: dayKey, workout_done: true,
                                                  games_played: played,
                                                  headline_index: headline,
-                                                 domain_scores: domains))
+                                                 domain_scores: domains,
+                                                 workout_games: lineup))
         }
         // first activity of the day earns the base XP instantly; later games just
         // refine the score. The server reconciles to the authoritative per-day total.
-        if !wasDoneToday { xp += 100 + Int(headline.rounded()) }
+        if firstActivityToday { xp += 100 + Int(headline.rounded()) }
 
         saveCache()
         Task {
@@ -387,7 +402,8 @@ final class AppModel {
             try? await supa.upsertDailyProgress(day: dayKey, workoutDone: true,
                                                 gamesPlayed: played,
                                                 headlineIndex: headline,
-                                                domainScores: domains)
+                                                domainScores: domains,
+                                                workoutGames: lineup)
             await refreshXP()
         }
     }

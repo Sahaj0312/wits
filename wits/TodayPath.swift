@@ -21,11 +21,13 @@ struct WorkoutPathView: View {
     private let futurePreview = 12   // a long road ahead, like the duolingo map
 
     struct DayNode: Identifiable {
-        enum State { case done, doneToday, today, inProgress, missed, locked }
+        enum State { case done, doneToday, today, inProgress, partial, missed, locked }
         let id: Int
         let date: Date
         let day: Int
         let state: State
+        /// For `.partial`: fraction of the prescribed workout completed (0…1).
+        var progress: Double = 0
     }
 
     var body: some View {
@@ -144,6 +146,14 @@ struct WorkoutPathView: View {
                 .frame(width: st.size, height: st.size)
                 .overlay(Circle().strokeBorder(node.state == .locked ? Color.witsLine : .clear, lineWidth: 2))
                 .shadow(color: st.glow ? .witsAccent.opacity(0.45) : .witsShadow, radius: st.glow ? 10 : 5, y: 3)
+            // Partial days: an accent arc showing how much of the workout was done.
+            if node.state == .partial {
+                Circle()
+                    .trim(from: 0, to: max(0.04, min(1, node.progress)))
+                    .stroke(Color.witsAccent, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                    .frame(width: st.size, height: st.size)
+            }
             dayLabel(node.day, number: 19, fg: st.fg)
         }
     }
@@ -162,6 +172,7 @@ struct WorkoutPathView: View {
     private func nodeStyle(_ s: DayNode.State) -> (fill: Color, fg: Color, size: CGFloat, glow: Bool) {
         switch s {
         case .done, .doneToday: (Color.witsAccent, .white, 66, true)   // completed = highlighted
+        case .partial: (Color.witsCard, Color.witsMuted, 62, false)    // started, not finished
         case .missed: (Color.witsLine, Color.witsMuted, 58, false)
         case .locked: (Color.witsCard, Color.witsFaint, 62, false)
         default: (Color.witsCard, Color.witsFaint, 62, false)
@@ -173,21 +184,34 @@ struct WorkoutPathView: View {
     private func buildNodes() -> [DayNode] {
         let cal = Calendar.current
         let today = cal.startOfDay(for: Date())
-        let doneDates = Set(app.progressDays
-            .filter { $0.workout_done == true }
-            .compactMap { $0.dayDate.map { cal.startOfDay(for: $0) } })
-        let start = min(doneDates.min() ?? today, today)
+        // Anchor the journey at the user's earliest recorded active day.
+        let activeDates = app.progressDays
+            .compactMap { $0.dayDate.map { cal.startOfDay(for: $0) } }
+        let start = min(activeDates.min() ?? today, today)
 
         var out: [DayNode] = []
         var d = start
         var n = 1
         while d <= today, n <= 400 {
             let isToday = cal.isDate(d, inSameDayAs: today)
-            let done = doneDates.contains(d) || (isToday && app.isWorkoutDoneToday)
-            let state: DayNode.State = isToday
-                ? (done ? .doneToday : (app.today.results.isEmpty ? .today : .inProgress))
-                : (done ? .done : .missed)
-            out.append(DayNode(id: n, date: d, day: n, state: state))
+            var node: DayNode
+            if isToday {
+                let state: DayNode.State = app.isWorkoutDoneToday ? .doneToday
+                    : (app.today.results.isEmpty ? .today : .inProgress)
+                node = DayNode(id: n, date: d, day: n, state: state)
+            } else {
+                // Completion is measured from games actually played vs. the
+                // prescribed lineup — a partly-done workout is never "completed".
+                switch app.workoutStatus(on: d) {
+                case .completed: node = DayNode(id: n, date: d, day: n, state: .done)
+                case .partial:
+                    let total = max(1, app.progressDays.first { $0.day == SupabaseManager.dayString(d) }?.workout_games?.count ?? WorkoutBuilder.size)
+                    let frac = Double(app.playedGames(on: d).count) / Double(total)
+                    node = DayNode(id: n, date: d, day: n, state: .partial, progress: frac)
+                case .none: node = DayNode(id: n, date: d, day: n, state: .missed)
+                }
+            }
+            out.append(node)
             d = cal.date(byAdding: .day, value: 1, to: d) ?? today.addingTimeInterval(90_000)
             n += 1
         }
@@ -229,15 +253,25 @@ struct DayDetailSheet: View {
                 let r = results.first { $0.game == g }
                 return LineupRow(game: g, level: r?.newDifficulty?.level, done: r != nil)
             }
-        case .done, .missed:
-            // Past day → the real games + levels, reconstructed from sessions.
-            // Fall back to a rotation preview only for days with no record.
+        case .done, .partial, .missed:
+            // Past day → show the full prescribed lineup, marking which games were
+            // actually played (with the level) and leaving the rest unchecked.
             let played = app.playedGames(on: node.date)
+            let byGame = Dictionary(played.map { ($0.game, $0) }, uniquingKeysWith: { a, _ in a })
+            let prescribed = dayProgress?.workout_games?.compactMap { GameID(rawValue: $0) } ?? []
+            if !prescribed.isEmpty {
+                return prescribed.map { g in
+                    let p = byGame[g]
+                    return LineupRow(game: g, level: p?.level, done: p != nil)
+                }
+            }
+            // Legacy days with no persisted lineup: show what we have (the games
+            // played), else a best-effort preview.
             if !played.isEmpty {
-                return played.map { LineupRow(game: $0.game, level: $0.level, done: node.state == .done) }
+                return played.map { LineupRow(game: $0.game, level: $0.level, done: true) }
             }
             return WorkoutBuilder.build(for: node.date).games.map {
-                LineupRow(game: $0, level: nil, done: node.state == .done)
+                LineupRow(game: $0, level: nil, done: false)
             }
         case .locked:
             // Future day — a preview of what's coming up (weak spots unknown yet).
@@ -249,14 +283,13 @@ struct DayDetailSheet: View {
     private var dayProgress: DailyProgressRow? {
         app.progressDays.first { $0.day == SupabaseManager.dayString(node.date) }
     }
-    private var brainScore: Int? { dayProgress?.headline_index.map { Int($0.rounded()) } }
-
     private var statusText: String {
         switch node.state {
         case .done: "completed"
         case .doneToday: "completed today"
         case .today: "ready to train"
         case .inProgress: "in progress"
+        case .partial: "incomplete · \(app.playedGames(on: node.date).count)/\(dayProgress?.workout_games?.count ?? WorkoutBuilder.size) done"
         case .locked: "locked"
         case .missed: "missed"
         }
@@ -269,7 +302,6 @@ struct DayDetailSheet: View {
     /// Exact content height so the sheet fits everything with no scroll / no gap.
     private var sheetHeight: CGFloat {
         var h: CGFloat = 22 + 62          // top pad + title block (title + status)
-        if brainScore != nil { h += 16 + 32 }
         h += 16 + 20                      // "the workout" label
         h += 16 + CGFloat(rows.count) * 64 + CGFloat(max(0, rows.count - 1)) * 10
         switch node.state {
@@ -299,16 +331,6 @@ struct DayDetailSheet: View {
                     }
                 }
                 .padding(.top, 22)
-
-                if let score = brainScore {
-                    HStack(spacing: 6) {
-                        Text("\(score)")
-                            .font(.system(size: 30, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.witsAccent).monospacedDigit()
-                        Text("brain score that day")
-                            .font(.witsBody(13.5)).foregroundStyle(Color.witsMuted)
-                    }
-                }
 
                 Text(node.state == .locked ? "what's coming up" : "the workout")
                     .font(.witsBody(14, weight: .bold))
