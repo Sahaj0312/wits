@@ -201,47 +201,93 @@ final class SplitGame {
     func draw(into ctx: inout GraphicsContext, size: CGSize) {
         let dividerX = splitX * size.width
 
-        // Faint zone tints + the vertical divider.
-        ctx.fill(Path(CGRect(x: 0, y: 0, width: dividerX, height: size.height)),
-                 with: .color(Color.witsAccent.opacity(0.04)))
-        var div = Path()
-        div.move(to: CGPoint(x: dividerX, y: 0))
-        div.addLine(to: CGPoint(x: dividerX, y: size.height))
-        ctx.stroke(div, with: .color(Color.witsLine.opacity(0.6)),
-                   style: StrokeStyle(lineWidth: 1, dash: [4, 5]))
+        drawStage(into: &ctx, size: size, dividerX: dividerX)
 
-        // Right zone: the go/no-go emojis.
-        for e in emojis {
-            let pt = CGPoint(x: e.x * size.width, y: e.y * size.height)
-            let remaining = e.ttl - e.age
-            let alpha = min(1, min(e.age / 0.18, remaining / 0.35))
-            ctx.opacity = max(0.15, alpha)
-            ctx.draw(Text(e.isTarget ? target : lookAlike).font(.system(size: 36)),
-                     at: pt, anchor: .center)
-            ctx.opacity = 1
-        }
-
-        // Left zone: pipes.
-        let pipeColor = Color.witsAccent.opacity(0.55)
+        // Left zone: gates.
         for p in pipes {
             let x = p.x * size.width
             let w = pipeW * size.width
             let gapTop = (p.gapY - p.gapH / 2) * size.height
             let gapBot = (p.gapY + p.gapH / 2) * size.height
-            ctx.fill(Path(roundedRect: CGRect(x: x, y: 0, width: w, height: gapTop), cornerRadius: 5),
-                     with: .color(pipeColor))
-            ctx.fill(Path(roundedRect: CGRect(x: x, y: gapBot, width: w, height: size.height - gapBot), cornerRadius: 5),
-                     with: .color(pipeColor))
+            ctx.chip(CGRect(x: x, y: -2, width: w, height: gapTop + 2),
+                     fill: Color.witsAccent.opacity(0.70),
+                     corner: 8,
+                     glow: Color.witsAccent)
+            ctx.chip(CGRect(x: x, y: gapBot, width: w, height: size.height - gapBot + 2),
+                     fill: Color.witsAccent.opacity(0.70),
+                     corner: 8,
+                     glow: Color.witsAccent)
         }
 
+        // Right zone: go/no-go chips.
+        for e in emojis { drawEmoji(e, into: &ctx, size: size) }
+
         // The flyer.
+        drawFlyer(into: &ctx, size: size)
+    }
+
+    private func drawStage(into ctx: inout GraphicsContext, size: CGSize, dividerX: CGFloat) {
+        let inset: CGFloat = 9
+        let left = CGRect(x: inset, y: inset, width: dividerX - inset * 1.5, height: size.height - inset * 2)
+        let right = CGRect(x: dividerX + inset * 0.5, y: inset, width: size.width - dividerX - inset * 1.5, height: size.height - inset * 2)
+        ctx.fill(Path(roundedRect: left, cornerRadius: 14), with: .color(.white.opacity(0.035)))
+        ctx.fill(Path(roundedRect: right, cornerRadius: 14), with: .color(Color.witsWarm.opacity(0.035)))
+        ctx.stroke(Path(roundedRect: left, cornerRadius: 14), with: .color(.white.opacity(0.055)), lineWidth: 1)
+        ctx.stroke(Path(roundedRect: right, cornerRadius: 14), with: .color(.white.opacity(0.055)), lineWidth: 1)
+
+        for i in 1..<5 {
+            let y = CGFloat(i) * size.height / 5
+            var line = Path()
+            line.move(to: CGPoint(x: 14, y: y))
+            line.addLine(to: CGPoint(x: size.width - 14, y: y))
+            ctx.stroke(line, with: .color(.white.opacity(0.035)), lineWidth: 1)
+        }
+
+        var div = Path()
+        div.move(to: CGPoint(x: dividerX, y: 14))
+        div.addLine(to: CGPoint(x: dividerX, y: size.height - 14))
+        var glow = ctx
+        glow.addFilter(.shadow(color: Color.witsAccent.opacity(0.55), radius: 8))
+        glow.stroke(div, with: .color(Color.witsAccent.opacity(0.72)),
+                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round, dash: [7, 7]))
+
+        ctx.draw(Text("FLY").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(ArcadeInk.onDarkDim),
+                 at: CGPoint(x: 30, y: 28), anchor: .leading)
+        ctx.draw(Text("PICK").font(.system(size: 11, weight: .heavy, design: .rounded)).foregroundStyle(ArcadeInk.onDarkDim),
+                 at: CGPoint(x: dividerX + 18, y: 28), anchor: .leading)
+    }
+
+    private func drawEmoji(_ e: Emoji, into ctx: inout GraphicsContext, size: CGSize) {
+        let pt = CGPoint(x: e.x * size.width, y: e.y * size.height)
+        let remaining = e.ttl - e.age
+        let alpha = min(1, min(e.age / 0.16, remaining / 0.32))
+        let fontSize = min(43, max(34, size.width * 0.10))
+        let scale = 0.88 + 0.12 * alpha
+
+        ctx.opacity = max(0.18, alpha)
+        var glow = ctx
+        glow.addFilter(.shadow(color: (e.isTarget ? Color.witsAccent : Color.witsWarm).opacity(0.34), radius: 10))
+        glow.draw(Text(e.isTarget ? target : lookAlike).font(.system(size: fontSize * scale)),
+                  at: pt, anchor: .center)
+        ctx.opacity = 1
+    }
+
+    private func drawFlyer(into ctx: inout GraphicsContext, size: CGSize) {
         let bx = birdX * size.width
         let by = birdY * size.height
-        let r = birdRy * size.height
-        ctx.fill(Path(ellipseIn: CGRect(x: bx - r, y: by - r, width: r * 2, height: r * 2)),
-                 with: .color(Color.witsInk))
-        ctx.fill(Path(ellipseIn: CGRect(x: bx + r * 0.05, y: by - r * 0.35, width: r * 0.5, height: r * 0.5)),
-                 with: .color(Color.witsBg))
+        let r = max(12, birdRy * size.height)
+        let rect = CGRect(x: bx - r, y: by - r, width: r * 2, height: r * 2)
+        ctx.orb(rect, color: Color.witsAccent, glow: 0.95)
+
+        var wing = Path()
+        wing.move(to: CGPoint(x: bx - r * 0.15, y: by + r * 0.1))
+        wing.addLine(to: CGPoint(x: bx - r * 1.0, y: by + r * 0.55))
+        wing.addLine(to: CGPoint(x: bx - r * 0.45, y: by - r * 0.08))
+        wing.closeSubpath()
+        ctx.fill(wing, with: .color(.white.opacity(0.34)))
+
+        ctx.fill(Path(ellipseIn: CGRect(x: bx + r * 0.25, y: by - r * 0.42, width: r * 0.32, height: r * 0.32)),
+                 with: .color(Color(light: 0x13203C, dark: 0x13203C)))
     }
 }
 
@@ -277,9 +323,12 @@ struct SplitSurvivalScreen: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 15, weight: .heavy))
                         .foregroundStyle(Color.witsFaint)
-                        .padding(12)
+                        .frame(width: 40, height: 40)
+                        .background(Color.witsCard.opacity(0.92), in: Circle())
+                        .shadow(color: .witsShadow, radius: 7, y: 4)
                 }
                 .padding(.top, 44)
+                .padding(.leading, 10)
             }
         }
         .onAppear { GameFeel.shared.warmUp() }
@@ -290,11 +339,12 @@ struct SplitSurvivalScreen: View {
 
     private var intro: some View {
         VStack(spacing: 0) {
-            Spacer()
-            VStack(spacing: 16) {
-                Image(systemName: GameID.split.symbol)
-                    .font(.system(size: 36, weight: .heavy))
-                    .foregroundStyle(Color.witsAccent)
+            GameTopTag(text: "survival")
+                .padding(.bottom, 18)
+            SplitIntroHero(target: model.target, lookAlike: model.lookAlike)
+                .rise()
+            Spacer(minLength: 18)
+            VStack(spacing: 13) {
                 Text("split")
                     .font(.witsDisplay(30))
                     .foregroundStyle(Color.witsInk)
@@ -307,10 +357,8 @@ struct SplitSurvivalScreen: View {
                     .foregroundStyle(Color.witsFaint)
                     .multilineTextAlignment(.center)
             }
-            .padding(28)
-            .frame(maxWidth: .infinity)
-            .cardSurface()
-            .rise()
+            .padding(.horizontal, 4)
+            .rise(0.08)
             Spacer()
             Cta(title: "start", action: startRun)
                 .rise(0.1)
@@ -324,27 +372,18 @@ struct SplitSurvivalScreen: View {
     // MARK: Playing
 
     private var playing: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 10) {
-                Text("level \(model.level)")
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsAccent)
-                    .monospacedDigit()
-                Spacer()
-                HStack(spacing: 6) {
-                    Text("tap").font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                    Text(model.target).font(.system(size: 17))
-                    Text("avoid").font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                    Text(model.lookAlike).font(.system(size: 17))
-                }
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 44)
+        VStack(spacing: 10) {
+            SplitRunHUD(level: model.level,
+                        progress: model.depthIntoLevel,
+                        best: best,
+                        target: model.target,
+                        lookAlike: model.lookAlike)
+                .padding(.leading, 48)
 
             GeometryReader { geo in
                 ZStack {
+                    ArcadeArena()
+
                     TimelineView(.animation) { tl in
                         Canvas { ctx, size in
                             _ = tick                     // read so the closure re-evaluates each tick
@@ -356,6 +395,7 @@ struct SplitSurvivalScreen: View {
                             if !model.alive { endRun() }
                         }
                     }
+
                     // Stable tap layer (NOT rebuilt each frame, so taps track reliably).
                     Color.clear
                         .contentShape(Rectangle())
@@ -363,20 +403,23 @@ struct SplitSurvivalScreen: View {
                             DragGesture(minimumDistance: 0)
                                 .onEnded { v in model.handleTap(v.location, size: geo.size) }
                         )
+
                     if !model.started {
-                        Text("tap the left side to fly")
-                            .font(.witsBody(15, weight: .semibold))
-                            .foregroundStyle(Color.witsMuted)
-                            .padding(.horizontal, 14).padding(.vertical, 8)
-                            .background(Color.witsCard, in: Capsule())
+                        SplitStartPrompt()
                             .allowsHitTesting(false)
                     }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                        .strokeBorder(.white.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: .witsShadow, radius: 12, y: 8)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .padding(.horizontal, 10)
-            .padding(.bottom, 10)
         }
+        .padding(.horizontal, 10)
+        .padding(.top, 42)
+        .padding(.bottom, 10)
     }
 
     // MARK: Game over
@@ -384,7 +427,7 @@ struct SplitSurvivalScreen: View {
     private var gameOver: some View {
         VStack(spacing: 0) {
             Spacer()
-            VStack(spacing: 8) {
+            VStack(spacing: 12) {
                 Image(systemName: GameID.split.symbol)
                     .font(.system(size: 34, weight: .heavy))
                     .foregroundStyle(Color.witsAccent)
@@ -404,9 +447,10 @@ struct SplitSurvivalScreen: View {
                     .font(.system(size: 56, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsInk)
                     .monospacedDigit()
-                Text("best level \(max(best, endLevel))")
-                    .font(.witsBody(15, weight: .semibold))
-                    .foregroundStyle(Color.witsMuted)
+                HStack(spacing: 10) {
+                    SplitStatPill(title: "best", value: "level \(max(best, endLevel))")
+                    SplitStatPill(title: "picks", value: "\(model.trials)")
+                }
             }
             .padding(28)
             .frame(maxWidth: .infinity)
@@ -437,5 +481,163 @@ struct SplitSurvivalScreen: View {
         GameFeel.shared.play(newBest ? .newBest : .gameOver)
         onRunComplete(model.level, model.depthIntoLevel, model.trials)
         withAnimation(.easeOut(duration: 0.25)) { phase = .over }
+    }
+}
+
+private struct SplitIntroHero: View {
+    var target: String
+    var lookAlike: String
+
+    var body: some View {
+        HeroPanel {
+            GeometryReader { geo in
+                let w = geo.size.width
+                let h = geo.size.height
+                let mid = w * 0.5
+
+                ZStack {
+                    Rectangle()
+                        .fill(.white.opacity(0.045))
+                        .frame(width: 1)
+                        .position(x: mid, y: h / 2)
+
+                    ForEach(0..<3, id: \.self) { i in
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.witsAccent.opacity(0.64 - Double(i) * 0.12))
+                            .frame(width: 22, height: 76 - CGFloat(i) * 10)
+                            .position(x: 72 + CGFloat(i) * 48, y: i == 1 ? 138 : 50)
+                            .shadow(color: Color.witsAccent.opacity(0.28), radius: 10)
+                    }
+
+                    Circle()
+                        .fill(Color.witsAccent)
+                        .frame(width: 30, height: 30)
+                        .overlay(alignment: .topTrailing) {
+                            Circle()
+                                .fill(.white.opacity(0.62))
+                                .frame(width: 8, height: 8)
+                                .offset(x: -7, y: 7)
+                        }
+                        .shadow(color: Color.witsAccent.opacity(0.6), radius: 14)
+                        .position(x: 52, y: 98)
+
+                    SplitHeroChip(text: target, accent: .witsAccent)
+                        .position(x: mid + 64, y: 66)
+                    SplitHeroChip(text: lookAlike, accent: .witsWarm)
+                        .position(x: mid + 134, y: 126)
+                    SplitHeroChip(text: target, accent: .witsAccent)
+                        .position(x: mid + 196, y: 84)
+                }
+            }
+        }
+    }
+}
+
+private struct SplitHeroChip: View {
+    var text: String
+    var accent: Color
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 28))
+            .frame(width: 48, height: 48)
+            .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(accent.opacity(0.9), lineWidth: 2)
+            )
+            .shadow(color: accent.opacity(0.35), radius: 12)
+    }
+}
+
+private struct SplitRunHUD: View {
+    var level: Int
+    var progress: Double
+    var best: Int
+    var target: String
+    var lookAlike: String
+
+    var body: some View {
+        VStack(spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text("level \(level)")
+                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsAccent)
+                    .monospacedDigit()
+                Spacer(minLength: 8)
+                Text("best \(best)")
+                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.witsFaint)
+                    .monospacedDigit()
+            }
+
+            ProgressTrack(fraction: progress, animated: false)
+
+            HStack(spacing: 8) {
+                SplitTargetChip(label: "tap", symbol: target, color: .witsAccent)
+                SplitTargetChip(label: "avoid", symbol: lookAlike, color: .witsWarm)
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.witsCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .witsShadow, radius: 9, y: 5)
+    }
+}
+
+private struct SplitTargetChip: View {
+    var label: String
+    var symbol: String
+    var color: Color
+
+    var body: some View {
+        HStack(spacing: 5) {
+            Text(label)
+                .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(color)
+            Text(symbol)
+                .font(.system(size: 16))
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(color.opacity(0.12), in: Capsule())
+    }
+}
+
+private struct SplitStartPrompt: View {
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "hand.tap.fill")
+                .font(.system(size: 17, weight: .heavy))
+                .foregroundStyle(Color.witsAccent)
+            Text("tap left to launch")
+                .font(.witsBody(15, weight: .semibold))
+                .foregroundStyle(Color.witsInk)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .background(.ultraThinMaterial, in: Capsule())
+        .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
+    }
+}
+
+private struct SplitStatPill: View {
+    var title: String
+    var value: String
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsFaint)
+            Text(value)
+                .font(.system(size: 14.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsInk)
+                .monospacedDigit()
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
