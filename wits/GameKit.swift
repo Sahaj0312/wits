@@ -18,15 +18,25 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     case spotSpeed, colorClash, matchBack, ruleFinder
     // expanded library
     case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
+    // survival-only (no staircased workout mode; not in the daily pool)
+    case split
 
     var id: String { rawValue }
 
-    /// Games playable today.
+    /// Games in the daily-workout pool (staircased, train + survival modes).
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder,
          .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper]
     }
     var isLive: Bool { Self.live.contains(self) }
+
+    /// Games that exist only as a survival/arcade run — no train mode, never
+    /// prescribed in the daily workout, but they still feed the weakness engine.
+    static var survivalOnly: [GameID] { [.split] }
+    var isSurvivalOnly: Bool { Self.survivalOnly.contains(self) }
+
+    /// Tappable in the library (has some playable mode).
+    var isPlayable: Bool { isLive || isSurvivalOnly }
 }
 
 enum CognitiveDomain: String, Codable, CaseIterable, Identifiable {
@@ -55,6 +65,7 @@ extension GameID {
         case .colorClash, .tileShift: .flexibility
         case .ruleFinder: .reasoning
         case .numberRush, .estimator: .math
+        case .split: .multitasking
         }
     }
 
@@ -73,6 +84,7 @@ extension GameID {
         case .tileShift: "tile shift"
         case .lastSeen: "last seen"
         case .pathKeeper: "path keeper"
+        case .split: "split"
         }
     }
 
@@ -92,6 +104,7 @@ extension GameID {
         case .tileShift: "the rule keeps changing."
         case .lastSeen: "never tap the same one twice."
         case .pathKeeper: "repeat the hops, in order."
+        case .split: "fly and pick at once. one slip ends it."
         }
     }
 
@@ -104,6 +117,7 @@ extension GameID {
         case .colorClash, .tileShift: "flexibility"
         case .ruleFinder: "problem solving"
         case .numberRush, .estimator: "math"
+        case .split: "attention"
         }
     }
 
@@ -123,6 +137,7 @@ extension GameID {
         case .ruleFinder: "logical reasoning"
         case .numberRush: "arithmetic"
         case .estimator: "numerical estimation"
+        case .split: "dual-tasking"
         }
     }
 
@@ -142,6 +157,7 @@ extension GameID {
         case .tileShift: "follow the rule on screen — sometimes match by colour, sometimes by shape. it keeps flipping."
         case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
         case .pathKeeper: "watch a token hop across the board, then repeat its path in the same order."
+        case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         }
     }
 
@@ -159,6 +175,7 @@ extension GameID {
         case .ruleFinder: "logical reasoning is recognising patterns, drawing conclusions, and making decisions."
         case .numberRush: "arithmetic is performing quick mental calculations accurately under time pressure."
         case .estimator: "numerical estimation is judging quantities at a glance, without stopping to count."
+        case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
         }
     }
 
@@ -178,6 +195,7 @@ extension GameID {
         case .tileShift: "arrow.triangle.2.circlepath"
         case .lastSeen: "sparkles"
         case .pathKeeper: "point.topleft.down.to.point.bottomright.curvepath.fill"
+        case .split: "rectangle.split.1x2.fill"
         }
     }
 
@@ -197,6 +215,7 @@ extension GameID {
         case .tileShift: (0x4A1E50, 0x2D1433)
         case .lastSeen: (0x123A4D, 0x0F2A3A)
         case .pathKeeper: (0x1E3A5E, 0x14243F)
+        case .split: (0x123A33, 0x0F2A2A)
         }
     }
 
@@ -220,6 +239,7 @@ extension GameID {
         case .ruleFinder: "complexity"
         case .lastSeen: "remembered"
         case .pathKeeper: "maxLen"
+        case .split: "maxLevel"
         default: "bestStreak"
         }
     }
@@ -235,6 +255,7 @@ extension GameID {
         case .crowdControl: "\(Int(v)) perfect"
         case .lastSeen: "\(Int(v)) recalled"
         case .pathKeeper: "\(Int(v)) steps"
+        case .split: "level \(Int(v))"
         default: "streak \(Int(v))"
         }
     }

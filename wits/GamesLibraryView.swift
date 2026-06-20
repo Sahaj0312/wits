@@ -41,37 +41,48 @@ struct GamesLibraryView: View {
         }
         .background(Color.witsBg.ignoresSafeArea())
         .fullScreenCover(item: $launch) { g in
-            GameLauncher(game: g)
+            if g.isSurvivalOnly {
+                SplitSurvivalScreen(
+                    best: app.gameStats[g]?.survivalBest ?? 0,
+                    onRunComplete: { level, depth, trials in
+                        app.recordSplitRun(levelReached: level, depth: depth, trials: trials)
+                    },
+                    onQuit: { launch = nil }
+                )
+            } else {
+                GameLauncher(game: g)
+            }
         }
         .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
     }
 
     private func card(_ g: GameID) -> some View {
         Button {
-            guard g.isLive else { return }
+            guard g.isPlayable else { return }
             if app.entitlement.isExpired { showPaywall = true } else { launch = g }
         } label: {
             VStack(alignment: .leading, spacing: 10) {
                 Image(systemName: g.symbol)
                     .font(.system(size: 22, weight: .heavy))
-                    .foregroundStyle(g.isLive ? Color.witsAccent : Color.witsFaint)
+                    .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
                     .frame(width: 46, height: 46)
-                    .background((g.isLive ? Color.witsAccent : Color.witsFaint).opacity(0.14),
+                    .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.14),
                                 in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 Text(g.displayName)
                     .font(.system(size: 15.5, weight: .bold, design: .rounded))
                     .foregroundStyle(Color.witsInk)
-                Text(g.isLive ? g.domain.label : "coming soon")
+                Text(g.isSurvivalOnly ? "\(g.domain.label) · survival"
+                     : (g.isLive ? g.domain.label : "coming soon"))
                     .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(g.isLive ? Color.witsMuted : Color.witsFaint)
+                    .foregroundStyle(g.isPlayable ? Color.witsMuted : Color.witsFaint)
             }
             .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
             .padding(16)
             .cardSurface()
-            .opacity(g.isLive ? 1 : 0.6)
+            .opacity(g.isPlayable ? 1 : 0.6)
         }
         .buttonStyle(.plain)
-        .disabled(!g.isLive)
+        .disabled(!g.isPlayable)
     }
 }
 

@@ -117,6 +117,8 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .tileShift:   TileShift.makeView(config: config, onComplete: onComplete)
     case .lastSeen:    LastSeen.makeView(config: config, onComplete: onComplete)
     case .pathKeeper:  PathKeeper.makeView(config: config, onComplete: onComplete)
+    // Survival-only: launched via SplitSurvivalScreen, never through this path.
+    case .split:       AnyView(EmptyView())
     }
 }
 
