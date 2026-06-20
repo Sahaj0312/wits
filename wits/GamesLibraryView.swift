@@ -57,8 +57,7 @@ struct GamesLibraryView: View {
     }
 
     private func card(_ g: GameID) -> some View {
-        let stats = app.gameStats[g]
-        return Button {
+        Button {
             guard g.isPlayable else { return }
             if app.entitlement.isExpired { showPaywall = true } else { launch = g }
         } label: {
@@ -93,55 +92,14 @@ struct GamesLibraryView: View {
                         .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-
-                Spacer(minLength: 0)
-
-                HStack(spacing: 8) {
-                    libraryMetric(value: bestValue(for: g, stats: stats), label: bestLabel(for: g))
-                    if g.isLive {
-                        libraryMetric(value: "lvl \(String(format: "%.1f", app.difficultyFor(g).level))", label: "start")
-                    }
-                }
             }
-            .frame(maxWidth: .infinity, minHeight: 178, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 132, alignment: .topLeading)
             .padding(16)
             .cardSurface()
             .opacity(g.isPlayable ? 1 : 0.6)
         }
         .buttonStyle(.plain)
         .disabled(!g.isPlayable)
-    }
-
-    private func bestValue(for game: GameID, stats: GameStats?) -> String {
-        if game.isSurvivalOnly {
-            let best = stats?.survivalBest ?? 0
-            return best > 0 ? "lvl \(best)" : "—"
-        }
-        let best = stats?.bestScore ?? 0
-        return best > 0 ? "\(best)" : "—"
-    }
-
-    private func bestLabel(for game: GameID) -> String {
-        game.isSurvivalOnly ? "best" : "points"
-    }
-
-    private func libraryMetric(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(value)
-                .font(.system(size: 13.5, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsInk)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Text(label)
-                .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                .foregroundStyle(Color.witsFaint)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
