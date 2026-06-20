@@ -201,6 +201,17 @@ private struct WorkoutSummary: View {
         guard !results.isEmpty else { return 0 }
         return Int((results.reduce(0) { $0 + $1.accuracy } / Double(results.count) * 100).rounded())
     }
+    private var bestRound: GameResult? {
+        results.max { lhs, rhs in lhs.accuracy == rhs.accuracy ? lhs.score < rhs.score : lhs.accuracy < rhs.accuracy }
+    }
+    private var trainedDomains: [CognitiveDomain] {
+        Array(Set(results.map(\.domain))).sorted { $0.label < $1.label }
+    }
+    private var bestStreak: Int? {
+        let values = results.compactMap { $0.raw["bestStreak"] }.filter { $0 > 0 }
+        guard let best = values.max() else { return nil }
+        return Int(best)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -222,6 +233,10 @@ private struct WorkoutSummary: View {
             }
             .padding(.top, 22)
             .rise(0.16)
+
+            progressMoment
+                .padding(.top, 12)
+                .rise(0.2)
 
             VStack(spacing: 10) {
                 ForEach(Array(results.enumerated()), id: \.offset) { i, r in
@@ -273,5 +288,46 @@ private struct WorkoutSummary: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
         .cardSurface()
+    }
+
+    private var progressMoment: some View {
+        HStack(spacing: 10) {
+            momentPill(icon: "sparkles", value: "\(trainedDomains.count)", label: trainedDomains.count == 1 ? "skill trained" : "skills trained")
+            if let bestRound {
+                momentPill(icon: bestRound.game.symbol,
+                           value: "\(Int((bestRound.accuracy * 100).rounded()))%",
+                           label: "best round")
+            }
+            if let bestStreak {
+                momentPill(icon: "flame.fill", value: "\(bestStreak)", label: "best streak")
+            }
+        }
+    }
+
+    private func momentPill(icon: String, value: String, label: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(Color.witsAccent)
+                .frame(width: 26, height: 26)
+                .background(Color.witsAccent.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 1) {
+                Text(value)
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsInk)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                Text(label)
+                    .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.witsMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

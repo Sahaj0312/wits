@@ -57,32 +57,91 @@ struct GamesLibraryView: View {
     }
 
     private func card(_ g: GameID) -> some View {
-        Button {
+        let stats = app.gameStats[g]
+        return Button {
             guard g.isPlayable else { return }
             if app.entitlement.isExpired { showPaywall = true } else { launch = g }
         } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                Image(systemName: g.symbol)
-                    .font(.system(size: 22, weight: .heavy))
-                    .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
-                    .frame(width: 46, height: 46)
-                    .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.14),
-                                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                Text(g.displayName)
-                    .font(.system(size: 15.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                Text(g.isSurvivalOnly ? "\(g.domain.label) · survival"
-                     : (g.isLive ? g.domain.label : "coming soon"))
-                    .font(.system(size: 12.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(g.isPlayable ? Color.witsMuted : Color.witsFaint)
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: g.symbol)
+                        .font(.system(size: 21, weight: .heavy))
+                        .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
+                        .frame(width: 44, height: 44)
+                        .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.14),
+                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    Spacer(minLength: 0)
+                    Text(g.isSurvivalOnly ? "survival" : (g.isLive ? g.domain.label : "soon"))
+                        .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
+                        .lineLimit(1)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.12), in: Capsule())
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(g.displayName)
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Text(g.tagline)
+                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                        .foregroundStyle(g.isPlayable ? Color.witsMuted : Color.witsFaint)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 0)
+
+                HStack(spacing: 8) {
+                    libraryMetric(value: bestValue(for: g, stats: stats), label: bestLabel(for: g))
+                    if g.isLive {
+                        libraryMetric(value: "lvl \(String(format: "%.1f", app.difficultyFor(g).level))", label: "start")
+                    }
+                }
             }
-            .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 178, alignment: .topLeading)
             .padding(16)
             .cardSurface()
             .opacity(g.isPlayable ? 1 : 0.6)
         }
         .buttonStyle(.plain)
         .disabled(!g.isPlayable)
+    }
+
+    private func bestValue(for game: GameID, stats: GameStats?) -> String {
+        if game.isSurvivalOnly {
+            let best = stats?.survivalBest ?? 0
+            return best > 0 ? "lvl \(best)" : "—"
+        }
+        let best = stats?.bestScore ?? 0
+        return best > 0 ? "\(best)" : "—"
+    }
+
+    private func bestLabel(for game: GameID) -> String {
+        game.isSurvivalOnly ? "best" : "points"
+    }
+
+    private func libraryMetric(value: String, label: String) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(value)
+                .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsInk)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.witsFaint)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 7)
+        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -94,6 +153,7 @@ private struct GameLauncher: View {
     @Environment(\.dismiss) private var dismiss
     @State private var phase: Phase = .card
     @State private var lastResult: GameResult?
+    @State private var lastNewBest = false
     @State private var attempt = 0   // bump to force a fresh game instance on replay
 
     private enum Phase { case card, train, survival, result }
@@ -124,8 +184,10 @@ private struct GameLauncher: View {
             ZStack {
                 Color.witsBg.ignoresSafeArea()
                 makeGameView(game, config: .standard(game, difficulty: app.difficultyFor(game), freePlay: true)) { r in
+                    let previousBest = app.gameStats[game]?.bestScore ?? 0
                     app.recordGameResult(r, source: "free_play")
                     lastResult = r
+                    lastNewBest = r.score > previousBest
                     withAnimation(.easeOut(duration: 0.2)) { phase = .result }
                 }
                 .id(attempt)
@@ -145,6 +207,7 @@ private struct GameLauncher: View {
             GameResultView(
                 game: game,
                 result: lastResult,
+                isNewBest: lastNewBest,
                 onReplay: { attempt += 1; withAnimation(.easeOut(duration: 0.2)) { phase = .train } },
                 onDone: { dismiss() }
             )
@@ -165,6 +228,7 @@ private struct GameLauncher: View {
 private struct GameResultView: View {
     let game: GameID
     let result: GameResult?
+    var isNewBest: Bool
     var onReplay: () -> Void
     var onDone: () -> Void
 
@@ -175,6 +239,11 @@ private struct GameResultView: View {
     private var bestStreak: Int? {
         guard let v = result?.raw["bestStreak"], v > 0 else { return nil }
         return Int(v)
+    }
+    private var bestStat: String? {
+        guard game.statKey != "bestStreak" else { return nil }
+        guard let v = result?.raw[game.statKey] else { return nil }
+        return game.statLabel(v)
     }
 
     var body: some View {
@@ -194,10 +263,20 @@ private struct GameResultView: View {
                 Text("points")
                     .font(.witsBody(13, weight: .semibold))
                     .foregroundStyle(Color.witsMuted)
-                if accuracyPct != nil || bestStreak != nil {
-                    HStack(spacing: 26) {
+                if isNewBest {
+                    Text("NEW BEST")
+                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .kerning(1)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.witsWarm, in: Capsule())
+                }
+                if accuracyPct != nil || bestStreak != nil || bestStat != nil {
+                    HStack(spacing: 12) {
                         if let a = accuracyPct { stat("\(a)%", "accuracy") }
                         if let s = bestStreak { stat("\(s)", "best streak") }
+                        if let bestStat { stat(bestStat, "best stat") }
                     }
                     .padding(.top, 8)
                 }

@@ -17,6 +17,7 @@ struct TodayView: View {
     @State private var showCheckIn = false
     @State private var pendingStart = false
     @State private var challengeGame: GameID?
+    @State private var didCenterLiveNode = false
     @AppStorage("notifPrimerAsked") private var notifPrimerAsked = false
 
     private var greeting: String {
@@ -30,35 +31,39 @@ struct TodayView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                header
-                Text(app.isWorkoutDoneToday ? "done for today — see you tomorrow"
-                                            : "your journey")
-                    .font(.witsBody(13.5, weight: .semibold))
-                    .foregroundStyle(Color.witsMuted)
-                    .padding(.top, 20)
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    Text(app.isWorkoutDoneToday ? "done for today — see you tomorrow"
+                                                : "your journey")
+                        .font(.witsBody(13.5, weight: .semibold))
+                        .foregroundStyle(Color.witsMuted)
+                        .padding(.top, 20)
 
-                WorkoutPathView(onStart: beginWorkout)
-                    .padding(.top, 6)
+                    WorkoutPathView(onStart: beginWorkout)
+                        .padding(.top, 6)
 
-                if case .trial = app.entitlement {
-                    Text("\(app.entitlement.trialDaysLeft) days left in your free trial")
-                        .font(.witsBody(12.5))
-                        .foregroundStyle(Color.witsFaint)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 8)
+                    if case .trial = app.entitlement {
+                        Text("\(app.entitlement.trialDaysLeft) days left in your free trial")
+                            .font(.witsBody(12.5))
+                            .foregroundStyle(Color.witsFaint)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 8)
+                    }
+
+                    if let g = app.dailyChallengeGame, !app.dailyChallengeDone {
+                        challengeCard(g).padding(.top, 14)
+                    }
                 }
-
-                if let g = app.dailyChallengeGame, !app.dailyChallengeDone {
-                    challengeCard(g).padding(.top, 14)
-                }
+                .padding(.horizontal, WitsMetrics.screenPadding)
+                .padding(.top, 12)
+                .padding(.bottom, 28)
+                .onAppear { centerLiveNode(proxy, animated: false) }
+                .onChange(of: app.today.results.count) { _, _ in centerLiveNode(proxy, animated: true) }
             }
-            .padding(.horizontal, WitsMetrics.screenPadding)
-            .padding(.top, 12)
-            .padding(.bottom, 28)
+            .scrollIndicators(.hidden)
         }
-        .scrollIndicators(.hidden)
         .background(Color.witsBg.ignoresSafeArea())
         .fullScreenCover(isPresented: $playing) {
             GameHost(
@@ -183,5 +188,23 @@ struct TodayView: View {
         if app.entitlement.isExpired { showPaywall = true }
         else if app.needsCheckIn { showCheckIn = true }
         else { playing = true }
+    }
+
+    private func centerLiveNode(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard !didCenterLiveNode || animated else { return }
+        didCenterLiveNode = true
+        let scroll = {
+            if animated {
+                withAnimation(.timingCurve(0.2, 0.8, 0.3, 1, duration: 0.38)) {
+                    proxy.scrollTo(WorkoutPathView.liveScrollID, anchor: .center)
+                }
+            } else {
+                proxy.scrollTo(WorkoutPathView.liveScrollID, anchor: .center)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08, execute: scroll)
+        if !animated {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.28, execute: scroll)
+        }
     }
 }

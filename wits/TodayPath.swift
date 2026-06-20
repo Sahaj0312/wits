@@ -13,6 +13,7 @@ struct WorkoutPathView: View {
     @Environment(AppModel.self) private var app
     /// Tapped the live (today) node — start / resume the workout.
     var onStart: () -> Void
+    static let liveScrollID = "workout-path-live-node"
 
     @State private var pulse = false
     @State private var selected: DayNode?
@@ -58,6 +59,10 @@ struct WorkoutPathView: View {
                         // later-drawn neighbour can never occlude it.
                         .zIndex(node.state == .today || node.state == .inProgress ? 1 : 0)
                 }
+                Color.clear
+                    .frame(width: 1, height: 1)
+                    .position(pos(cur))
+                    .id(Self.liveScrollID)
             }
             .frame(width: geo.size.width, height: CGFloat(count) * spacing)
         }
