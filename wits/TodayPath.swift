@@ -49,7 +49,12 @@ struct WorkoutPathView: View {
                         .stroke(Color.witsAccent, style: StrokeStyle(lineWidth: 6, lineCap: .round))
                 }
                 ForEach(Array(nodes.enumerated()), id: \.element.id) { i, node in
-                    node_view(node).position(pos(i))
+                    node_view(node)
+                        .position(pos(i))
+                        // Live node carries a "start"/"resume" pill below it that
+                        // reaches into the next node's space — keep it on top so a
+                        // later-drawn neighbour can never occlude it.
+                        .zIndex(node.state == .today || node.state == .inProgress ? 1 : 0)
                 }
             }
             .frame(width: geo.size.width, height: CGFloat(count) * spacing)
@@ -123,7 +128,10 @@ struct WorkoutPathView: View {
                 .font(.system(size: 12.5, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.witsAccent)
                 .padding(.horizontal, 12).padding(.vertical, 5)
-                .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                // Solid backing first, accent tint over it: the pill stays legible
+                // even where it floats over the path or a neighbouring node.
+                .background(Color.witsAccent.opacity(0.18), in: Capsule())
+                .background(Color.witsBg, in: Capsule())
                 .fixedSize()
                 .offset(y: 28)
         }
