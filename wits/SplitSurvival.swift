@@ -203,23 +203,9 @@ final class SplitGame {
 
         drawStage(into: &ctx, size: size, dividerX: dividerX)
 
-        // Left zone: gates.
-        for p in pipes {
-            let x = p.x * size.width
-            let w = pipeW * size.width
-            let gapTop = (p.gapY - p.gapH / 2) * size.height
-            let gapBot = (p.gapY + p.gapH / 2) * size.height
-            ctx.chip(CGRect(x: x, y: -2, width: w, height: gapTop + 2),
-                     fill: Color.witsAccent.opacity(0.70),
-                     corner: 8,
-                     glow: Color.witsAccent)
-            ctx.chip(CGRect(x: x, y: gapBot, width: w, height: size.height - gapBot + 2),
-                     fill: Color.witsAccent.opacity(0.70),
-                     corner: 8,
-                     glow: Color.witsAccent)
-        }
+        drawGates(into: &ctx, size: size, dividerX: dividerX)
 
-        // Right zone: go/no-go chips.
+        // Right zone: go/no-go emojis.
         for e in emojis { drawEmoji(e, into: &ctx, size: size) }
 
         // The flyer.
@@ -270,6 +256,26 @@ final class SplitGame {
         glow.draw(Text(e.isTarget ? target : lookAlike).font(.system(size: fontSize * scale)),
                   at: pt, anchor: .center)
         ctx.opacity = 1
+    }
+
+    private func drawGates(into ctx: inout GraphicsContext, size: CGSize, dividerX: CGFloat) {
+        var gateCtx = ctx
+        gateCtx.clip(to: Path(CGRect(x: 0, y: 0, width: dividerX, height: size.height)))
+
+        for p in pipes {
+            let x = p.x * size.width
+            let w = pipeW * size.width
+            let gapTop = (p.gapY - p.gapH / 2) * size.height
+            let gapBot = (p.gapY + p.gapH / 2) * size.height
+            gateCtx.chip(CGRect(x: x, y: -2, width: w, height: gapTop + 2),
+                         fill: Color.witsAccent.opacity(0.70),
+                         corner: 8,
+                         glow: Color.witsAccent)
+            gateCtx.chip(CGRect(x: x, y: gapBot, width: w, height: size.height - gapBot + 2),
+                         fill: Color.witsAccent.opacity(0.70),
+                         corner: 8,
+                         glow: Color.witsAccent)
+        }
     }
 
     private func drawFlyer(into ctx: inout GraphicsContext, size: CGSize) {
