@@ -175,7 +175,11 @@ final class AppModel {
 
     func refreshFriends() async {
         guard supa.isSignedIn else { return }
-        if let d = try? await supa.callFunction("social", body: ["action": "friendList"]),
+        // Send the device-local "today" so the backend's trained-today / streak
+        // checks line up with how days are written (dayString uses local time, not
+        // UTC). Without this they disagree after UTC midnight (evening in the US).
+        let today = SupabaseManager.dayString(Date())
+        if let d = try? await supa.callFunction("social", body: ["action": "friendList", "today": today]),
            let r = try? JSONDecoder().decode(FriendListResp.self, from: d) {
             friends = r.friends
         }
