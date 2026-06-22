@@ -2,7 +2,7 @@
 //  OnboardingAccount.swift
 //  wits
 //
-//  Section one: account creation. Sign-up method (Apple / Google / email OTP)
+//  Section one: account creation. Sign-up method (Apple / Google)
 //  and date of birth — Lumosity's order, wits' voice, real Supabase auth.
 //
 
@@ -16,10 +16,6 @@ struct AuthScreen: View {
 
     @Environment(SupabaseManager.self) private var supa
 
-    private enum Mode { case chooser, email, code }
-    @State private var mode: Mode = .chooser
-    @State private var email = ""
-    @State private var code = ""
     @State private var working = false
     @State private var error: String?
 
@@ -28,17 +24,12 @@ struct AuthScreen: View {
             Wordmark()
                 .padding(.bottom, 30)
 
-            switch mode {
-            case .chooser: chooser
-            case .email:   emailEntry
-            case .code:    codeEntry
-            }
+            chooser
 
             Spacer()
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 12)
-        .animation(.easeOut(duration: 0.22), value: mode)
         .onAppear {
             // Returning user with a restored session — skip straight past sign-up.
             if supa.isSignedIn { onAuthed() }
@@ -74,13 +65,6 @@ struct AuthScreen: View {
                     fg: Color.witsInk, bg: Color.witsCard, bordered: true
                 ) { run { try await supa.signInWithGoogle() } }
                     .rise(0.22)
-
-                ProviderButton(
-                    label: "continue with email",
-                    systemImage: "envelope.fill",
-                    fg: Color.witsInk, bg: Color.witsCard, bordered: true
-                ) { withAnimation { mode = .email } }
-                    .rise(0.28)
             }
 
             errorView
@@ -90,82 +74,6 @@ struct AuthScreen: View {
                 .foregroundStyle(Color.witsFaint)
                 .padding(.top, 18)
                 .rise(0.36)
-        }
-    }
-
-    // MARK: Email entry
-
-    private var emailEntry: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            BackChip { withAnimation { mode = .chooser; error = nil } }
-                .padding(.bottom, 18)
-            Text("what's your email")
-                .font(.witsDisplay(30))
-                .foregroundStyle(Color.witsInk)
-            Text("we'll send a 6-digit code. no password to forget.")
-                .font(.witsBody(16))
-                .foregroundStyle(Color.witsMuted)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
-
-            FieldCard {
-                TextField("you@example.com", text: $email)
-                    .textContentType(.emailAddress)
-                    .keyboardType(.emailAddress)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .font(.witsBody(17, weight: .semibold))
-            }
-
-            errorView
-
-            Cta(title: working ? "sending…" : "send the code", dimmed: !emailValid || working) {
-                guard emailValid, !working else { return }
-                run(advanceTo: .code) { try await supa.sendEmailOTP(email.trimmed) }
-            }
-            .padding(.top, 20)
-        }
-    }
-
-    // MARK: Code entry
-
-    private var codeEntry: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            BackChip { withAnimation { mode = .email; code = ""; error = nil } }
-                .padding(.bottom, 18)
-            Text("enter the code")
-                .font(.witsDisplay(30))
-                .foregroundStyle(Color.witsInk)
-            Text("sent to \(email.trimmed). check your spam folder if you don't see it.")
-                .font(.witsBody(16))
-                .foregroundStyle(Color.witsMuted)
-                .padding(.top, 12)
-                .padding(.bottom, 24)
-
-            FieldCard {
-                TextField("123456", text: $code)
-                    .keyboardType(.numberPad)
-                    .textContentType(.oneTimeCode)
-                    .font(.system(size: 26, weight: .heavy, design: .rounded))
-                    .kerning(6)
-                    .onChange(of: code) { _, new in
-                        code = String(new.filter(\.isNumber).prefix(6))
-                    }
-            }
-
-            errorView
-
-            Cta(title: working ? "verifying…" : "verify", dimmed: code.count < 6 || working) {
-                guard code.count >= 6, !working else { return }
-                run(onSuccess: onAuthed) { try await supa.verifyEmailOTP(email: email.trimmed, token: code) }
-            }
-            .padding(.top, 20)
-
-            QuietButton(title: "resend code") {
-                run { try await supa.sendEmailOTP(email.trimmed) }
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.top, 8)
         }
     }
 
@@ -181,30 +89,16 @@ struct AuthScreen: View {
         }
     }
 
-    private var emailValid: Bool {
-        let e = email.trimmed
-        return e.contains("@") && e.contains(".") && e.count >= 5
-    }
-
     /// Runs an async auth action with loading + error handling.
-    /// `advanceTo` switches mode on success; `onSuccess` fires a completion.
-    private func run(
-        advanceTo nextMode: Mode? = nil,
-        onSuccess: (() -> Void)? = nil,
-        _ action: @escaping () async throws -> Void
-    ) {
+    private func run(_ action: @escaping () async throws -> Void) {
         working = true
         error = nil
         Task {
             do {
                 try await action()
                 working = false
-                if let nextMode { withAnimation { mode = nextMode } }
-                onSuccess?()
                 // Apple/Google land here already signed in → advance the flow.
-                if nextMode == nil && onSuccess == nil && supa.isSignedIn {
-                    onAuthed()
-                }
+                if supa.isSignedIn { onAuthed() }
             } catch SupabaseError.cancelled {
                 working = false
             } catch {
@@ -364,20 +258,3 @@ private struct FieldCard<Content: View>: View {
     }
 }
 
-private struct BackChip: View {
-    var action: () -> Void
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 5) {
-                Image(systemName: "chevron.left").font(.system(size: 12, weight: .bold))
-                Text("back").font(.system(size: 13, weight: .semibold, design: .rounded))
-            }
-            .foregroundStyle(Color.witsFaint)
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-private extension String {
-    var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
-}

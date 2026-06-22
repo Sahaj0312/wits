@@ -163,29 +163,6 @@ final class SupabaseManager {
         session = Keychain.loadJSON(keychainKey)
     }
 
-    // MARK: Email OTP (passwordless / "magic link")
-
-    /// Sends a one-time code (and magic link) to the address.
-    func sendEmailOTP(_ email: String) async throws {
-        try await call(
-            "auth/v1/otp",
-            method: "POST",
-            body: ["email": email, "create_user": true],
-            authed: false
-        )
-    }
-
-    /// Verifies the 6-digit code and starts a session.
-    func verifyEmailOTP(email: String, token: String) async throws {
-        let data = try await call(
-            "auth/v1/verify",
-            method: "POST",
-            body: ["type": "email", "email": email, "token": token],
-            authed: false
-        )
-        try persist(decodeTokenResponse(data))
-    }
-
     // MARK: Sign in with Apple (native, id_token grant)
 
     func signInWithApple() async throws {
