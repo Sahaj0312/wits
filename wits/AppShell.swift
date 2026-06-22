@@ -122,11 +122,6 @@ struct ActivityTab: View {
                         }
                     }
                 }
-
-                Text("wits measures how you do on these games over time. it doesn't claim to raise your iq — it shows you getting sharper at the skills you train.")
-                    .font(.witsBody(12.5))
-                    .foregroundStyle(Color.witsFaint)
-                    .padding(.top, 6)
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.bottom, 24)
