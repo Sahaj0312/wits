@@ -18,6 +18,7 @@ struct AuthSheet: View {
 
     @State private var working = false
     @State private var error: String?
+    @State private var contentHeight: CGFloat = 300
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -27,6 +28,7 @@ struct AuthSheet: View {
             Text("so we can save your progress and pick up right where you left off.")
                 .font(.witsBody(15))
                 .foregroundStyle(Color.witsMuted)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
                 .padding(.bottom, 24)
 
@@ -49,13 +51,20 @@ struct AuthSheet: View {
             Text("by continuing you agree to our terms of service & privacy policy.")
                 .font(.witsBody(12))
                 .foregroundStyle(Color.witsFaint)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 18)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.top, 28)
-        .padding(.bottom, 16)
-        .presentationDetents([.height(360)])
+        .padding(.bottom, 12)
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(key: SheetHeightKey.self, value: proxy.size.height)
+            }
+        }
+        .onPreferenceChange(SheetHeightKey.self) { contentHeight = $0 }
+        .presentationDetents([.height(contentHeight)])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.witsBg)
     }
@@ -225,6 +234,13 @@ private struct ProviderButton: View {
             .shadow(color: .witsShadow, radius: 8, y: 5)
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct SheetHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 300
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 
