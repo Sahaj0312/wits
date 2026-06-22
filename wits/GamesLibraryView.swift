@@ -12,8 +12,13 @@ struct GamesLibraryView: View {
     @Environment(AppModel.self) private var app
     @State private var launch: GameID?
     @State private var showPaywall = false
+    @State private var filter: CognitiveDomain?
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+
+    private var filteredGames: [GameID] {
+        GameID.allCases.filter { filter == nil || $0.domain == filter }
+    }
 
     var body: some View {
         ScrollView {
@@ -29,12 +34,15 @@ struct GamesLibraryView: View {
                     .font(.witsBody(15))
                     .foregroundStyle(Color.witsMuted)
 
+                filterBar
+
                 LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(GameID.allCases) { g in
+                    ForEach(filteredGames) { g in
                         card(g)
                     }
                 }
                 .padding(.top, 4)
+                .animation(.easeOut(duration: 0.2), value: filter)
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.bottom, 24)
@@ -54,6 +62,19 @@ struct GamesLibraryView: View {
             }
         }
         .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
+    }
+
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                FilterChip(label: "all", selected: filter == nil) { filter = nil }
+                ForEach(CognitiveDomain.allCases) { d in
+                    FilterChip(label: d.label, selected: filter == d) { filter = d }
+                }
+            }
+            .padding(.horizontal, WitsMetrics.screenPadding)
+        }
+        .padding(.horizontal, -WitsMetrics.screenPadding)
     }
 
     private func card(_ g: GameID) -> some View {
@@ -100,6 +121,27 @@ struct GamesLibraryView: View {
         }
         .buttonStyle(.plain)
         .disabled(!g.isPlayable)
+    }
+}
+
+/// Single-select pill used to filter the library by cognitive focus.
+private struct FilterChip: View {
+    var label: String
+    var selected: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(selected ? Color.witsBg : Color.witsInk)
+                .padding(.horizontal, 15)
+                .padding(.vertical, 9)
+                .background(selected ? Color.witsAccent : Color.witsCard, in: Capsule())
+                .overlay(Capsule().strokeBorder(selected ? .clear : Color.witsLine, lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+        .animation(.easeOut(duration: 0.12), value: selected)
     }
 }
 
