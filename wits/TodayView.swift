@@ -31,38 +31,42 @@ struct TodayView: View {
     }
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    header
-                    Text(app.isWorkoutDoneToday ? "done for today — see you tomorrow"
-                                                : "your journey")
-                        .font(.witsBody(13.5, weight: .semibold))
-                        .foregroundStyle(Color.witsMuted)
-                        .padding(.top, 20)
-
-                    WorkoutPathView(onStart: beginWorkout)
-                        .padding(.top, 6)
-
-                    if case .trial = app.entitlement {
-                        Text("\(app.entitlement.trialDaysLeft) days left in your free trial")
-                            .font(.witsBody(12.5))
-                            .foregroundStyle(Color.witsFaint)
-                            .frame(maxWidth: .infinity)
-                            .padding(.top, 8)
-                    }
-
-                    if let g = app.dailyChallengeGame, !app.dailyChallengeDone {
-                        challengeCard(g).padding(.top, 14)
-                    }
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            header
                 .padding(.horizontal, WitsMetrics.screenPadding)
                 .padding(.top, 12)
-                .padding(.bottom, 28)
-                .onAppear { centerLiveNode(proxy, animated: false) }
-                .onChange(of: app.today.results.count) { _, _ in centerLiveNode(proxy, animated: true) }
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(app.isWorkoutDoneToday ? "done for today — see you tomorrow"
+                                                    : "your journey")
+                            .font(.witsBody(13.5, weight: .semibold))
+                            .foregroundStyle(Color.witsMuted)
+                            .padding(.top, 20)
+
+                        WorkoutPathView(onStart: beginWorkout)
+                            .padding(.top, 6)
+
+                        if case .trial = app.entitlement {
+                            Text("\(app.entitlement.trialDaysLeft) days left in your free trial")
+                                .font(.witsBody(12.5))
+                                .foregroundStyle(Color.witsFaint)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 8)
+                        }
+
+                        if let g = app.dailyChallengeGame, !app.dailyChallengeDone {
+                            challengeCard(g).padding(.top, 14)
+                        }
+                    }
+                    .padding(.horizontal, WitsMetrics.screenPadding)
+                    .padding(.bottom, 28)
+                    .onAppear { centerLiveNode(proxy, animated: false) }
+                    .onChange(of: app.today.results.count) { _, _ in centerLiveNode(proxy, animated: true) }
+                }
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
         }
         .background(Color.witsBg.ignoresSafeArea())
         .fullScreenCover(isPresented: $playing) {
