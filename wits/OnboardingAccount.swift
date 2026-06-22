@@ -9,9 +9,9 @@
 import SwiftUI
 import AuthenticationServices
 
-// MARK: - Sign-up method
+// MARK: - Sign-up method (bottom sheet)
 
-struct AuthScreen: View {
+struct AuthSheet: View {
     var onAuthed: () -> Void
 
     @Environment(SupabaseManager.self) private var supa
@@ -21,35 +21,14 @@ struct AuthScreen: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Wordmark()
-                .padding(.bottom, 30)
-
-            chooser
-
-            Spacer()
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 12)
-        .onAppear {
-            // Returning user with a restored session — skip straight past sign-up.
-            if supa.isSignedIn { onAuthed() }
-        }
-    }
-
-    // MARK: Chooser
-
-    private var chooser: some View {
-        VStack(alignment: .leading, spacing: 0) {
             Text("create your account")
-                .font(.witsDisplay(30))
+                .font(.witsDisplay(28))
                 .foregroundStyle(Color.witsInk)
-                .rise()
             Text("so we can save your progress and pick up right where you left off.")
-                .font(.witsBody(16))
+                .font(.witsBody(15))
                 .foregroundStyle(Color.witsMuted)
-                .padding(.top, 12)
-                .padding(.bottom, 28)
-                .rise(0.08)
+                .padding(.top, 10)
+                .padding(.bottom, 24)
 
             VStack(spacing: 10) {
                 ProviderButton(
@@ -57,14 +36,12 @@ struct AuthScreen: View {
                     systemImage: "apple.logo",
                     fg: .white, bg: Color.black
                 ) { run { try await supa.signInWithApple() } }
-                    .rise(0.16)
 
                 ProviderButton(
                     label: "continue with google",
                     assetGlyph: "G",
                     fg: Color.witsInk, bg: Color.witsCard, bordered: true
                 ) { run { try await supa.signInWithGoogle() } }
-                    .rise(0.22)
             }
 
             errorView
@@ -73,8 +50,14 @@ struct AuthScreen: View {
                 .font(.witsBody(12))
                 .foregroundStyle(Color.witsFaint)
                 .padding(.top, 18)
-                .rise(0.36)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, WitsMetrics.screenPadding)
+        .padding(.top, 28)
+        .padding(.bottom, 16)
+        .presentationDetents([.height(360)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.witsBg)
     }
 
     // MARK: Bits

@@ -15,7 +15,7 @@ let onboardingQuizTotal = 11.0
 
 enum OnboardingStep: Hashable {
     // 1 — account creation
-    case hook, auth, username, birthdate
+    case hook, username, birthdate
     // 2 — goals & personalization
     case welcome, goals, calibrate
     // 3 — self-assessment
@@ -38,7 +38,7 @@ enum OnboardingStep: Hashable {
 
     static let flow: [OnboardingStep] = [
         .hook,
-        .auth, .username, .birthdate,
+        .username, .birthdate,
         .welcome, .goals, .calibrate,
         .likert(0), .likert(1), .likert(2), .stat, .likert(3), .likert(4), .likert(5),
         .aboutYou, .gender, .education, .attribution, .screenTime,
@@ -162,11 +162,26 @@ struct OnboardingView: View {
     @Environment(SupabaseManager.self) private var supa
     @State private var stepIndex = 0
     @State private var data = OnboardingData()
+    @State private var showAuth = false
 
     private var step: OnboardingStep { OnboardingStep.flow[stepIndex] }
 
     private func next() {
         stepIndex = min(stepIndex + 1, OnboardingStep.flow.count - 1)
+    }
+
+    /// Called once the user finishes Apple/Google sign-in.
+    private func completeAuth() {
+        showAuth = false
+        Task {
+            // returning user (already onboarded on the server) → go straight in
+            if await supa.isOnboardingComplete() {
+                onFinished()
+            } else {
+                supa.recordCheckpoint(.accountCreated)
+                next()
+            }
+        }
     }
 
     private var flankerPct: Int {
@@ -195,24 +210,18 @@ struct OnboardingView: View {
                 ))
         }
         .animation(.timingCurve(0.2, 0.8, 0.3, 1, duration: 0.28), value: stepIndex)
+        .sheet(isPresented: $showAuth) {
+            AuthSheet(onAuthed: completeAuth)
+        }
     }
 
     @ViewBuilder
     private var screen: some View {
         switch step {
         case .hook:
-            HookScreen(onNext: next)
-        case .auth:
-            AuthScreen(onAuthed: {
-                Task {
-                    // returning user (already onboarded on the server) → go straight in
-                    if await supa.isOnboardingComplete() {
-                        onFinished()
-                    } else {
-                        supa.recordCheckpoint(.accountCreated)
-                        next()
-                    }
-                }
+            HookScreen(onNext: {
+                // Returning user with a restored session — skip sign-in.
+                if supa.isSignedIn { completeAuth() } else { showAuth = true }
             })
         case .username:
             UsernameScreen(suggested: supa.suggestedName) { name in
