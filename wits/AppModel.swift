@@ -66,7 +66,6 @@ final class AppModel {
     /// Earned by training; computed server-side over full history.
     var xp: Int = 0
     var percentile: Int? = nil
-    var percentileMessage: String? = nil
     var friendCode: String? = nil
     var friends: [FriendInfo] = []
     /// Recent daily lifestyle check-ins (ascending by day), for the activity charts.
@@ -141,7 +140,6 @@ final class AppModel {
         if let d = try? await supa.callFunction("social", body: ["action": "percentile"]),
            let r = try? JSONDecoder().decode(PercentileResp.self, from: d), r.hasData {
             percentile = r.percentile
-            percentileMessage = r.message
         }
         await refreshFriends()
     }

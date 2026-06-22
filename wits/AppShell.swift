@@ -114,21 +114,6 @@ struct ActivityTab: View {
                     LifestyleCard(checkins: app.checkins)
                 }
 
-                if let msg = app.percentileMessage {
-                    HStack(spacing: 12) {
-                        Image(systemName: "person.3.fill")
-                            .font(.system(size: 18, weight: .heavy))
-                            .foregroundStyle(Color.witsAccent)
-                        Text(msg)
-                            .font(.witsBody(14, weight: .semibold))
-                            .foregroundStyle(Color.witsInk)
-                        Spacer(minLength: 0)
-                    }
-                    .padding(16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .cardSurface()
-                }
-
                 if !friendRanking.isEmpty {
                     section("friends")
                     VStack(spacing: 8) {
