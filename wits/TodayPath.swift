@@ -156,6 +156,8 @@ struct WorkoutPathView: View {
     private func staticNode(_ node: DayNode) -> some View {
         let st = nodeStyle(node.state)
         return ZStack {
+            Circle().fill(Color.witsBg)
+                .frame(width: st.size + 10, height: st.size + 10)
             Circle().fill(st.fill)
                 .frame(width: st.size, height: st.size)
                 .overlay(Circle().strokeBorder(node.state == .locked ? Color.witsLine : .clear, lineWidth: 2))
