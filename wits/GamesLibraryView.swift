@@ -83,21 +83,16 @@ struct GamesLibraryView: View {
             if app.entitlement.isExpired { showPaywall = true } else { launch = g }
         } label: {
             VStack(alignment: .leading, spacing: 11) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: g.symbol)
-                        .font(.system(size: 21, weight: .heavy))
-                        .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
-                        .frame(width: 44, height: 44)
-                        .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.14),
-                                    in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                    Spacer(minLength: 0)
-                    Text(g.isSurvivalOnly ? "survival" : (g.isLive ? g.domain.label : "soon"))
-                        .font(.system(size: 10.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
-                        .lineLimit(1)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.12), in: Capsule())
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 10) {
+                        gameIcon(g)
+                        Spacer(minLength: 0)
+                        gameBadge(g)
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        gameIcon(g)
+                        gameBadge(g)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -121,6 +116,32 @@ struct GamesLibraryView: View {
         }
         .buttonStyle(.plain)
         .disabled(!g.isPlayable)
+    }
+
+    private func gameIcon(_ g: GameID) -> some View {
+        Image(systemName: g.symbol)
+            .font(.system(size: 21, weight: .heavy))
+            .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
+            .frame(width: 44, height: 44)
+            .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.14),
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func gameBadge(_ g: GameID) -> some View {
+        Text(gameBadgeLabel(g))
+            .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+            .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.12), in: Capsule())
+    }
+
+    private func gameBadgeLabel(_ g: GameID) -> String {
+        if g.isSurvivalOnly { return "survival" }
+        guard g.isLive else { return "soon" }
+        return g.domain == .multitasking ? "multitask" : g.domain.label
     }
 }
 
