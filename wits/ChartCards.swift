@@ -188,7 +188,7 @@ struct MetricDetailView: View {
 /// Per-domain scores as a radar/spider chart — a richer read than flat bars.
 struct DomainRadarChart: View {
     let scores: [CognitiveDomain: Double]
-    private let domains = CognitiveDomain.allCases   // 6 axes
+    private let domains = CognitiveDomain.allCases
 
     var body: some View {
         let vals = domains.map { max(0, min(1, (scores[$0] ?? 0) / 100)) }
