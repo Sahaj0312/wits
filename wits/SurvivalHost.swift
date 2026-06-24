@@ -46,36 +46,43 @@ struct SurvivalHost: View {
     private var best: Int { stats?.survivalBest ?? 0 }
 
     var body: some View {
-        ZStack {
-            Color.witsBg.ignoresSafeArea()
-            switch phase {
-            case .card:
-                GameCard(game: game, stats: stats, primaryTitle: "start survival",
-                         onPlay: startRun, onBack: onQuit)
-            case .playing:
-                VStack(spacing: 10) {
-                    ComboHUD(score: score, combo: combo, multiplier: multiplier,
-                             lives: lives, maxLives: 3)
-                        .padding(.top, 8)
-                    makeGameView(game, config: .survival(game, difficulty: seedDifficulty,
-                                                          onOutcome: handle)) { _ in }
-                        .id(runID)
+        GeometryReader { geo in
+            ZStack {
+                Color.witsBg.ignoresSafeArea()
+                switch phase {
+                case .card:
+                    GameCard(game: game, stats: stats, primaryTitle: "start survival",
+                             onPlay: startRun, onBack: onQuit)
+                case .playing:
+                    VStack(spacing: 10) {
+                        ComboHUD(score: score, combo: combo, multiplier: multiplier,
+                                 lives: lives, maxLives: 3)
+                            .padding(.top, 8)
+                        makeGameView(game, config: .survival(game, difficulty: seedDifficulty,
+                                                              onOutcome: handle)) { _ in }
+                            .id(runID)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, max(geo.safeAreaInsets.top, 8))
+                    .padding(.bottom, max(geo.safeAreaInsets.bottom, 8))
+                    .clipped()
+                    .witsShake(trigger: shakeTick)
+                    .witsFlash(.witsWarm, trigger: flashTick)
+                case .gameOver:
+                    gameOver
                 }
-                .witsShake(trigger: shakeTick)
-                .witsFlash(.witsWarm, trigger: flashTick)
-            case .gameOver:
-                gameOver
             }
-        }
-        .overlay(alignment: .topLeading) {
-            if phase == .playing {
-                Button(action: onQuit) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(Color.witsFaint)
-                        .padding(12)
+            .overlay(alignment: .topLeading) {
+                if phase == .playing {
+                    Button(action: onQuit) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(Color.witsFaint)
+                            .padding(12)
+                    }
+                    .padding(.leading, 8)
+                    .padding(.top, max(geo.safeAreaInsets.top, 8))
                 }
-                .padding(.top, 44)
             }
         }
         .onAppear { GameFeel.shared.warmUp() }

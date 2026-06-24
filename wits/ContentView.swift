@@ -35,9 +35,15 @@ struct ContentView: View {
 struct DebugGameHarness: View {
     let id: GameID
     var body: some View {
-        ZStack {
-            Color.witsBg.ignoresSafeArea()
-            makeGameView(id, config: .standard(id, difficulty: .seed(for: id), freePlay: true)) { _ in }
+        GeometryReader { geo in
+            ZStack {
+                Color.witsBg.ignoresSafeArea()
+                makeGameView(id, config: .standard(id, difficulty: .seed(for: id), freePlay: true)) { _ in }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, max(geo.safeAreaInsets.top, 8))
+                    .padding(.bottom, max(geo.safeAreaInsets.bottom, 8))
+                    .clipped()
+            }
         }
     }
 }

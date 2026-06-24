@@ -271,6 +271,17 @@ struct WordConnectScreen: View {
     private let startedAt = Date()
     private let currentLevel: Int
 
+    private struct ScreenLayout {
+        var spacing: CGFloat
+        var topPadding: CGFloat
+        var bottomPadding: CGFloat
+        var boardHeight: CGFloat
+        var wordPillHeight: CGFloat
+        var bonusHeight: CGFloat
+        var wheelHeight: CGFloat
+        var buttonSize: CGFloat
+    }
+
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
         self.onResult = onResult
@@ -302,23 +313,55 @@ struct WordConnectScreen: View {
     }
 
     var body: some View {
-        ZStack {
-            background
-            VStack(spacing: 12) {
-                if !cfg.isSurvival { topBar }
-                targetBoard
+        GeometryReader { geo in
+            let layout = Self.layout(for: geo.size,
+                                     bonusVisible: !foundBonus.isEmpty,
+                                     hasTopBar: !cfg.isSurvival)
+            ZStack {
+                background
+                VStack(spacing: layout.spacing) {
+                    if !cfg.isSurvival { topBar }
+                    targetBoard(height: min(crosswordBoardHeight, layout.boardHeight))
 
-                Spacer(minLength: 4)
+                    Spacer(minLength: 0)
 
-                currentWordPill
-                bonusRow
-                letterWheel
-                actionRow
+                    currentWordPill(height: layout.wordPillHeight)
+                    bonusRow(height: layout.bonusHeight)
+                    letterWheel(height: layout.wheelHeight)
+                    actionRow(buttonSize: layout.buttonSize)
+                }
+                .padding(.horizontal, WitsMetrics.screenPadding)
+                .padding(.top, layout.topPadding)
+                .padding(.bottom, layout.bottomPadding)
             }
-            .padding(.horizontal, WitsMetrics.screenPadding)
-            .padding(.top, 18)
-            .padding(.bottom, 12)
+            .frame(width: geo.size.width, height: geo.size.height)
+            .clipped()
         }
+    }
+
+    private static func layout(for size: CGSize, bonusVisible: Bool, hasTopBar: Bool) -> ScreenLayout {
+        let compact = size.height < 720
+        let spacing: CGFloat = compact ? 8 : 12
+        let topPadding: CGFloat = compact ? 8 : 12
+        let bottomPadding: CGFloat = compact ? 6 : 10
+        let wordPillHeight: CGFloat = compact ? 44 : 50
+        let bonusHeight: CGFloat = bonusVisible ? (compact ? 22 : 26) : 0
+        let buttonSize: CGFloat = compact ? 44 : 50
+        let topBarHeight: CGFloat = hasTopBar ? (compact ? 34 : 42) : 0
+        let boardChromeHeight: CGFloat = compact ? 62 : 74
+        let fixedHeight = topPadding + bottomPadding + wordPillHeight + bonusHeight + buttonSize + topBarHeight + boardChromeHeight + spacing * 5
+        let flexibleHeight = max(330, size.height - fixedHeight)
+        let boardHeight = min(compact ? 210 : 246, max(146, flexibleHeight * (compact ? 0.45 : 0.48)))
+        let wheelHeight = min(compact ? 224 : 260, max(178, flexibleHeight - boardHeight))
+
+        return ScreenLayout(spacing: spacing,
+                            topPadding: topPadding,
+                            bottomPadding: bottomPadding,
+                            boardHeight: boardHeight,
+                            wordPillHeight: wordPillHeight,
+                            bonusHeight: bonusHeight,
+                            wheelHeight: wheelHeight,
+                            buttonSize: buttonSize)
     }
 
     private var background: some View {
@@ -330,7 +373,6 @@ struct WordConnectScreen: View {
             startPoint: .top,
             endPoint: .bottom
         )
-        .ignoresSafeArea()
         .overlay(alignment: .topTrailing) {
             Image(systemName: "textformat.abc")
                 .font(.system(size: 154, weight: .heavy))
@@ -355,7 +397,7 @@ struct WordConnectScreen: View {
         }
     }
 
-    private var targetBoard: some View {
+    private func targetBoard(height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 2) {
@@ -380,7 +422,7 @@ struct WordConnectScreen: View {
 
             crosswordGrid
                 .frame(maxWidth: .infinity)
-                .frame(height: crosswordBoardHeight)
+                .frame(height: height)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -434,15 +476,15 @@ struct WordConnectScreen: View {
         .accessibilityLabel("crossword word grid")
     }
 
-    private var currentWordPill: some View {
+    private func currentWordPill(height: CGFloat) -> some View {
         Text(currentWord.isEmpty ? "make a word" : currentWord)
-            .font(.system(size: currentWord.count > 6 ? 22 : 26, weight: .heavy, design: .rounded))
+            .font(.system(size: currentWord.count > 6 ? height * 0.44 : height * 0.52, weight: .heavy, design: .rounded))
             .foregroundStyle(currentWord.isEmpty ? Color.witsFaint : Color.witsAccent)
             .monospaced()
             .lineLimit(1)
             .minimumScaleFactor(0.72)
             .frame(maxWidth: .infinity)
-            .frame(height: 50)
+            .frame(height: height)
             .background(Color.witsCard.opacity(0.95), in: Capsule())
             .overlay(
                 Capsule()
@@ -452,7 +494,7 @@ struct WordConnectScreen: View {
     }
 
     @ViewBuilder
-    private var bonusRow: some View {
+    private func bonusRow(height: CGFloat) -> some View {
         if !foundBonus.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -470,11 +512,11 @@ struct WordConnectScreen: View {
                 }
                 .padding(.horizontal, 2)
             }
-            .frame(height: 26)
+            .frame(height: height)
         }
     }
 
-    private var letterWheel: some View {
+    private func letterWheel(height: CGFloat) -> some View {
         GeometryReader { geo in
             let size = min(geo.size.width, geo.size.height)
             let center = CGPoint(x: geo.size.width / 2, y: geo.size.height / 2)
@@ -526,7 +568,7 @@ struct WordConnectScreen: View {
                     }
             )
         }
-        .frame(height: 260)
+        .frame(height: height)
         .padding(.top, 2)
     }
 
@@ -541,27 +583,27 @@ struct WordConnectScreen: View {
             .accessibilityLabel(letter)
     }
 
-    private var actionRow: some View {
+    private func actionRow(buttonSize: CGFloat) -> some View {
         HStack(spacing: 10) {
             Spacer(minLength: 0)
-            iconButton("shuffle", systemName: "shuffle") {
+            iconButton("shuffle", systemName: "shuffle", size: buttonSize) {
                 selectedIndices.removeAll()
                 withAnimation(.easeOut(duration: 0.16)) { letters.shuffle() }
             }
-            iconButton("clear", systemName: "delete.left.fill") {
+            iconButton("clear", systemName: "delete.left.fill", size: buttonSize) {
                 selectedIndices.removeAll()
             }
-            hintButton
+            hintButton(size: buttonSize)
             Spacer(minLength: 0)
         }
     }
 
-    private var hintButton: some View {
+    private func hintButton(size: CGFloat) -> some View {
         Button(action: useHint) {
             Image(systemName: "lightbulb.fill")
-                .font(.system(size: 17, weight: .heavy))
+                .font(.system(size: size * 0.34, weight: .heavy))
                 .foregroundStyle(hintCandidateCells.isEmpty ? Color.witsFaint : Color.witsWarm)
-                .frame(width: 50, height: 50)
+                .frame(width: size, height: size)
                 .background(Color.witsCard.opacity(0.95), in: Circle())
                 .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1.5))
         }
@@ -570,12 +612,12 @@ struct WordConnectScreen: View {
         .accessibilityLabel("hint")
     }
 
-    private func iconButton(_ label: String, systemName: String, action: @escaping () -> Void) -> some View {
+    private func iconButton(_ label: String, systemName: String, size: CGFloat, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: systemName)
-                .font(.system(size: 17, weight: .heavy))
+                .font(.system(size: size * 0.34, weight: .heavy))
                 .foregroundStyle(Color.witsInk)
-                .frame(width: 50, height: 50)
+                .frame(width: size, height: size)
                 .background(Color.witsCard.opacity(0.95), in: Circle())
                 .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1.5))
         }

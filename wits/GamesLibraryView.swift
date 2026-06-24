@@ -203,25 +203,32 @@ private struct GameLauncher: View {
                 .padding(.leading, 12)
             }
         case .train:
-            ZStack {
-                Color.witsBg.ignoresSafeArea()
-                makeGameView(game, config: .standard(game, difficulty: app.difficultyFor(game), freePlay: true)) { r in
-                    let previousBest = app.gameStats[game]?.bestScore ?? 0
-                    app.recordGameResult(r, source: "free_play")
-                    lastResult = r
-                    lastNewBest = r.score > previousBest
-                    withAnimation(.easeOut(duration: 0.2)) { phase = .result }
+            GeometryReader { geo in
+                ZStack {
+                    Color.witsBg.ignoresSafeArea()
+                    makeGameView(game, config: .standard(game, difficulty: app.difficultyFor(game), freePlay: true)) { r in
+                        let previousBest = app.gameStats[game]?.bestScore ?? 0
+                        app.recordGameResult(r, source: "free_play")
+                        lastResult = r
+                        lastNewBest = r.score > previousBest
+                        withAnimation(.easeOut(duration: 0.2)) { phase = .result }
+                    }
+                    .id(attempt)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, max(geo.safeAreaInsets.top, 8))
+                    .padding(.bottom, max(geo.safeAreaInsets.bottom, 8))
+                    .clipped()
                 }
-                .id(attempt)
-            }
-            .overlay(alignment: .topLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(Color.witsFaint)
-                        .padding(12)
+                .overlay(alignment: .topLeading) {
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(Color.witsFaint)
+                            .padding(12)
+                    }
+                    .padding(.leading, 8)
+                    .padding(.top, max(geo.safeAreaInsets.top, 8))
                 }
-                .padding(.top, 44)
             }
             .onAppear { GameFeel.shared.warmUp() }
             .onDisappear { GameFeel.shared.teardown() }

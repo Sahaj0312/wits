@@ -51,26 +51,33 @@ struct GameHost: View {
     private var daySeed: UInt64 { RewardEngine.daySeed(workout.day) }
 
     var body: some View {
-        ZStack {
-            Color.witsBg.ignoresSafeArea()
-            content
-                .id(stageKey)
-                .transition(.opacity)
+        GeometryReader { geo in
+            ZStack {
+                Color.witsBg.ignoresSafeArea()
+                content
+                    .id(stageKey)
+                    .transition(.opacity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.top, stage == .playing ? max(geo.safeAreaInsets.top, 8) : 0)
+                    .padding(.bottom, stage == .playing ? max(geo.safeAreaInsets.bottom, 8) : 0)
+                    .clipped()
+            }
+            .overlay(alignment: .topLeading) {
+                if stage == .playing {
+                    Button(action: onQuit) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(Color.witsFaint)
+                            .padding(12)
+                    }
+                    .padding(.leading, 8)
+                    .padding(.top, max(geo.safeAreaInsets.top, 8))
+                }
+            }
         }
         .animation(.easeOut(duration: 0.25), value: stageKey)
         .onAppear { GameFeel.shared.warmUp() }
         .onDisappear { GameFeel.shared.teardown() }
-        .overlay(alignment: .topLeading) {
-            if stage == .playing {
-                Button(action: onQuit) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(Color.witsFaint)
-                        .padding(12)
-                }
-                .padding(.horizontal, 8)
-            }
-        }
     }
 
     private var stageKey: String {
