@@ -394,7 +394,8 @@ private struct GameResultView: View {
 
     private var replayTitle: String {
         guard game == .wordConnect else { return "play again" }
-        return (result?.raw["levelDelta"] ?? 0) > 0 ? "play next level" : "play level 10"
+        guard (result?.raw["levelDelta"] ?? 0) > 0 else { return "play again" }
+        return "play next level"
     }
 
     private var wordGuessList: some View {

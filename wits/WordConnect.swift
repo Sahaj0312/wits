@@ -34,6 +34,7 @@ struct WordConnectScreen: View {
     private static let requiredWordPoints = 100
     private static let bonusWordPoints = 20
     private static let hintPenalty = 75
+    private static let maxHintsPerBoard = 2
 
     private enum Direction { case across, down }
 
@@ -276,6 +277,7 @@ struct WordConnectScreen: View {
     @State private var boardsSolved = 0
     @State private var foundBonus: [String] = []
     @State private var hintedCells: Set<Cell> = []
+    @State private var boardHintsUsed = 0
     @State private var feedback: Bool?
     @State private var dragMoved = false
     @State private var gestureActive = false
@@ -318,6 +320,7 @@ struct WordConnectScreen: View {
     }
 
     private var multiplier: Int { min(6, 1 + streak / 3) }
+    private var hintsRemaining: Int { max(0, Self.maxHintsPerBoard - boardHintsUsed) }
     private var runProgress: Double {
         let boardFraction = puzzle.required.isEmpty ? 0 : Double(foundRequiredCount) / Double(puzzle.required.count)
         return max(0, min(1, (Double(boardsSolved) + boardFraction) / Double(Self.boardsPerRun)))
@@ -638,13 +641,13 @@ struct WordConnectScreen: View {
         Button(action: useHint) {
             Image(systemName: "lightbulb.fill")
                 .font(.system(size: size * 0.34, weight: .heavy))
-                .foregroundStyle(hintCandidateCells.isEmpty ? Color.witsFaint : Color.witsWarm)
+                .foregroundStyle(hintCandidateCells.isEmpty || hintsRemaining == 0 ? Color.witsFaint : Color.witsWarm)
                 .frame(width: size, height: size)
                 .background(Color.witsCard.opacity(0.95), in: Circle())
                 .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1.5))
         }
         .buttonStyle(.plain)
-        .disabled(hintCandidateCells.isEmpty)
+        .disabled(hintCandidateCells.isEmpty || hintsRemaining == 0)
         .accessibilityLabel("hint")
     }
 
@@ -749,10 +752,15 @@ struct WordConnectScreen: View {
     }
 
     private func useHint() {
-        guard !finished, let cell = hintCandidateCells.randomElement() else { return }
+        guard !finished, hintsRemaining > 0, let cell = hintCandidateCells.randomElement() else { return }
         hintedCells.insert(cell)
         hintsUsed += 1
+        boardHintsUsed += 1
+        attempts += 1
+        wrong += 1
+        streak = 0
         score = max(0, score - Self.hintPenalty)
+        cfg.report(.miss)
     }
 
     private func flash(_ ok: Bool) {
@@ -771,6 +779,7 @@ struct WordConnectScreen: View {
             found.removeAll()
             foundBonus.removeAll()
             hintedCells.removeAll()
+            boardHintsUsed = 0
             selectedIndices.removeAll()
             recentPuzzleKeys = updatedRecent
         }
@@ -780,8 +789,8 @@ struct WordConnectScreen: View {
         guard !finished else { return }
         finished = true
         let accuracy = attempts > 0 ? Double(correct) / Double(attempts) : 0
-        let completedLevel = boardsSolved >= Self.boardsPerRun
-        let nextLevel = completedLevel ? min(10, currentLevel + 1) : currentLevel
+        let unlocksNextLevel = boardsSolved >= Self.boardsPerRun && accuracy >= 0.85
+        let nextLevel = unlocksNextLevel ? min(10, currentLevel + 1) : currentLevel
         var result = GameResult(game: .wordConnect, score: score, accuracy: accuracy)
         result.trials = attempts
         result.startedAt = startedAt
