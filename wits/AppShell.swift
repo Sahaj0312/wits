@@ -35,6 +35,7 @@ struct RootShell: View {
 
 struct ActivityTab: View {
     @Environment(AppModel.self) private var app
+    @State private var showScoringInfo = false
 
     private var headlinePoints: [SeriesPoint] { ProgressMath.headlineSeries(app.progressDays) }
     private var domainScores: [CognitiveDomain: Double] { ProgressMath.latestDomainScores(app.progressDays) }
@@ -65,9 +66,20 @@ struct ActivityTab: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         WitsBrandMark()
-                        Text("activity")
-                            .font(.witsDisplay(30))
-                            .foregroundStyle(Color.witsInk)
+                        HStack(spacing: 8) {
+                            Text("activity")
+                                .font(.witsDisplay(30))
+                                .foregroundStyle(Color.witsInk)
+                            Button { showScoringInfo = true } label: {
+                                Image(systemName: "info.circle.fill")
+                                    .font(.system(size: 19, weight: .bold))
+                                    .foregroundStyle(Color.witsFaint)
+                                    .frame(width: 32, height: 32)
+                                    .contentShape(Circle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("how WPI scoring works")
+                        }
                     }
                     Spacer()
                     wpiBadge
@@ -95,6 +107,11 @@ struct ActivityTab: View {
         }
         .background(Color.witsBg.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showScoringInfo) {
+            ScoringInfoSheet()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         }
     }
 
@@ -112,5 +129,88 @@ struct ActivityTab: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardSurface()
+    }
+}
+
+private struct ScoringInfoSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        WitsBrandMark()
+                        Text("how WPI works")
+                            .font(.witsDisplay(28))
+                            .foregroundStyle(Color.witsInk)
+                    }
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundStyle(Color.witsMuted)
+                            .frame(width: 34, height: 34)
+                            .background(Color.witsTint, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("close")
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    infoRow(icon: "bolt.fill",
+                            title: "WPI is your training score",
+                            body: "WPI is based on the mastery level you have earned in each skill area. It is separate from the points you see inside a game.")
+                    divider
+                    infoRow(icon: "number",
+                            title: "Skill score = mastery × 500",
+                            body: "Each game has a mastery level from 1 to 10. A level 4 skill is about 2000 WPI; level 10 is 5000.")
+                    divider
+                    infoRow(icon: "arrow.up.arrow.down",
+                            title: "Scores can move down",
+                            body: "Strong runs raise mastery. Weaker runs lower it gently, so WPI reflects current performance instead of only showing your best ever result.")
+                    divider
+                    infoRow(icon: "chart.bar.fill",
+                            title: "Overall is an average",
+                            body: "Your overall WPI is the average of trained skill scores. New skill areas appear after you play games in those areas.")
+                }
+                .padding(16)
+                .cardSurface()
+
+                Text("Raw points still matter for a single round, but WPI is the long-term progress system.")
+                    .font(.witsBody(14))
+                    .foregroundStyle(Color.witsMuted)
+                    .multilineTextAlignment(.leading)
+            }
+            .padding(.horizontal, WitsMetrics.screenPadding)
+            .padding(.top, 22)
+            .padding(.bottom, 28)
+        }
+        .background(Color.witsBg.ignoresSafeArea())
+    }
+
+    private var divider: some View {
+        Rectangle()
+            .fill(Color.witsLine)
+            .frame(height: 1)
+    }
+
+    private func infoRow(icon: String, title: String, body: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .heavy))
+                .foregroundStyle(Color.witsAccent)
+                .frame(width: 32, height: 32)
+                .background(Color.witsAccent.opacity(0.13), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 15.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsInk)
+                Text(body)
+                    .font(.witsBody(14))
+                    .foregroundStyle(Color.witsMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 }
