@@ -7,14 +7,18 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct WordConnectScreen: View {
     var cfg: GameConfig
     var onResult: (GameResult) -> Void
 
-    private static let gameSeconds = 45.0
     private static let recentPuzzleDefaultsKey = "wits.wordConnect.recentPuzzles"
     private static let recentPuzzleLimit = 12
+    private static let boardsPerRun = 2
+    private static let requiredWordPoints = 100
+    private static let bonusWordPoints = 20
+    private static let hintPenalty = 75
 
     private enum Direction { case across, down }
 
@@ -72,55 +76,28 @@ struct WordConnectScreen: View {
 
         private static func layout(_ words: [String]) -> [Entry] {
             guard let first = words.first else { return [] }
-            var entries = [Entry(word: first, row: 0, col: 0, direction: .across)]
-            var occupied = cells(for: entries)
-
-            for word in words.dropFirst() {
-                var candidates: [Entry] = []
-                let existing = occupied.sorted { a, b in
-                    a.key.row == b.key.row ? a.key.col < b.key.col : a.key.row < b.key.row
-                }
-
-                for (targetCell, targetLetter) in existing {
-                    for (offset, letter) in word.enumerated() where String(letter) == targetLetter {
-                        candidates.append(contentsOf: [
-                            Entry(word: word, row: targetCell.row - offset, col: targetCell.col, direction: .down),
-                            Entry(word: word, row: targetCell.row, col: targetCell.col - offset, direction: .across)
-                        ])
-                    }
-                }
-
-                var placed = candidates
-                    .filter { canPlace($0, entries: entries) }
-                    .min { lhs, rhs in
-                        let a = metrics(for: entries + [lhs])
-                        let b = metrics(for: entries + [rhs])
-                        if a.area != b.area { return a.area < b.area }
-                        if a.rows != b.rows { return a.rows < b.rows }
-                        return a.columns < b.columns
-                    }
-
-                if placed == nil {
-                    let maxRow = entries.flatMap { $0.cells().map(\.row) }.max() ?? 0
-                    placed = Entry(word: word, row: maxRow + 2, col: 0, direction: .across)
-                }
-
-                if let placed {
-                    entries.append(placed)
-                    occupied = cells(for: entries)
-                }
-            }
-
-            let minRow = entries.flatMap { $0.cells().map(\.row) }.min() ?? 0
-            let minCol = entries.flatMap { $0.cells().map(\.col) }.min() ?? 0
-            return entries.map {
-                Entry(word: $0.word, row: $0.row - minRow, col: $0.col - minCol, direction: $0.direction)
-            }
+            let ordered = ([first] + words.dropFirst().sorted { lhs, rhs in
+                lhs.count == rhs.count ? lhs < rhs : lhs.count > rhs.count
+            })
+            let seed = [Entry(word: ordered[0], row: 0, col: 0, direction: .across)]
+            return normalize(solve(entries: seed, remaining: Array(ordered.dropFirst())) ?? separatedLayout(ordered))
         }
 
         private static func canPlace(_ entry: Entry, entries: [Entry]) -> Bool {
             let occupied = cells(for: entries)
             var overlaps = 0
+            let before: Cell
+            let after: Cell
+            switch entry.direction {
+            case .across:
+                before = Cell(row: entry.row, col: entry.col - 1)
+                after = Cell(row: entry.row, col: entry.col + entry.word.count)
+            case .down:
+                before = Cell(row: entry.row - 1, col: entry.col)
+                after = Cell(row: entry.row + entry.word.count, col: entry.col)
+            }
+            guard occupied[before] == nil, occupied[after] == nil else { return false }
+
             for (offset, cell) in entry.cells().enumerated() {
                 let letter = String(entry.word[entry.word.index(entry.word.startIndex, offsetBy: offset)])
                 if let existing = occupied[cell] {
@@ -131,9 +108,114 @@ struct WordConnectScreen: View {
                         return false
                     }
                     overlaps += 1
+                } else {
+                    let sideCells: [Cell]
+                    switch entry.direction {
+                    case .across:
+                        sideCells = [Cell(row: cell.row - 1, col: cell.col), Cell(row: cell.row + 1, col: cell.col)]
+                    case .down:
+                        sideCells = [Cell(row: cell.row, col: cell.col - 1), Cell(row: cell.row, col: cell.col + 1)]
+                    }
+                    guard sideCells.allSatisfy({ occupied[$0] == nil }) else { return false }
                 }
             }
-            return overlaps > 0
+            return overlaps > 0 && boardRunsAreEntries(entries + [entry])
+        }
+
+        private static func solve(entries: [Entry], remaining: [String]) -> [Entry]? {
+            guard !remaining.isEmpty else { return entries }
+
+            let options = remaining.indices.map { index in
+                (index: index, candidates: candidates(for: remaining[index], entries: entries))
+            }
+            guard let next = options.min(by: { lhs, rhs in
+                if lhs.candidates.count != rhs.candidates.count { return lhs.candidates.count < rhs.candidates.count }
+                return remaining[lhs.index].count > remaining[rhs.index].count
+            }), !next.candidates.isEmpty else {
+                return nil
+            }
+
+            var rest = remaining
+            rest.remove(at: next.index)
+            let sortedCandidates = next.candidates.sorted { lhs, rhs in
+                let a = metrics(for: entries + [lhs])
+                let b = metrics(for: entries + [rhs])
+                if a.area != b.area { return a.area < b.area }
+                if a.rows != b.rows { return a.rows < b.rows }
+                return a.columns < b.columns
+            }
+
+            for candidate in sortedCandidates {
+                if let solved = solve(entries: entries + [candidate], remaining: rest) {
+                    return solved
+                }
+            }
+            return nil
+        }
+
+        private static func candidates(for word: String, entries: [Entry]) -> [Entry] {
+            let occupied = cells(for: entries)
+            let existing = occupied.sorted { a, b in
+                a.key.row == b.key.row ? a.key.col < b.key.col : a.key.row < b.key.row
+            }
+
+            var candidates: [Entry] = []
+            for (targetCell, targetLetter) in existing {
+                for (offset, letter) in word.enumerated() where String(letter) == targetLetter {
+                    candidates.append(contentsOf: [
+                        Entry(word: word, row: targetCell.row - offset, col: targetCell.col, direction: .down),
+                        Entry(word: word, row: targetCell.row, col: targetCell.col - offset, direction: .across)
+                    ])
+                }
+            }
+            return candidates.filter { canPlace($0, entries: entries) }
+        }
+
+        private static func boardRunsAreEntries(_ entries: [Entry]) -> Bool {
+            let occupied = cells(for: entries)
+            let expectedRuns = Set(entries.map { BoardRun(cells: $0.cells(), word: $0.word) })
+
+            for cell in occupied.keys {
+                if occupied[Cell(row: cell.row, col: cell.col - 1)] == nil,
+                   occupied[Cell(row: cell.row, col: cell.col + 1)] != nil {
+                    let run = run(from: cell, deltaRow: 0, deltaCol: 1, occupied: occupied)
+                    guard run.cells.count == 1 || expectedRuns.contains(run) else { return false }
+                }
+                if occupied[Cell(row: cell.row - 1, col: cell.col)] == nil,
+                   occupied[Cell(row: cell.row + 1, col: cell.col)] != nil {
+                    let run = run(from: cell, deltaRow: 1, deltaCol: 0, occupied: occupied)
+                    guard run.cells.count == 1 || expectedRuns.contains(run) else { return false }
+                }
+            }
+            return true
+        }
+
+        private static func run(from start: Cell, deltaRow: Int, deltaCol: Int, occupied: [Cell: String]) -> BoardRun {
+            var cells: [Cell] = []
+            var letters: [String] = []
+            var cell = start
+            while let letter = occupied[cell] {
+                cells.append(cell)
+                letters.append(letter)
+                cell = Cell(row: cell.row + deltaRow, col: cell.col + deltaCol)
+            }
+            return BoardRun(cells: cells, word: letters.joined())
+        }
+
+        private static func normalize(_ entries: [Entry]) -> [Entry] {
+            let minRow = entries.flatMap { $0.cells().map(\.row) }.min() ?? 0
+            let minCol = entries.flatMap { $0.cells().map(\.col) }.min() ?? 0
+            return entries.map {
+                Entry(word: $0.word, row: $0.row - minRow, col: $0.col - minCol, direction: $0.direction)
+            }
+        }
+
+        private static func separatedLayout(_ words: [String]) -> [Entry] {
+            var row = 0
+            return words.map { word in
+                defer { row += 2 }
+                return Entry(word: word, row: row, col: 0, direction: .across)
+            }
         }
 
         private static func cells(for entries: [Entry]) -> [Cell: String] {
@@ -158,34 +240,44 @@ struct WordConnectScreen: View {
         }
     }
 
+    private struct BoardRun: Hashable {
+        let cells: [Cell]
+        let word: String
+    }
+
     @State private var puzzle: Puzzle
     @State private var letters: [String]
     @State private var selectedIndices: [Int] = []
     @State private var found: Set<String> = []
-    @State private var timeLeft = gameSeconds
     @State private var score = 0
     @State private var attempts = 0
     @State private var correct = 0
     @State private var wrong = 0
+    @State private var hintsUsed = 0
     @State private var streak = 0
     @State private var bestStreak = 0
-    @State private var wordsFound = 0
+    @State private var requiredWordsFoundTotal = 0
+    @State private var bonusWordsFoundTotal = 0
     @State private var boardsSolved = 0
+    @State private var foundBonus: [String] = []
+    @State private var hintedCells: Set<Cell> = []
     @State private var feedback: Bool?
     @State private var dragMoved = false
     @State private var gestureActive = false
     @State private var finished = false
     @State private var recentPuzzleKeys: [String]
+    @State private var guessedWords: [String] = []
 
     private let startedAt = Date()
-    private let level: Double
+    private let currentLevel: Int
 
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
         self.onResult = onResult
-        self.level = cfg.difficulty.level
+        let seededLevel = Self.levelNumber(cfg.difficulty.level)
+        self.currentLevel = seededLevel
         let recent = Self.loadRecentPuzzleKeys()
-        let p = Self.makePuzzle(level: cfg.difficulty.level, avoiding: recent)
+        let p = Self.makePuzzle(level: Double(seededLevel), avoiding: recent)
         _puzzle = State(initialValue: p)
         _letters = State(initialValue: p.letters.shuffled())
         _recentPuzzleKeys = State(initialValue: Self.recordRecentPuzzle(p.key, in: recent))
@@ -200,7 +292,10 @@ struct WordConnectScreen: View {
     }
 
     private var multiplier: Int { min(6, 1 + streak / 3) }
-    private var validWords: Set<String> { Set(puzzle.required + puzzle.bonus) }
+    private var runProgress: Double {
+        let boardFraction = puzzle.required.isEmpty ? 0 : Double(foundRequiredCount) / Double(puzzle.required.count)
+        return max(0, min(1, (Double(boardsSolved) + boardFraction) / Double(Self.boardsPerRun)))
+    }
     private var crosswordBoardHeight: CGFloat {
         let ideal = CGFloat(puzzle.rows) * 38 + CGFloat(max(0, puzzle.rows - 1)) * 5
         return min(246, max(130, ideal))
@@ -216,6 +311,7 @@ struct WordConnectScreen: View {
                 Spacer(minLength: 4)
 
                 currentWordPill
+                bonusRow
                 letterWheel
                 actionRow
             }
@@ -223,7 +319,6 @@ struct WordConnectScreen: View {
             .padding(.top, 18)
             .padding(.bottom, 12)
         }
-        .task { await runTimer() }
     }
 
     private var background: some View {
@@ -247,25 +342,16 @@ struct WordConnectScreen: View {
     private var topBar: some View {
         VStack(spacing: 9) {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                Text("level \(currentLevel)")
                     .font(.system(size: 17, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsInk)
-                    .monospacedDigit()
-                if multiplier > 1 {
-                    Text("x\(multiplier)")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(Color.witsAccent.opacity(0.14), in: Capsule())
-                }
                 Spacer()
-                Text("\(Int(ceil(timeLeft)))s")
+                Text("\(score) pts")
                     .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
+                    .foregroundStyle(Color.witsAccent)
                     .monospacedDigit()
             }
-            ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
+            ProgressTrack(fraction: runProgress, animated: true)
         }
     }
 
@@ -282,8 +368,8 @@ struct WordConnectScreen: View {
                         .monospacedDigit()
                 }
                 Spacer()
-                if boardsSolved > 0 {
-                    Text("\(boardsSolved) cleared")
+                if !cfg.isSurvival {
+                    Text("board \(min(boardsSolved + 1, Self.boardsPerRun))/\(Self.boardsPerRun)")
                         .font(.system(size: 12, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsAccent)
                         .padding(.horizontal, 10)
@@ -325,13 +411,14 @@ struct WordConnectScreen: View {
                 ForEach(Array(puzzle.cells.keys), id: \.self) { cellCoord in
                     let solved = puzzle.isSolved(cellCoord, found: found)
                     let active = puzzle.isActive(cellCoord, currentWord: currentWord)
-                    Text(solved ? (puzzle.cells[cellCoord] ?? "") : "")
+                    let hinted = hintedCells.contains(cellCoord)
+                    Text(solved || hinted ? (puzzle.cells[cellCoord] ?? "") : "")
                         .font(.system(size: min(20, cell * 0.52), weight: .heavy, design: .rounded))
-                        .foregroundStyle(solved ? Color.witsAccent : Color.witsInk)
+                        .foregroundStyle(solved ? Color.witsAccent : hinted ? Color.witsWarm : Color.witsInk)
                         .frame(width: cell, height: cell)
                         .background(
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(solved ? Color.witsAccent.opacity(0.18) : Color.witsTint)
+                                .fill(solved ? Color.witsAccent.opacity(0.18) : hinted ? Color.witsWarm.opacity(0.16) : Color.witsTint)
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 9, style: .continuous)
@@ -362,6 +449,29 @@ struct WordConnectScreen: View {
                     .strokeBorder(feedback == true ? Color.witsAccent : feedback == false ? Color.witsWarm : Color.witsLine, lineWidth: 2)
             )
             .animation(.easeOut(duration: 0.14), value: feedback)
+    }
+
+    @ViewBuilder
+    private var bonusRow: some View {
+        if !foundBonus.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    Text("bonus")
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsMuted)
+                    ForEach(foundBonus, id: \.self) { word in
+                        Text(word.lowercased())
+                            .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsAccent)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.witsAccent.opacity(0.13), in: Capsule())
+                    }
+                }
+                .padding(.horizontal, 2)
+            }
+            .frame(height: 26)
+        }
     }
 
     private var letterWheel: some View {
@@ -441,8 +551,23 @@ struct WordConnectScreen: View {
             iconButton("clear", systemName: "delete.left.fill") {
                 selectedIndices.removeAll()
             }
+            hintButton
             Spacer(minLength: 0)
         }
+    }
+
+    private var hintButton: some View {
+        Button(action: useHint) {
+            Image(systemName: "lightbulb.fill")
+                .font(.system(size: 17, weight: .heavy))
+                .foregroundStyle(hintCandidateCells.isEmpty ? Color.witsFaint : Color.witsWarm)
+                .frame(width: 50, height: 50)
+                .background(Color.witsCard.opacity(0.95), in: Circle())
+                .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1.5))
+        }
+        .buttonStyle(.plain)
+        .disabled(hintCandidateCells.isEmpty)
+        .accessibilityLabel("hint")
     }
 
     private func iconButton(_ label: String, systemName: String, action: @escaping () -> Void) -> some View {
@@ -486,40 +611,70 @@ struct WordConnectScreen: View {
         let word = currentWord.uppercased()
         guard word.count >= 2 else { return }
 
-        if found.contains(word) {
+        if found.contains(word) || foundBonus.contains(word) {
             flash(false)
             selectedIndices.removeAll()
             return
         }
 
         attempts += 1
-        if validWords.contains(word) {
+        if puzzle.required.contains(word) {
             correct += 1
             streak += 1
             bestStreak = max(bestStreak, streak)
-            wordsFound += 1
+            requiredWordsFoundTotal += 1
             found.insert(word)
-            let points = word.count * 40
-            score += points * multiplier
-            cfg.report(.hit, points: points, combo: streak)
+            score += Self.requiredWordPoints * multiplier
+            logGuess(word, kind: "required")
+            cfg.report(.hit, points: Self.requiredWordPoints, combo: streak)
             flash(true)
             selectedIndices.removeAll()
 
             if foundRequiredCount >= puzzle.required.count {
-                boardsSolved += 1
-                score += cfg.isSurvival ? 0 : 250
+                let completedBoards = boardsSolved + 1
+                boardsSolved = completedBoards
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.32) {
                     guard !finished else { return }
-                    nextPuzzle()
+                    if cfg.isSurvival || completedBoards < Self.boardsPerRun {
+                        nextPuzzle()
+                    } else {
+                        finish()
+                    }
                 }
             }
+        } else if isBonusWord(word) {
+            correct += 1
+            streak += 1
+            bestStreak = max(bestStreak, streak)
+            bonusWordsFoundTotal += 1
+            foundBonus.append(word)
+            score += Self.bonusWordPoints
+            logGuess(word, kind: "bonus")
+            cfg.report(.hit, points: Self.bonusWordPoints, combo: streak)
+            flash(true)
+            selectedIndices.removeAll()
         } else {
             wrong += 1
             streak = 0
+            logGuess(word, kind: "miss")
             cfg.report(.miss)
             flash(false)
             selectedIndices.removeAll()
         }
+    }
+
+    private var hintCandidateCells: [Cell] {
+        puzzle.entries
+            .filter { !found.contains($0.word) }
+            .flatMap { $0.cells() }
+            .filter { !hintedCells.contains($0) }
+    }
+
+    private func useHint() {
+        guard !finished, let cell = hintCandidateCells.randomElement() else { return }
+        hintedCells.insert(cell)
+        hintsUsed += 1
+        score = max(0, score - Self.hintPenalty)
     }
 
     private func flash(_ ok: Bool) {
@@ -530,28 +685,16 @@ struct WordConnectScreen: View {
     }
 
     private func nextPuzzle() {
-        let p = Self.makePuzzle(level: level + Double(boardsSolved) * 0.35, avoiding: [puzzle.key] + recentPuzzleKeys)
+        let p = Self.makePuzzle(level: Double(currentLevel), avoiding: [puzzle.key] + recentPuzzleKeys)
         let updatedRecent = Self.recordRecentPuzzle(p.key, in: recentPuzzleKeys)
         withAnimation(.easeOut(duration: 0.18)) {
             puzzle = p
             letters = p.letters.shuffled()
             found.removeAll()
+            foundBonus.removeAll()
+            hintedCells.removeAll()
             selectedIndices.removeAll()
             recentPuzzleKeys = updatedRecent
-        }
-    }
-
-    private func runTimer() async {
-        let start = Date()
-        while !Task.isCancelled {
-            try? await Task.sleep(for: .milliseconds(40))
-            guard !finished else { return }
-            if cfg.isSurvival { continue }
-            timeLeft = max(0, Self.gameSeconds - Date().timeIntervalSince(start))
-            if timeLeft <= 0 {
-                finish()
-                return
-            }
         }
     }
 
@@ -559,17 +702,39 @@ struct WordConnectScreen: View {
         guard !finished else { return }
         finished = true
         let accuracy = attempts > 0 ? Double(correct) / Double(attempts) : 0
+        let completedLevel = boardsSolved >= Self.boardsPerRun
+        let nextLevel = completedLevel ? min(10, currentLevel + 1) : currentLevel
         var result = GameResult(game: .wordConnect, score: score, accuracy: accuracy)
         result.trials = attempts
         result.startedAt = startedAt
         result.durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
         result.raw = [
             "bestStreak": Double(bestStreak),
-            "wordsFound": Double(wordsFound),
+            "wordsFound": Double(requiredWordsFoundTotal + bonusWordsFoundTotal),
+            "requiredWordsFound": Double(requiredWordsFoundTotal),
+            "bonusWordsFound": Double(bonusWordsFoundTotal),
             "boardsSolved": Double(boardsSolved),
-            "wrong": Double(wrong)
+            "wrong": Double(wrong),
+            "hintsUsed": Double(hintsUsed),
+            "levelStart": Double(currentLevel),
+            "levelEnd": Double(nextLevel),
+            "levelDelta": Double(nextLevel - currentLevel)
         ]
+        result.text = ["guessedWords": guessedWords]
         onResult(result)
+    }
+
+    private func logGuess(_ word: String, kind: String) {
+        guard !guessedWords.contains(where: { $0.hasPrefix("\(word)|") }) else { return }
+        guessedWords.append("\(word)|\(kind)")
+    }
+
+    private func isBonusWord(_ word: String) -> Bool {
+        word.count >= 3
+            && !puzzle.required.contains(word)
+            && !foundBonus.contains(word)
+            && Self.canForm(word, from: letters)
+            && Self.isDictionaryWord(word)
     }
 
     private static func wheelPoint(index: Int, count: Int, radius: CGFloat, center: CGPoint) -> CGPoint {
@@ -585,8 +750,8 @@ struct WordConnectScreen: View {
     }
 
     private static func makePuzzle(level: Double, avoiding recent: [String] = []) -> Puzzle {
-        let cap = level < 2 ? 1 : level < 5 ? 2 : level < 8 ? 3 : 4
-        let pool = bank.filter { $0.difficulty <= cap }
+        let tier = puzzleTier(for: level)
+        let pool = bank.filter { $0.difficulty == tier }
         let blocked = Set(recent)
         let eligible = pool.filter { !blocked.contains($0.key) }
         if let pick = eligible.randomElement() { return pick }
@@ -595,6 +760,49 @@ struct WordConnectScreen: View {
         return pool.filter { $0.key != currentKey }.randomElement()
             ?? pool.randomElement()
             ?? bank[0]
+    }
+
+    private static func puzzleTier(for level: Double) -> Int {
+        let n = Int(floor(clampLevel(level)))
+        if n <= 2 { return 1 }
+        if n <= 5 { return 2 }
+        if n <= 8 { return 3 }
+        return 4
+    }
+
+    private static func clampLevel(_ level: Double) -> Double {
+        min(10, max(1, level))
+    }
+
+    private static func levelNumber(_ level: Double) -> Int {
+        min(10, max(1, Int(floor(clampLevel(level)))))
+    }
+
+    private static func canForm(_ word: String, from letters: [String]) -> Bool {
+        var counts: [Character: Int] = [:]
+        for letter in letters {
+            guard let ch = letter.first else { continue }
+            counts[ch, default: 0] += 1
+        }
+        for ch in word {
+            guard let count = counts[ch], count > 0 else { return false }
+            counts[ch] = count - 1
+        }
+        return true
+    }
+
+    private static func isDictionaryWord(_ word: String) -> Bool {
+        let text = word.lowercased()
+        let checker = UITextChecker()
+        let range = NSRange(location: 0, length: text.utf16.count)
+        let misspelled = checker.rangeOfMisspelledWord(
+            in: text,
+            range: range,
+            startingAt: 0,
+            wrap: false,
+            language: "en_US"
+        )
+        return misspelled.location == NSNotFound
     }
 
     private static func loadRecentPuzzleKeys() -> [String] {

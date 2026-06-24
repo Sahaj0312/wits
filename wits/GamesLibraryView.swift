@@ -7,6 +7,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct GamesLibraryView: View {
     @Environment(AppModel.self) private var app
@@ -252,8 +253,10 @@ private struct GameResultView: View {
     var isNewBest: Bool
     var onReplay: () -> Void
     var onDone: () -> Void
+    @State private var definitionWord: DefinitionWord?
 
     private var accuracyPct: Int? {
+        guard game != .wordConnect else { return nil }
         guard let r = result, r.trials > 0 else { return nil }
         return Int((r.accuracy * 100).rounded())
     }
@@ -265,6 +268,32 @@ private struct GameResultView: View {
         guard game.statKey != "bestStreak" else { return nil }
         guard let v = result?.raw[game.statKey] else { return nil }
         return game.statLabel(v)
+    }
+    private var wordLevelEnd: Double? {
+        guard game == .wordConnect else { return nil }
+        return result?.raw["levelEnd"]
+    }
+    private var wordLevelProgress: Double {
+        guard game == .wordConnect else { return 0 }
+        return (result?.raw["boardsSolved"] ?? 0) >= 2 ? 1 : 0
+    }
+    private var wordLevelText: String? {
+        guard let level = wordLevelEnd else { return nil }
+        let label = "level \(min(10, max(1, Int(floor(level)))))"
+        return (result?.raw["levelDelta"] ?? 0) > 0 ? "\(label) unlocked" : "\(label) complete"
+    }
+    private var wordLevelDeltaText: String? {
+        guard game == .wordConnect, let delta = result?.raw["levelDelta"] else { return nil }
+        guard delta > 0 else { return nil }
+        return "+\(Int(delta)) level"
+    }
+    private var guessedWords: [(word: String, kind: String)] {
+        guard game == .wordConnect else { return [] }
+        return result?.text["guessedWords"]?.compactMap { item in
+            let parts = item.split(separator: "|", maxSplits: 1).map(String.init)
+            guard let word = parts.first, !word.isEmpty else { return nil }
+            return (word, parts.count > 1 ? parts[1] : "guess")
+        } ?? []
     }
 
     var body: some View {
@@ -293,13 +322,44 @@ private struct GameResultView: View {
                         .padding(.vertical, 4)
                         .background(Color.witsWarm, in: Capsule())
                 }
+                if game == .wordConnect, let wordLevelText {
+                    VStack(spacing: 6) {
+                        HStack {
+                            Text(wordLevelText)
+                                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Color.witsInk)
+                            Spacer()
+                            if let wordLevelDeltaText {
+                                Text(wordLevelDeltaText)
+                                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(wordLevelDeltaText.hasPrefix("-") ? Color.witsWarm : Color.witsAccent)
+                                    .monospacedDigit()
+                            }
+                        }
+                        ProgressTrack(fraction: wordLevelProgress, animated: false)
+                    }
+                    .padding(.top, 8)
+                }
                 if accuracyPct != nil || bestStreak != nil || bestStat != nil {
                     HStack(spacing: 12) {
                         if let a = accuracyPct { stat("\(a)%", "accuracy") }
                         if let s = bestStreak { stat("\(s)", "best streak") }
                         if let bestStat { stat(bestStat, "best stat") }
+                        if game == .wordConnect, let boards = result?.raw["boardsSolved"] {
+                            stat("\(Int(boards))/2", "boards")
+                        }
+                        if game == .wordConnect, let bonus = result?.raw["bonusWordsFound"] {
+                            stat("\(Int(bonus))", "bonus")
+                        }
+                        if game == .wordConnect, let hints = result?.raw["hintsUsed"] {
+                            stat("\(Int(hints))", "hints")
+                        }
                     }
                     .padding(.top, 8)
+                }
+                if !guessedWords.isEmpty {
+                    wordGuessList
+                        .padding(.top, 8)
                 }
             }
             .padding(28)
@@ -307,7 +367,7 @@ private struct GameResultView: View {
             .cardSurface()
             .rise()
             Spacer()
-            Cta(title: "play again", action: onReplay)
+            Cta(title: replayTitle, action: onReplay)
                 .rise(0.1)
             QuietButton(title: "back to games", action: onDone)
                 .padding(.top, 6)
@@ -316,6 +376,90 @@ private struct GameResultView: View {
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.witsBg.ignoresSafeArea())
+        .sheet(item: $definitionWord) { item in
+            DictionarySheet(term: item.term)
+        }
+    }
+
+    private var replayTitle: String {
+        guard game == .wordConnect else { return "play again" }
+        return (result?.raw["levelDelta"] ?? 0) > 0 ? "play next level" : "play level 10"
+    }
+
+    private var wordGuessList: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("guessed words")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsMuted)
+                Spacer()
+                Text("\(guessedWords.count)")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsFaint)
+                    .monospacedDigit()
+            }
+
+            ScrollView {
+                VStack(spacing: 7) {
+                    ForEach(Array(guessedWords.enumerated()), id: \.offset) { _, guess in
+                        guessRow(guess.word, kind: guess.kind)
+                    }
+                }
+            }
+            .frame(maxHeight: 142)
+        }
+        .padding(12)
+        .background(Color.witsTint.opacity(0.72), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(Color.witsLine, lineWidth: 1)
+        )
+    }
+
+    private func guessRow(_ word: String, kind: String) -> some View {
+        let hasDefinition = UIReferenceLibraryViewController.dictionaryHasDefinition(forTerm: word.lowercased())
+        return Button {
+            guard hasDefinition else { return }
+            definitionWord = DefinitionWord(term: word.lowercased())
+        } label: {
+            HStack(spacing: 8) {
+                Text(word.lowercased())
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsInk)
+                Spacer(minLength: 8)
+                Text(guessLabel(kind))
+                    .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(guessColor(kind))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(guessColor(kind).opacity(0.12), in: Capsule())
+                Image(systemName: "book.closed.fill")
+                    .font(.system(size: 11, weight: .heavy))
+                    .foregroundStyle(hasDefinition ? Color.witsMuted : Color.witsFaint.opacity(0.45))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(Color.witsCard.opacity(0.72), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!hasDefinition)
+    }
+
+    private func guessLabel(_ kind: String) -> String {
+        switch kind {
+        case "required": "grid"
+        case "bonus": "bonus"
+        case "miss": "miss"
+        default: kind
+        }
+    }
+
+    private func guessColor(_ kind: String) -> Color {
+        switch kind {
+        case "required", "bonus": Color.witsAccent
+        case "miss": Color.witsWarm
+        default: Color.witsMuted
+        }
     }
 
     private func stat(_ value: String, _ label: String) -> some View {
@@ -329,4 +473,19 @@ private struct GameResultView: View {
                 .foregroundStyle(Color.witsMuted)
         }
     }
+}
+
+private struct DefinitionWord: Identifiable {
+    let term: String
+    var id: String { term }
+}
+
+private struct DictionarySheet: UIViewControllerRepresentable {
+    let term: String
+
+    func makeUIViewController(context: Context) -> UIReferenceLibraryViewController {
+        UIReferenceLibraryViewController(term: term)
+    }
+
+    func updateUIViewController(_ uiViewController: UIReferenceLibraryViewController, context: Context) {}
 }

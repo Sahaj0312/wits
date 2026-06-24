@@ -342,7 +342,7 @@ final class AppModel {
         assert(source != "survival", "survival runs must go through recordSurvivalRun (staircase must not move)")
         let id = result.game
         let current = difficulty[id] ?? .seed(for: id)
-        let next = advanceDifficulty(for: id, current, accuracy: result.accuracy)
+        let next = advanceDifficulty(for: id, current, accuracy: result.accuracy, levelDelta: result.raw["levelDelta"])
         difficulty[id] = next
         var r = result
         r.newDifficulty = next

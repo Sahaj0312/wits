@@ -164,7 +164,7 @@ extension GameID {
         case .tileShift: "follow the rule on screen — sometimes match by colour, sometimes by shape. it keeps flipping."
         case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
         case .pathKeeper: "watch a token hop across the board, then repeat its path in the same order."
-        case .wordConnect: "connect the letters in the wheel to uncover every hidden word before time runs out."
+        case .wordConnect: "connect letters in the wheel to uncover every hidden word in the grid. clear two boards to unlock the next level."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         }
     }
@@ -234,6 +234,7 @@ extension GameID {
     var seedLevel: Double {
         switch self {
         case .crowdControl, .echoGrid, .lastSeen, .pathKeeper, .matchBack: 1
+        case .wordConnect: 1
         default: 2
         }
     }
@@ -331,8 +332,67 @@ struct GameResult: Codable, Equatable {
     var startedAt: Date = Date()
     var durationMs: Int = 0
     var raw: [String: Double] = [:] // game-specific extras → game_sessions.details
+    var text: [String: [String]] = [:]
 
     var domain: CognitiveDomain { game.domain }
+
+    init(game: GameID,
+         score: Int,
+         accuracy: Double,
+         medianRTms: Int? = nil,
+         threshold: Double? = nil,
+         trials: Int = 0,
+         newDifficulty: DifficultyState? = nil,
+         startedAt: Date = Date(),
+         durationMs: Int = 0,
+         raw: [String: Double] = [:],
+         text: [String: [String]] = [:]) {
+        self.game = game
+        self.score = score
+        self.accuracy = accuracy
+        self.medianRTms = medianRTms
+        self.threshold = threshold
+        self.trials = trials
+        self.newDifficulty = newDifficulty
+        self.startedAt = startedAt
+        self.durationMs = durationMs
+        self.raw = raw
+        self.text = text
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case game, score, accuracy, medianRTms, threshold, trials, newDifficulty, startedAt, durationMs, raw, text
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        game = try c.decode(GameID.self, forKey: .game)
+        score = try c.decode(Int.self, forKey: .score)
+        accuracy = try c.decode(Double.self, forKey: .accuracy)
+        medianRTms = try c.decodeIfPresent(Int.self, forKey: .medianRTms)
+        threshold = try c.decodeIfPresent(Double.self, forKey: .threshold)
+        trials = try c.decodeIfPresent(Int.self, forKey: .trials) ?? 0
+        newDifficulty = try c.decodeIfPresent(DifficultyState.self, forKey: .newDifficulty)
+        startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt) ?? Date()
+        durationMs = try c.decodeIfPresent(Int.self, forKey: .durationMs) ?? 0
+        raw = try c.decodeIfPresent([String: Double].self, forKey: .raw) ?? [:]
+        text = try c.decodeIfPresent([String: [String]].self, forKey: .text) ?? [:]
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(game, forKey: .game)
+        try c.encode(score, forKey: .score)
+        try c.encode(accuracy, forKey: .accuracy)
+        try c.encodeIfPresent(medianRTms, forKey: .medianRTms)
+        try c.encodeIfPresent(threshold, forKey: .threshold)
+        try c.encode(trials, forKey: .trials)
+        try c.encodeIfPresent(newDifficulty, forKey: .newDifficulty)
+        try c.encode(startedAt, forKey: .startedAt)
+        try c.encode(durationMs, forKey: .durationMs)
+        try c.encode(raw, forKey: .raw)
+        try c.encode(text, forKey: .text)
+    }
 }
 
 // MARK: - Config
