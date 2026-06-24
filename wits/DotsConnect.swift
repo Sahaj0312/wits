@@ -50,6 +50,23 @@ struct DotsConnectScreen: View {
         }
     }
 
+    private enum RouteKind: CaseIterable {
+        case rowSnake, columnSnake, spiral
+    }
+
+    private enum BoardTransform: CaseIterable {
+        case identity, mirrorX, mirrorY, rotate180
+    }
+
+    private struct PuzzleRecipe {
+        let size: Int
+        let difficulty: Int
+        let pathCount: Int
+        let route: RouteKind
+        let transform: BoardTransform
+        let seed: Int
+    }
+
     @State private var puzzle: Puzzle
     @State private var boardIndex = 1
     @State private var paths: [Int: [Cell]] = [:]
@@ -65,13 +82,17 @@ struct DotsConnectScreen: View {
 
     private let startedAt = Date()
     private let level: Int
+    nonisolated private static let maxPathCount = 8
 
     private static let palette: [Color] = [
         Color(red: 0.13, green: 0.70, blue: 1.00),
         Color(red: 0.98, green: 0.29, blue: 0.78),
         Color(red: 1.00, green: 0.54, blue: 0.12),
         Color(red: 0.21, green: 0.95, blue: 0.08),
-        Color(red: 0.56, green: 0.41, blue: 0.86)
+        Color(red: 0.56, green: 0.41, blue: 0.86),
+        Color(red: 1.00, green: 0.27, blue: 0.21),
+        Color(red: 0.99, green: 0.86, blue: 0.18),
+        Color(red: 0.22, green: 0.90, blue: 0.78)
     ]
 
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
@@ -129,10 +150,15 @@ struct DotsConnectScreen: View {
                 }
                 .buttonStyle(.plain)
 
-                Text("\(boardIndex)/\(Self.boardsPerRun)")
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .monospacedDigit()
+                VStack(spacing: 1) {
+                    Text("level \(level)")
+                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.72))
+                    Text("board \(boardIndex)/\(Self.boardsPerRun)")
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .monospacedDigit()
+                }
                     .frame(maxWidth: .infinity)
                     .frame(height: 50)
                     .background(.white.opacity(0.14), in: Capsule())
@@ -419,36 +445,148 @@ struct DotsConnectScreen: View {
             "bestStreak": Double(bestStreak),
             "hintsUsed": Double(hintsUsed),
             "mistakes": Double(mistakes),
-            "gridSize": Double(puzzle.size)
+            "gridSize": Double(puzzle.size),
+            "levelStart": Double(level),
+            "puzzleDifficulty": Double(puzzle.difficulty)
         ]
         onResult(result)
     }
 
     private static func pickPuzzle(level: Double, excluding excludedIDs: [Puzzle.ID]) -> Puzzle {
-        let tier = level < 4 ? 1 : level < 8 ? 2 : 3
-        let pool = puzzles.filter { $0.difficulty <= tier }
+        let levelNumber = min(10, max(1, Int(floor(level))))
+        let lowerBound = max(1, levelNumber - 2)
+        let nearLevelPool = puzzles.filter { lowerBound...levelNumber ~= $0.difficulty }
+        let fallbackPool = puzzles.filter { $0.difficulty <= levelNumber }
+        let pool = nearLevelPool.isEmpty ? fallbackPool : nearLevelPool
         return pool.filter { !excludedIDs.contains($0.id) }.randomElement() ?? pool.randomElement() ?? puzzles[0]
     }
 
-    private static let puzzles: [Puzzle] = [
-        Puzzle(size: 5, paths: [
-            [Cell(row: 0, col: 0), Cell(row: 1, col: 0), Cell(row: 2, col: 0), Cell(row: 3, col: 0), Cell(row: 4, col: 0)],
-            [Cell(row: 0, col: 1), Cell(row: 0, col: 2), Cell(row: 0, col: 3), Cell(row: 0, col: 4), Cell(row: 1, col: 4), Cell(row: 2, col: 4), Cell(row: 3, col: 4), Cell(row: 4, col: 4)],
-            [Cell(row: 1, col: 1), Cell(row: 1, col: 2), Cell(row: 1, col: 3), Cell(row: 2, col: 3), Cell(row: 3, col: 3), Cell(row: 3, col: 2), Cell(row: 2, col: 2)],
-            [Cell(row: 2, col: 1), Cell(row: 3, col: 1), Cell(row: 4, col: 1), Cell(row: 4, col: 2), Cell(row: 4, col: 3)]
-        ], difficulty: 1),
-        Puzzle(size: 5, paths: [
-            [Cell(row: 0, col: 0), Cell(row: 0, col: 1), Cell(row: 0, col: 2), Cell(row: 0, col: 3), Cell(row: 0, col: 4)],
-            [Cell(row: 1, col: 0), Cell(row: 1, col: 1), Cell(row: 1, col: 2), Cell(row: 1, col: 3), Cell(row: 1, col: 4), Cell(row: 2, col: 4), Cell(row: 3, col: 4), Cell(row: 4, col: 4)],
-            [Cell(row: 2, col: 0), Cell(row: 3, col: 0), Cell(row: 4, col: 0), Cell(row: 4, col: 1), Cell(row: 3, col: 1), Cell(row: 2, col: 1)],
-            [Cell(row: 2, col: 2), Cell(row: 2, col: 3), Cell(row: 3, col: 3), Cell(row: 3, col: 2), Cell(row: 4, col: 2), Cell(row: 4, col: 3)]
-        ], difficulty: 1),
-        Puzzle(size: 6, paths: [
-            [Cell(row: 0, col: 0), Cell(row: 1, col: 0), Cell(row: 2, col: 0), Cell(row: 3, col: 0), Cell(row: 4, col: 0), Cell(row: 5, col: 0)],
-            [Cell(row: 0, col: 1), Cell(row: 0, col: 2), Cell(row: 0, col: 3), Cell(row: 0, col: 4), Cell(row: 0, col: 5), Cell(row: 1, col: 5), Cell(row: 2, col: 5), Cell(row: 3, col: 5)],
-            [Cell(row: 1, col: 1), Cell(row: 1, col: 2), Cell(row: 2, col: 2), Cell(row: 3, col: 2), Cell(row: 3, col: 1), Cell(row: 2, col: 1)],
-            [Cell(row: 1, col: 3), Cell(row: 1, col: 4), Cell(row: 2, col: 4), Cell(row: 3, col: 4), Cell(row: 4, col: 4), Cell(row: 4, col: 5), Cell(row: 5, col: 5)],
-            [Cell(row: 2, col: 3), Cell(row: 3, col: 3), Cell(row: 4, col: 3), Cell(row: 5, col: 3), Cell(row: 5, col: 2), Cell(row: 5, col: 1), Cell(row: 4, col: 1), Cell(row: 4, col: 2), Cell(row: 5, col: 4)]
-        ], difficulty: 2)
-    ]
+    nonisolated private static let puzzles: [Puzzle] = makePuzzles()
+
+    nonisolated private static func makePuzzles() -> [Puzzle] {
+        makeRecipes().map(makePuzzle)
+    }
+
+    nonisolated private static func makeRecipes() -> [PuzzleRecipe] {
+        var recipes: [PuzzleRecipe] = []
+        for level in 1...10 {
+            let size = level <= 3 ? 5 : level <= 6 ? 6 : 7
+            let pathCount = min(maxPathCount, max(4, 3 + Int(ceil(Double(level) / 2.0))))
+            let variants = 8
+            for variant in 0..<variants {
+                recipes.append(
+                    PuzzleRecipe(
+                        size: size,
+                        difficulty: level,
+                        pathCount: pathCount,
+                        route: RouteKind.allCases[variant % RouteKind.allCases.count],
+                        transform: BoardTransform.allCases[(variant / RouteKind.allCases.count + level) % BoardTransform.allCases.count],
+                        seed: level * 31 + variant * 17
+                    )
+                )
+            }
+        }
+        return recipes
+    }
+
+    nonisolated private static func makePuzzle(_ recipe: PuzzleRecipe) -> Puzzle {
+        let route = transformedRoute(kind: recipe.route, size: recipe.size, transform: recipe.transform)
+        let lengths = segmentLengths(total: route.count, count: recipe.pathCount, seed: recipe.seed)
+        var paths: [[Cell]] = []
+        var start = 0
+        for length in lengths {
+            paths.append(Array(route[start..<(start + length)]))
+            start += length
+        }
+        return Puzzle(size: recipe.size, paths: paths, difficulty: recipe.difficulty)
+    }
+
+    nonisolated private static func segmentLengths(total: Int, count: Int, seed: Int) -> [Int] {
+        let minimum = 2
+        let baseTotal = minimum * count
+        guard count > 0, total >= baseTotal else { return [total] }
+        let remaining = total - baseTotal
+        let weights = (0..<count).map { 3 + abs((seed + $0 * 7) % 6) }
+        let weightTotal = weights.reduce(0, +)
+        var lengths = weights.map { minimum + remaining * $0 / weightTotal }
+        var used = lengths.reduce(0, +)
+        var index = abs(seed) % count
+        while used < total {
+            lengths[index] += 1
+            used += 1
+            index = (index + 2) % count
+        }
+        return lengths
+    }
+
+    nonisolated private static func transformedRoute(kind: RouteKind, size: Int, transform: BoardTransform) -> [Cell] {
+        route(kind: kind, size: size).map { transformCell($0, size: size, transform: transform) }
+    }
+
+    nonisolated private static func transformCell(_ cell: Cell, size: Int, transform: BoardTransform) -> Cell {
+        switch transform {
+        case .identity:
+            cell
+        case .mirrorX:
+            Cell(row: cell.row, col: size - 1 - cell.col)
+        case .mirrorY:
+            Cell(row: size - 1 - cell.row, col: cell.col)
+        case .rotate180:
+            Cell(row: size - 1 - cell.row, col: size - 1 - cell.col)
+        }
+    }
+
+    nonisolated private static func route(kind: RouteKind, size: Int) -> [Cell] {
+        switch kind {
+        case .rowSnake:
+            rowSnake(size: size)
+        case .columnSnake:
+            columnSnake(size: size)
+        case .spiral:
+            spiral(size: size)
+        }
+    }
+
+    nonisolated private static func rowSnake(size: Int) -> [Cell] {
+        var cells: [Cell] = []
+        for row in 0..<size {
+            let columns = row.isMultiple(of: 2) ? Array(0..<size) : Array((0..<size).reversed())
+            for col in columns { cells.append(Cell(row: row, col: col)) }
+        }
+        return cells
+    }
+
+    nonisolated private static func columnSnake(size: Int) -> [Cell] {
+        var cells: [Cell] = []
+        for col in 0..<size {
+            let rows = col.isMultiple(of: 2) ? Array(0..<size) : Array((0..<size).reversed())
+            for row in rows { cells.append(Cell(row: row, col: col)) }
+        }
+        return cells
+    }
+
+    nonisolated private static func spiral(size: Int) -> [Cell] {
+        var cells: [Cell] = []
+        var top = 0
+        var bottom = size - 1
+        var left = 0
+        var right = size - 1
+        while top <= bottom && left <= right {
+            for col in left...right { cells.append(Cell(row: top, col: col)) }
+            if top < bottom {
+                for row in (top + 1)...bottom { cells.append(Cell(row: row, col: right)) }
+            }
+            if top < bottom && left < right {
+                for col in stride(from: right - 1, through: left, by: -1) { cells.append(Cell(row: bottom, col: col)) }
+            }
+            if top + 1 < bottom && left < right {
+                for row in stride(from: bottom - 1, through: top + 1, by: -1) { cells.append(Cell(row: row, col: left)) }
+            }
+            top += 1
+            bottom -= 1
+            left += 1
+            right -= 1
+        }
+        return cells
+    }
 }
