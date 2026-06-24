@@ -55,8 +55,22 @@ struct ActivityTab: View {
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.witsMuted)
         }
-        .padding(.horizontal, 16).padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .padding(.trailing, 6)
         .background(Color.witsAccent.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(alignment: .bottomTrailing) {
+            Button { showScoringInfo = true } label: {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundStyle(Color.witsFaint)
+                    .frame(width: 28, height: 28)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("how WPI scoring works")
+            .padding(3)
+        }
     }
 
     var body: some View {
@@ -66,20 +80,9 @@ struct ActivityTab: View {
                 HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 2) {
                         WitsBrandMark()
-                        HStack(spacing: 8) {
-                            Text("activity")
-                                .font(.witsDisplay(30))
-                                .foregroundStyle(Color.witsInk)
-                            Button { showScoringInfo = true } label: {
-                                Image(systemName: "info.circle.fill")
-                                    .font(.system(size: 19, weight: .bold))
-                                    .foregroundStyle(Color.witsFaint)
-                                    .frame(width: 32, height: 32)
-                                    .contentShape(Circle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("how WPI scoring works")
-                        }
+                        Text("activity")
+                            .font(.witsDisplay(30))
+                            .foregroundStyle(Color.witsInk)
                     }
                     Spacer()
                     wpiBadge
@@ -109,8 +112,6 @@ struct ActivityTab: View {
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showScoringInfo) {
             ScoringInfoSheet()
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
         }
         }
     }
@@ -134,15 +135,16 @@ struct ActivityTab: View {
 
 private struct ScoringInfoSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var contentHeight: CGFloat = 560
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 3) {
                         WitsBrandMark()
                         Text("how WPI works")
-                            .font(.witsDisplay(28))
+                            .font(.witsDisplay(26))
                             .foregroundStyle(Color.witsInk)
                     }
                     Spacer()
@@ -157,7 +159,7 @@ private struct ScoringInfoSheet: View {
                     .accessibilityLabel("close")
                 }
 
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 10) {
                     infoRow(icon: "bolt.fill",
                             title: "WPI is your training score",
                             body: "WPI is based on the mastery level you have earned in each skill area. It is separate from the points you see inside a game.")
@@ -174,18 +176,27 @@ private struct ScoringInfoSheet: View {
                             title: "Overall is an average",
                             body: "Your overall WPI is the average of trained skill scores. New skill areas appear after you play games in those areas.")
                 }
-                .padding(16)
+                .padding(14)
                 .cardSurface()
 
                 Text("Raw points still matter for a single round, but WPI is the long-term progress system.")
-                    .font(.witsBody(14))
+                    .font(.witsBody(13.5))
                     .foregroundStyle(Color.witsMuted)
                     .multilineTextAlignment(.leading)
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
-            .padding(.top, 22)
-            .padding(.bottom, 28)
+            .padding(.top, 20)
+            .padding(.bottom, 20)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: ScoringInfoSheetHeightKey.self, value: proxy.size.height)
+                }
+            }
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .onPreferenceChange(ScoringInfoSheetHeightKey.self) { contentHeight = ceil($0) }
+        .presentationDetents([.height(contentHeight)])
+        .presentationDragIndicator(.hidden)
         .background(Color.witsBg.ignoresSafeArea())
     }
 
@@ -198,19 +209,26 @@ private struct ScoringInfoSheet: View {
     private func infoRow(icon: String, title: String, body: String) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: icon)
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: 14, weight: .heavy))
                 .foregroundStyle(Color.witsAccent)
-                .frame(width: 32, height: 32)
+                .frame(width: 30, height: 30)
                 .background(Color.witsAccent.opacity(0.13), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(.system(size: 15.5, weight: .heavy, design: .rounded))
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsInk)
                 Text(body)
-                    .font(.witsBody(14))
+                    .font(.witsBody(13.5))
                     .foregroundStyle(Color.witsMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+}
+
+private struct ScoringInfoSheetHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 560
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
