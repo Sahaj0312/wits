@@ -226,14 +226,16 @@ private struct GameLauncher: View {
                     .clipped()
                 }
                 .overlay(alignment: .topLeading) {
-                    Button { dismiss() } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .heavy))
-                            .foregroundStyle(Color.witsFaint)
-                            .padding(12)
+                    if !game.usesEmbeddedQuitControl {
+                        Button { dismiss() } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 15, weight: .heavy))
+                                .foregroundStyle(Color.witsFaint)
+                                .padding(12)
+                        }
+                        .padding(.leading, 8)
+                        .padding(.top, max(geo.safeAreaInsets.top, 8))
                     }
-                    .padding(.leading, 8)
-                    .padding(.top, max(geo.safeAreaInsets.top, 8))
                 }
             }
             .onAppear { GameFeel.shared.warmUp() }

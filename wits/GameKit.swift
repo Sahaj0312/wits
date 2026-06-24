@@ -47,6 +47,14 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
         default: false
         }
     }
+
+    /// Some games place their own primary top-left control inside the playfield.
+    var usesEmbeddedQuitControl: Bool {
+        switch self {
+        case .dotsConnect: true
+        default: false
+        }
+    }
 }
 
 enum CognitiveDomain: String, Codable, CaseIterable, Identifiable {
@@ -59,7 +67,7 @@ enum CognitiveDomain: String, Codable, CaseIterable, Identifiable {
         case .multitasking: "multitasking"
         case .memory: "memory"
         case .flexibility: "flexibility"
-        case .reasoning: "reasoning"
+        case .reasoning: "reason"
         case .math: "math"
         case .language: "language"
         }

@@ -63,7 +63,7 @@ struct GameHost: View {
                     .clipped()
             }
             .overlay(alignment: .topLeading) {
-                if stage == .playing {
+                if stage == .playing, currentGame?.usesEmbeddedQuitControl != true {
                     Button(action: onQuit) {
                         Image(systemName: "xmark")
                             .font(.system(size: 15, weight: .heavy))
