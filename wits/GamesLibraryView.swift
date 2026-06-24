@@ -205,7 +205,11 @@ private struct GameLauncher: View {
         case .train:
             GeometryReader { geo in
                 ZStack {
-                    Color.witsBg.ignoresSafeArea()
+                    if game == .wordConnect {
+                        WordConnectSafeAreaBackground()
+                    } else {
+                        Color.witsBg.ignoresSafeArea()
+                    }
                     makeGameView(game, config: .standard(game, difficulty: app.difficultyFor(game), freePlay: true)) { r in
                         let previousBest = app.gameStats[game]?.bestScore ?? 0
                         app.recordGameResult(r, source: "free_play")
@@ -215,8 +219,8 @@ private struct GameLauncher: View {
                     }
                     .id(attempt)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, max(geo.safeAreaInsets.top, 8))
-                    .padding(.bottom, max(geo.safeAreaInsets.bottom, 8))
+                    .padding(.top, game == .wordConnect ? 0 : max(geo.safeAreaInsets.top, 8))
+                    .padding(.bottom, game == .wordConnect ? 0 : max(geo.safeAreaInsets.bottom, 8))
                     .clipped()
                 }
                 .overlay(alignment: .topLeading) {

@@ -9,6 +9,21 @@
 import SwiftUI
 import UIKit
 
+struct WordConnectSafeAreaBackground: View {
+    var body: some View {
+        LinearGradient(
+            stops: [
+                .init(color: Color(light: 0xEDF5FF, dark: 0x172B55), location: 0),
+                .init(color: Color(light: 0xEDF5FF, dark: 0x172B55), location: 0.14),
+                .init(color: Color(light: 0xF3F5F9, dark: 0x131A2C), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+        .ignoresSafeArea()
+    }
+}
+
 struct WordConnectScreen: View {
     var cfg: GameConfig
     var onResult: (GameResult) -> Void
@@ -311,17 +326,23 @@ struct WordConnectScreen: View {
         let ideal = CGFloat(puzzle.rows) * 38 + CGFloat(max(0, puzzle.rows - 1)) * 5
         return min(246, max(130, ideal))
     }
+    private var targetBoardIdealHeight: CGFloat {
+        min(326, max(226, crosswordBoardHeight + 86))
+    }
 
     var body: some View {
         GeometryReader { geo in
             let layout = Self.layout(for: geo.size,
                                      bonusVisible: !foundBonus.isEmpty,
-                                     hasTopBar: !cfg.isSurvival)
+                                     hasTopBar: !cfg.isSurvival,
+                                     idealBoardHeight: targetBoardIdealHeight,
+                                     topSafeInset: geo.safeAreaInsets.top,
+                                     bottomSafeInset: geo.safeAreaInsets.bottom)
             ZStack {
-                background
+                background.ignoresSafeArea()
                 VStack(spacing: layout.spacing) {
                     if !cfg.isSurvival { topBar }
-                    targetBoard(height: min(crosswordBoardHeight, layout.boardHeight))
+                    targetBoard(height: layout.boardHeight)
 
                     Spacer(minLength: 0)
 
@@ -335,24 +356,40 @@ struct WordConnectScreen: View {
                 .padding(.bottom, layout.bottomPadding)
             }
             .frame(width: geo.size.width, height: geo.size.height)
-            .clipped()
         }
     }
 
-    private static func layout(for size: CGSize, bonusVisible: Bool, hasTopBar: Bool) -> ScreenLayout {
-        let compact = size.height < 720
-        let spacing: CGFloat = compact ? 8 : 12
-        let topPadding: CGFloat = compact ? 8 : 12
-        let bottomPadding: CGFloat = compact ? 6 : 10
-        let wordPillHeight: CGFloat = compact ? 44 : 50
-        let bonusHeight: CGFloat = bonusVisible ? (compact ? 22 : 26) : 0
-        let buttonSize: CGFloat = compact ? 44 : 50
-        let topBarHeight: CGFloat = hasTopBar ? (compact ? 34 : 42) : 0
-        let boardChromeHeight: CGFloat = compact ? 62 : 74
-        let fixedHeight = topPadding + bottomPadding + wordPillHeight + bonusHeight + buttonSize + topBarHeight + boardChromeHeight + spacing * 5
-        let flexibleHeight = max(330, size.height - fixedHeight)
-        let boardHeight = min(compact ? 210 : 246, max(146, flexibleHeight * (compact ? 0.45 : 0.48)))
-        let wheelHeight = min(compact ? 224 : 260, max(178, flexibleHeight - boardHeight))
+    private static func layout(for size: CGSize,
+                               bonusVisible: Bool,
+                               hasTopBar: Bool,
+                               idealBoardHeight: CGFloat,
+                               topSafeInset: CGFloat,
+                               bottomSafeInset: CGFloat) -> ScreenLayout {
+        let compact = size.height < 760
+        let spacing: CGFloat = compact ? 7 : 10
+        let topPadding: CGFloat = (compact ? 8 : 10) + topSafeInset
+        let bottomPadding: CGFloat = (compact ? 8 : 10) + bottomSafeInset
+        let wordPillHeight: CGFloat = compact ? 42 : 48
+        let bonusHeight: CGFloat = bonusVisible ? (compact ? 22 : 24) : 0
+        let buttonSize: CGFloat = compact ? 42 : 48
+        let topBarHeight: CGFloat = hasTopBar ? (compact ? 34 : 38) : 0
+        let childCount = 4 + (hasTopBar ? 1 : 0) + (bonusVisible ? 1 : 0) + 1
+        let spacingHeight = CGFloat(max(0, childCount - 1)) * spacing
+        let reservedHeight = topPadding + bottomPadding + topBarHeight + wordPillHeight + bonusHeight + buttonSize + spacingHeight
+        let availableHeight = max(0, size.height - reservedHeight)
+        let maxWheelHeight = min(size.width - WitsMetrics.screenPadding * 2, compact ? 224 : 260)
+        let minWheelHeight: CGFloat = compact ? 168 : 190
+        let minBoardHeight: CGFloat = compact ? 218 : 242
+        let targetWheelHeight = min(maxWheelHeight, max(minWheelHeight, availableHeight * (compact ? 0.42 : 0.43)))
+        var boardHeight = min(idealBoardHeight, max(minBoardHeight, availableHeight - targetWheelHeight))
+        var wheelHeight = min(maxWheelHeight, max(minWheelHeight, availableHeight - boardHeight))
+
+        if boardHeight + wheelHeight > availableHeight {
+            let overflow = boardHeight + wheelHeight - availableHeight
+            let wheelShrink = min(overflow, max(0, wheelHeight - minWheelHeight))
+            wheelHeight -= wheelShrink
+            boardHeight = max(190, boardHeight - (overflow - wheelShrink))
+        }
 
         return ScreenLayout(spacing: spacing,
                             topPadding: topPadding,
@@ -393,6 +430,7 @@ struct WordConnectScreen: View {
                     .foregroundStyle(Color.witsAccent)
                     .monospacedDigit()
             }
+            .padding(.leading, 34)
             ProgressTrack(fraction: runProgress, animated: true)
         }
     }
@@ -422,9 +460,10 @@ struct WordConnectScreen: View {
 
             crosswordGrid
                 .frame(maxWidth: .infinity)
-                .frame(height: height)
+                .frame(maxHeight: .infinity)
         }
         .padding(16)
+        .frame(height: height)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.witsCard.opacity(0.94), in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
         .shadow(color: .witsShadow, radius: 12, y: 7)
@@ -496,21 +535,18 @@ struct WordConnectScreen: View {
     @ViewBuilder
     private func bonusRow(height: CGFloat) -> some View {
         if !foundBonus.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    Text("bonus")
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                    ForEach(foundBonus, id: \.self) { word in
-                        Text(word.lowercased())
-                            .font(.system(size: 11.5, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.witsAccent)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.witsAccent.opacity(0.13), in: Capsule())
-                    }
-                }
-                .padding(.horizontal, 2)
+            HStack(spacing: 7) {
+                Text("bonus")
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsMuted)
+                Text("\(foundBonus.count)")
+                    .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsAccent)
+                    .monospacedDigit()
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.witsAccent.opacity(0.13), in: Capsule())
+                Spacer(minLength: 0)
             }
             .frame(height: height)
         }
