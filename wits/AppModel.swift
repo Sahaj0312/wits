@@ -12,20 +12,6 @@
 import SwiftUI
 import Observation
 
-/// A daily lifestyle check-in answered before the workout. mood 1…5 (low→great),
-/// sleep is a bucket index 0…4 mapping to [≤5, 6, 7, 8, 9+] hours.
-struct DailyCheckIn: Codable, Equatable, Identifiable {
-    var day: String
-    var mood: Int
-    var sleep: Int
-    var id: String { day }
-
-    static let sleepLabels = ["≤5", "6", "7", "8", "9+"]
-    var sleepLabel: String { Self.sleepLabels[min(max(sleep, 0), 4)] }
-    /// Representative hours for averaging/plotting.
-    var sleepHours: Double { [5, 6, 7, 8, 9][min(max(sleep, 0), 4)] }
-}
-
 /// A game actually played on a given day, with the difficulty level it ran at —
 /// the record behind the day-detail recap ("you played these, at these levels").
 struct PlayedGame: Codable, Equatable {
@@ -62,8 +48,6 @@ final class AppModel {
     var headlineIndex: Double? = nil
     /// Per-day rollups for the progress chart (ascending by day).
     var progressDays: [DailyProgressRow] = []
-    /// Recent daily lifestyle check-ins (ascending by day), for the activity charts.
-    var checkins: [DailyCheckIn] = []
     /// Actual workout games played per day (key yyyy-MM-dd, local), with the level
     /// played — reconstructed from game_sessions so a past day's recap shows the
     /// real lineup and difficulty, not a rotation guess.
@@ -93,36 +77,6 @@ final class AppModel {
         refreshReminderSchedule()
         load = .ready
         Task { await reconcile() }
-    }
-
-    // MARK: Daily check-in (mood + sleep)
-
-    /// User can turn the pre-workout check-in off ("stop these check-ins").
-    var checkinsDisabled: Bool {
-        get { UserDefaults.standard.bool(forKey: "wits.checkinsDisabled") }
-        set { UserDefaults.standard.set(newValue, forKey: "wits.checkinsDisabled") }
-    }
-
-    var todayCheckIn: DailyCheckIn? {
-        let key = SupabaseManager.dayString(Date())
-        return checkins.first { $0.day == key }
-    }
-    var isCheckInDoneToday: Bool { todayCheckIn != nil }
-
-    private var checkinSkipKey: String { "wits.checkinSkipped." + SupabaseManager.dayString(Date()) }
-    var checkinSkippedToday: Bool { UserDefaults.standard.bool(forKey: checkinSkipKey) }
-    func skipCheckInToday() { UserDefaults.standard.set(true, forKey: checkinSkipKey) }
-
-    /// Whether to show the check-in before starting today's workout.
-    var needsCheckIn: Bool { !checkinsDisabled && !isCheckInDoneToday && !checkinSkippedToday }
-
-    func recordCheckIn(mood: Int, sleep: Int) {
-        let key = SupabaseManager.dayString(Date())
-        let entry = DailyCheckIn(day: key, mood: mood, sleep: sleep)
-        if let i = checkins.firstIndex(where: { $0.day == key }) { checkins[i] = entry }
-        else { checkins.append(entry) }
-        saveCache()
-        Task { try? await supa.upsertCheckIn(day: key, mood: mood, sleep: sleep) }
     }
 
     /// Foreground / midnight: break the streak if a day was missed, refresh the day.
@@ -428,12 +382,6 @@ final class AppModel {
             progressDays = rows
             headlineIndex = rows.last?.headline_index ?? headlineIndex
         }
-        if let rows = try? await supa.fetchCheckins(since: since) {
-            checkins = rows.compactMap { r in
-                guard let m = r.mood, let s = r.sleep else { return nil }
-                return DailyCheckIn(day: r.day, mood: m, sleep: s)
-            }
-        }
         if let rows = try? await supa.fetchSessions(since: since) {
             // Bucket workout runs per local day (oldest → newest), carrying the
             // workout_id that ties each run to a specific prescribed workout.
@@ -554,7 +502,6 @@ final class AppModel {
         var today: DailyWorkout
         var headlineIndex: Double?
         var progressDays: [DailyProgressRow]
-        var checkins: [DailyCheckIn]?
         var playedByDay: [String: [PlayedGame]]?
     }
 
@@ -567,7 +514,6 @@ final class AppModel {
             today: today,
             headlineIndex: headlineIndex,
             progressDays: progressDays,
-            checkins: checkins,
             playedByDay: playedByDay
         )
         if let data = try? JSONEncoder().encode(state) {
@@ -588,7 +534,6 @@ final class AppModel {
         })
         headlineIndex = state.headlineIndex
         progressDays = state.progressDays
-        checkins = state.checkins ?? []
         playedByDay = state.playedByDay ?? [:]
         // keep cached workout only if it's still today's
         if Calendar.current.isDate(state.today.day, inSameDayAs: Date()) {

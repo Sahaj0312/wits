@@ -14,8 +14,6 @@ struct TodayView: View {
     @State private var playing = false
     @State private var showPrimer = false
     @State private var showPaywall = false
-    @State private var showCheckIn = false
-    @State private var pendingStart = false
     @State private var challengeGame: GameID?
     @State private var didCenterLiveNode = false
     @AppStorage("notifPrimerAsked") private var notifPrimerAsked = false
@@ -84,27 +82,6 @@ struct TodayView: View {
                     }
                 },
                 onQuit: { playing = false }
-            )
-        }
-        .fullScreenCover(isPresented: $showCheckIn, onDismiss: {
-            if pendingStart { pendingStart = false; playing = true }
-        }) {
-            DailyCheckInView(
-                onFinish: { mood, sleep in
-                    if mood != nil || sleep != nil {
-                        app.recordCheckIn(mood: mood ?? 3, sleep: sleep ?? 2)
-                    } else {
-                        app.skipCheckInToday()
-                    }
-                    pendingStart = true
-                    showCheckIn = false
-                },
-                onStop: {
-                    app.checkinsDisabled = true
-                    app.skipCheckInToday()
-                    pendingStart = true
-                    showCheckIn = false
-                }
             )
         }
         .sheet(isPresented: $showPrimer) {
@@ -190,7 +167,6 @@ struct TodayView: View {
     /// Tapped the live node on the path → start / resume today's workout.
     private func beginWorkout() {
         if app.entitlement.isExpired { showPaywall = true }
-        else if app.needsCheckIn { showCheckIn = true }
         else { playing = true }
     }
 

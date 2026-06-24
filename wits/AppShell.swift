@@ -89,11 +89,6 @@ struct ActivityTab: View {
                         }
                     }
                 }
-
-                if !app.checkins.isEmpty {
-                    section("lifestyle")
-                    LifestyleCard(checkins: app.checkins)
-                }
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.bottom, 24)
