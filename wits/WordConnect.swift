@@ -73,23 +73,29 @@ struct WordConnectScreen: View {
             var occupied = cells(for: entries)
 
             for word in words.dropFirst() {
-                var placed: Entry?
+                var candidates: [Entry] = []
                 let existing = occupied.sorted { a, b in
                     a.key.row == b.key.row ? a.key.col < b.key.col : a.key.row < b.key.row
                 }
 
-                for (targetCell, targetLetter) in existing where placed == nil {
+                for (targetCell, targetLetter) in existing {
                     for (offset, letter) in word.enumerated() where String(letter) == targetLetter {
-                        let candidates = [
+                        candidates.append(contentsOf: [
                             Entry(word: word, row: targetCell.row - offset, col: targetCell.col, direction: .down),
                             Entry(word: word, row: targetCell.row, col: targetCell.col - offset, direction: .across)
-                        ]
-                        if let match = candidates.first(where: { canPlace($0, occupied: occupied) }) {
-                            placed = match
-                            break
-                        }
+                        ])
                     }
                 }
+
+                var placed = candidates
+                    .filter { canPlace($0, entries: entries) }
+                    .min { lhs, rhs in
+                        let a = metrics(for: entries + [lhs])
+                        let b = metrics(for: entries + [rhs])
+                        if a.area != b.area { return a.area < b.area }
+                        if a.rows != b.rows { return a.rows < b.rows }
+                        return a.columns < b.columns
+                    }
 
                 if placed == nil {
                     let maxRow = entries.flatMap { $0.cells().map(\.row) }.max() ?? 0
@@ -109,12 +115,18 @@ struct WordConnectScreen: View {
             }
         }
 
-        private static func canPlace(_ entry: Entry, occupied: [Cell: String]) -> Bool {
+        private static func canPlace(_ entry: Entry, entries: [Entry]) -> Bool {
+            let occupied = cells(for: entries)
             var overlaps = 0
             for (offset, cell) in entry.cells().enumerated() {
                 let letter = String(entry.word[entry.word.index(entry.word.startIndex, offsetBy: offset)])
                 if let existing = occupied[cell] {
                     guard existing == letter else { return false }
+                    guard entries
+                        .filter({ $0.direction == entry.direction })
+                        .allSatisfy({ !$0.cells().contains(cell) }) else {
+                        return false
+                    }
                     overlaps += 1
                 }
             }
@@ -129,6 +141,17 @@ struct WordConnectScreen: View {
                 }
             }
             return out
+        }
+
+        private static func metrics(for entries: [Entry]) -> (rows: Int, columns: Int, area: Int) {
+            let all = entries.flatMap { $0.cells() }
+            let minRow = all.map(\.row).min() ?? 0
+            let maxRow = all.map(\.row).max() ?? 0
+            let minCol = all.map(\.col).min() ?? 0
+            let maxCol = all.map(\.col).max() ?? 0
+            let rows = maxRow - minRow + 1
+            let columns = maxCol - minCol + 1
+            return (rows, columns, rows * columns)
         }
     }
 
@@ -172,6 +195,10 @@ struct WordConnectScreen: View {
 
     private var multiplier: Int { min(6, 1 + streak / 3) }
     private var validWords: Set<String> { Set(puzzle.required + puzzle.bonus) }
+    private var crosswordBoardHeight: CGFloat {
+        let ideal = CGFloat(puzzle.rows) * 38 + CGFloat(max(0, puzzle.rows - 1)) * 5
+        return min(246, max(130, ideal))
+    }
 
     var body: some View {
         ZStack {
@@ -261,8 +288,7 @@ struct WordConnectScreen: View {
 
             crosswordGrid
                 .frame(maxWidth: .infinity)
-                .frame(height: CGFloat(puzzle.rows) * 38 + CGFloat(max(0, puzzle.rows - 1)) * 5)
-                .frame(minHeight: 130, maxHeight: 246)
+                .frame(height: crosswordBoardHeight)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
