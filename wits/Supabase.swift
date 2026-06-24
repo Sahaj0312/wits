@@ -122,7 +122,7 @@ struct StreakRow: Decodable {
 }
 
 /// One recorded run, for reconstructing a past day's exact lineup + the level
-/// each game was played at. `difficulty` is the 0…10 staircase level for the run.
+/// each game was played at. `difficulty` is the 1...10 mastery level for the run.
 struct SessionRow: Decodable {
     var game: String
     var source: String

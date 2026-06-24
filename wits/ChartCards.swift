@@ -2,8 +2,8 @@
 //  ChartCards.swift
 //  wits
 //
-//  Swift Charts views for the progress screen: the "your brain is improving"
-//  hero line and the per-domain breakdown bars.
+//  Swift Charts views for the progress screen: the WPI hero line and the
+//  per-domain breakdown bars.
 //
 
 import SwiftUI
@@ -15,8 +15,8 @@ struct TrendLine: View {
 
     private var yDomain: ClosedRange<Double> {
         let vs = points.map(\.value)
-        let lo = max(0, (vs.min() ?? 0) - 8)
-        let hi = min(100, (vs.max() ?? 100) + 8)
+        let lo = max(0, (vs.min() ?? 0) - 400)
+        let hi = min(ProgressMath.maxScore, (vs.max() ?? ProgressMath.maxScore) + 400)
         return lo...(max(hi, lo + 1))
     }
 
@@ -56,9 +56,9 @@ struct TrendLine: View {
 /// A horizontal score bar that opens a full trend page when tapped.
 struct MetricBar: View {
     let label: String
-    let value: Double            // 0…100 current
+    let value: Double            // 0...5000 current WPI
     let series: [SeriesPoint]
-    var emphasized = false       // the overall "brain score" bar
+    var emphasized = false       // the overall WPI bar
 
     var body: some View {
         NavigationLink {
@@ -82,7 +82,7 @@ struct MetricBar: View {
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.witsLine)
                         Capsule().fill(Color.witsAccent)
-                            .frame(width: max(6, geo.size.width * value / 100))
+                            .frame(width: max(6, geo.size.width * max(0, min(1, value / ProgressMath.maxScore))))
                     }
                 }
                 .frame(height: emphasized ? 12 : 8)
@@ -99,7 +99,7 @@ struct MetricBar: View {
     }
 }
 
-/// Full-page trend for a single metric (brain score or one skill).
+/// Full-page trend for a single metric (overall WPI or one skill).
 struct MetricDetailView: View {
     let title: String
     let value: Double
@@ -130,7 +130,7 @@ struct MetricDetailView: View {
                         .font(.system(size: 56, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsAccent)
                         .monospacedDigit()
-                    Text("/ 100")
+                    Text("/ 5000")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.witsMuted)
                 }
@@ -191,7 +191,7 @@ struct DomainRadarChart: View {
     private let domains = CognitiveDomain.allCases
 
     var body: some View {
-        let vals = domains.map { max(0, min(1, (scores[$0] ?? 0) / 100)) }
+        let vals = domains.map { max(0, min(1, (scores[$0] ?? 0) / ProgressMath.maxScore)) }
         Canvas { ctx, size in
             let c = CGPoint(x: size.width / 2, y: size.height / 2)
             let r = min(size.width, size.height) / 2 - 34

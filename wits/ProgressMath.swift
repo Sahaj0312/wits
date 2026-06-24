@@ -2,10 +2,10 @@
 //  ProgressMath.swift
 //  wits
 //
-//  Turns raw per-day rollups into the smoothed series the progress screen shows.
-//  Per-domain scores are exponentially-weighted (recency-biased) so the "your
-//  brain is improving" line is steady, not jittery. This is a measurement of how
-//  you do on the trained games over time — not a claim about real-world IQ.
+//  Turns raw per-day WPI rollups into the smoothed series the progress screen
+//  shows. Per-domain scores are exponentially-weighted (recency-biased) so the
+//  progress line is steady, not jittery. This is a measurement of how you do on
+//  the trained games over time — not a claim about real-world IQ.
 //
 
 import Foundation
@@ -17,6 +17,7 @@ struct SeriesPoint: Identifiable {
 }
 
 enum ProgressMath {
+    static let maxScore = 5000.0
     static let alpha = 0.35
 
     /// Running EWMA over a value series.
@@ -85,17 +86,17 @@ enum ProgressMath {
     /// A domain never trained yet starts at this "needs training" weight — high
     /// enough to get picked up early (explore the unknown) without overriding a
     /// genuinely weak, measured domain.
-    static let unknownWeakness = 55.0
+    static let unknownWeakness = 2600.0
     /// Each untrained day adds this much priority …
-    static let stalenessPerDay = 8.0
+    static let stalenessPerDay = 250.0
     /// … capped here, so staleness nudges a strong domain back into rotation
     /// over a few days but never outweighs a real, persistent weakness.
-    static let stalenessCap = 40.0
+    static let stalenessCap = 1250.0
 
     /// Per-domain "needs training" priority used to bias the daily workout
     /// toward what's lagging. Higher = train sooner. Two signals combine:
     ///
-    /// - **weakness** — `100 − smoothed score`, so the domains you score lowest
+    /// - **weakness** — `5000 - smoothed WPI`, so the domains you score lowest
     ///   on rank highest (untrained domains get `unknownWeakness`);
     /// - **staleness** — a bonus that grows the longer a domain goes untrained,
     ///   capped at `stalenessCap`, so a strong domain can't be starved out of
@@ -109,11 +110,11 @@ enum ProgressMath {
         let scored = sortedDays(days)
         guard !scored.isEmpty else { return [:] }
 
-        let scores = latestDomainScores(days)        // smoothed 0…100, trained domains only
+        let scores = latestDomainScores(days)        // smoothed 0...5000, trained domains only
         let start = calendar.startOfDay(for: today)
         var result: [CognitiveDomain: Double] = [:]
         for domain in CognitiveDomain.allCases {
-            let weakness = scores[domain].map { 100 - min(100, max(0, $0)) } ?? unknownWeakness
+            let weakness = scores[domain].map { maxScore - min(maxScore, max(0, $0)) } ?? unknownWeakness
 
             let lastTrained = scored
                 .filter { $0.domain_scores?[domain.rawValue] != nil }

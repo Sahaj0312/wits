@@ -31,7 +31,7 @@ protocol ArcadeGame: AnyObject {
     var id: GameID { get }
     var inputMode: ArcadeInputMode { get }
 
-    /// Baseline spawner from the persisted difficulty level (0…10).
+    /// Baseline spawner from the persisted mastery level (1...10).
     func seed(level: Double, survival: Bool) -> Spawner
 
     /// Emit one entity using the current (escalated) spawner params.
@@ -71,7 +71,7 @@ protocol ArcadeGame: AnyObject {
 extension ArcadeGame {
     func preStep(scene: ArcadeScene, dt: Double) {}
     func overlay(scene: ArcadeScene) -> AnyView { AnyView(EmptyView()) }
-    func advance(_ s: DifficultyState, accuracy: Double) -> DifficultyState { Staircase.adjust(s, accuracy: accuracy) }
+    func advance(_ s: DifficultyState, accuracy: Double) -> DifficultyState { MasteryLadder.adjust(s, accuracy: accuracy) }
 
     // default SK rendering: a clean soft-shadowed dot (overridden per game)
     func makeNode(_ e: ArcadeEntity, style: ArcadeStyle) -> SKNode {

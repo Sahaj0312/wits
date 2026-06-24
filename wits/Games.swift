@@ -130,18 +130,13 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     }
 }
 
-func advanceDifficulty(for id: GameID, _ s: DifficultyState, accuracy: Double, levelDelta: Double? = nil) -> DifficultyState {
+func advanceDifficulty(for id: GameID, _ s: DifficultyState, accuracy: Double) -> DifficultyState {
     switch id {
     case .arrowStorm:  return ArrowStorm.advance(s, accuracy: accuracy)
     case .crowdControl: return CrowdControl.advance(s, accuracy: accuracy)
     case .echoGrid:    return EchoGrid.advance(s, accuracy: accuracy)
     case .colorClash:  return ColorClash.advance(s, accuracy: accuracy)
-    case .wordConnect:
-        var next = s
-        next.level = min(10, max(1, s.level + (levelDelta ?? 0)))
-        next.sessionsPlayed += 1
-        return next
-    default:           return Staircase.adjust(s, accuracy: accuracy)
+    default:           return MasteryLadder.adjust(s, accuracy: accuracy)
     }
 }
 

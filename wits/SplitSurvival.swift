@@ -7,7 +7,7 @@
 //  go/no-go stream — tap the target, never the look-alike, don't let a target
 //  slip by. One mistake of any kind ends the run. Levels are time-gated and
 //  grow longer + harder; the level you reach is your score and feeds the
-//  multitasking domain (AppModel.recordSplitRun) — never the staircase.
+//  multitasking domain (AppModel.recordSplitRun) — never the mastery ladder.
 //
 
 import SwiftUI

@@ -4,8 +4,8 @@
 //
 //  Shared interface for the post-onboarding game library: a uniform identity,
 //  cognitive-domain mapping, persisted adaptive-difficulty state, a single
-//  GameResult every game emits, and the staircase that calibrates difficulty
-//  toward the ~71% accuracy sweet spot over repeated sessions.
+//  GameResult every game emits, and the mastery ladder that calibrates
+//  difficulty over repeated sessions.
 //
 
 import SwiftUI
@@ -19,12 +19,12 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     // expanded library
     case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
     case wordConnect
-    // survival-only (no staircased workout mode; not in the daily pool)
+    // survival-only (no mastery-adjusted workout mode; not in the daily pool)
     case split
 
     var id: String { rawValue }
 
-    /// Games in the daily-workout pool (staircased, train + survival modes).
+    /// Games in the daily-workout pool (mastery-adjusted, train + survival modes).
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder,
          .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect]
@@ -230,7 +230,7 @@ extension GameID {
         }
     }
 
-    /// Starting difficulty `level` for a brand-new player (0…10).
+    /// Starting mastery/difficulty level for a brand-new player (1…10).
     var seedLevel: Double {
         switch self {
         case .crowdControl, .echoGrid, .lastSeen, .pathKeeper, .matchBack: 1
@@ -286,9 +286,10 @@ struct GameStats: Codable {
 
 // MARK: - Adaptive difficulty
 
-/// Persisted per-user, per-game staircase state. `level` is a continuous 0…10
+/// Persisted per-user, per-game mastery state. `level` is a continuous 1…10
 /// parameter each game interprets in its own units (response window, span
-/// length, # of targets, …).
+/// length, # of targets, …). The same level is also the official scoring signal:
+/// WPI contribution = `level * 500`.
 struct DifficultyState: Codable, Equatable {
     var level: Double
     var reversals: Int = 0
@@ -300,16 +301,27 @@ struct DifficultyState: Codable, Equatable {
     }
 }
 
-/// 1-up/2-down-style post-run calibration. We adapt *within* a run for feel
-/// (each game tightens/loosens as you go); this nudges the *persisted* starting
-/// level between sessions toward the ~71% accuracy target.
-enum Staircase {
-    static func adjust(_ s: DifficultyState, accuracy: Double, step: Double = 0.6) -> DifficultyState {
+/// Simple post-run mastery ladder. Raw points stay game-local; this is the
+/// official skill signal used for WPI. Strong runs raise the next starting level,
+/// weak runs lower it gently, and middling runs keep the user near their current
+/// ability band.
+enum MasteryLadder {
+    static func delta(for accuracy: Double) -> Double {
+        switch accuracy {
+        case 0.85...: 0.5
+        case 0.70..<0.85: 0.2
+        case 0.55..<0.70: -0.1
+        default: -0.3
+        }
+    }
+
+    static func adjust(_ s: DifficultyState, accuracy: Double) -> DifficultyState {
         var next = s
-        let dir: Int = accuracy >= 0.80 ? 1 : (accuracy <= 0.60 ? -1 : 0)
+        let change = delta(for: accuracy)
+        let dir: Int = change > 0 ? 1 : (change < 0 ? -1 : 0)
         if dir != 0 {
             if s.lastDirection != 0 && dir != s.lastDirection { next.reversals += 1 }
-            next.level = max(0, min(10, s.level + Double(dir) * step))
+            next.level = max(1, min(10, s.level + change))
             next.lastDirection = dir
         }
         next.sessionsPlayed += 1
@@ -324,7 +336,7 @@ enum Staircase {
 struct GameResult: Codable, Equatable {
     let game: GameID
     var score: Int
-    var accuracy: Double            // 0…1 — the staircase + scoring signal
+    var accuracy: Double            // 0...1 — the mastery adjustment signal
     var medianRTms: Int? = nil
     var threshold: Double? = nil    // converged difficulty parameter this run
     var trials: Int = 0
@@ -435,7 +447,7 @@ struct GameConfig {
 
 protocol Game {
     static var id: GameID { get }
-    /// Pure staircase update from a finished run's accuracy.
+    /// Pure mastery update from a finished run's accuracy.
     static func advance(_ s: DifficultyState, accuracy: Double) -> DifficultyState
     /// The playable view; calls onComplete(GameResult) when the scored run ends.
     @MainActor static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView
@@ -443,6 +455,6 @@ protocol Game {
 
 extension Game {
     static func advance(_ s: DifficultyState, accuracy: Double) -> DifficultyState {
-        Staircase.adjust(s, accuracy: accuracy)
+        MasteryLadder.adjust(s, accuracy: accuracy)
     }
 }

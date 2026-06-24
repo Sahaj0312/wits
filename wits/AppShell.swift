@@ -44,13 +44,13 @@ struct ActivityTab: View {
     }
 
     /// Single headline number, top-right.
-    private var brainScoreBadge: some View {
+    private var wpiBadge: some View {
         VStack(spacing: 1) {
             Text(heroScore.map { "\(Int($0))" } ?? "—")
                 .font(.system(size: 34, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.witsAccent)
                 .monospacedDigit()
-            Text("brain score")
+            Text("WPI")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.witsMuted)
         }
@@ -70,16 +70,16 @@ struct ActivityTab: View {
                             .foregroundStyle(Color.witsInk)
                     }
                     Spacer()
-                    brainScoreBadge
+                    wpiBadge
                 }
                 .padding(.top, 8)
 
                 if domainScores.isEmpty {
-                    emptyCard("finish a workout to see your brain score and skill breakdown.")
+                    emptyCard("finish a workout to see your WPI and skill breakdown.")
                 } else {
                     DomainRadarChart(scores: domainScores)
 
-                    section("your scores")
+                    section("skill scores")
                     VStack(spacing: 10) {
                         MetricBar(label: "overall", value: heroScore ?? 0,
                                   series: headlinePoints, emphasized: true)

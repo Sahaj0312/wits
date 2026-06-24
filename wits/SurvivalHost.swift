@@ -4,7 +4,7 @@
 //
 //  Endless arcade mode for one game: 3 lives, a combo you lose on any miss, a
 //  single chase-able score, and instant tap-to-retry. Fair-but-brutal — every
-//  loss is the player's own. Never touches the adaptive staircase: it persists a
+//  loss is the player's own. Never touches the adaptive mastery level: it persists a
 //  survival best via AppModel.recordSurvivalRun.
 //
 

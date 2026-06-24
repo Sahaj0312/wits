@@ -30,7 +30,7 @@ struct DailyCheckIn: Codable, Equatable, Identifiable {
 /// the record behind the day-detail recap ("you played these, at these levels").
 struct PlayedGame: Codable, Equatable {
     var game: GameID
-    var level: Double          // 0…10 staircase level for that run
+    var level: Double          // 1...10 mastery level for that run
     var accuracy: Double
     var score: Int
 }
@@ -215,7 +215,7 @@ final class AppModel {
     var survivalBest: (GameID) -> Int { { [gameStats] id in gameStats[id]?.survivalBest ?? 0 } }
 
     /// Called when a survival run ends. Records the best + a tagged session, but
-    /// NEVER touches the adaptive staircase (survival must not move difficulty).
+    /// NEVER touches the adaptive mastery level (survival must not move difficulty).
     func recordSurvivalRun(game id: GameID, score: Int, trials: Int) {
         var st = gameStats[id] ?? GameStats()
         st.survivalRuns += 1
@@ -229,20 +229,16 @@ final class AppModel {
     }
 
     /// A finished "split" run. Records the survival best (level reached) like any
-    /// survival game, AND folds a multitasking domain score into today's rollup so
-    /// it feeds the weakness engine — but never the staircase. The score reuses
-    /// `domainScore(accuracy:level:)` so it lands on the same 0…100 scale as the
-    /// workout games: `level` = level reached (saturated so elite runs don't all
-    /// peg 100), `accuracy` = how deep into the next level you got. Best-of-day.
+    /// survival game, AND folds a multitasking WPI signal into today's rollup so
+    /// it feeds the weakness engine — but never the mastery ladder. Best-of-day.
     func recordSplitRun(levelReached: Int, depth: Double, trials: Int) {
         recordSurvivalRun(game: .split, score: levelReached, trials: trials)
-        let effLevel = min(Double(levelReached), 12)            // saturate
-        let effAccuracy = max(0, min(1, 0.5 + 0.5 * depth))     // reaching a level already counts
-        foldDomainScore(.multitasking, Self.domainScore(accuracy: effAccuracy, level: effLevel))
+        let effLevel = min(Self.masteryMax, max(Self.masteryMin, Double(levelReached) + max(0, min(1, depth))))
+        foldDomainScore(.multitasking, Self.domainScore(level: effLevel))
     }
 
     /// Merge one domain score into today's progress (best-of-day) without touching
-    /// the staircase — for survival games that still measure a cognitive domain.
+    /// the mastery ladder — for survival games that still measure a cognitive domain.
     /// Marks the day active (`workout_done`) so it shows on the progress charts;
     /// it does NOT count as a workout game, so the journey still reads it as a
     /// non-workout day.
@@ -278,12 +274,12 @@ final class AppModel {
     }
 
     /// Called as each game in a workout finishes: persist the run + advance the
-    /// game's persisted difficulty.
+    /// game's persisted mastery level.
     func recordGameResult(_ result: GameResult, source: String = "workout", workoutID: String? = nil) {
-        assert(source != "survival", "survival runs must go through recordSurvivalRun (staircase must not move)")
+        assert(source != "survival", "survival runs must go through recordSurvivalRun (mastery must not move)")
         let id = result.game
         let current = difficulty[id] ?? .seed(for: id)
-        let next = advanceDifficulty(for: id, current, accuracy: result.accuracy, levelDelta: result.raw["levelDelta"])
+        let next = advanceDifficulty(for: id, current, accuracy: result.accuracy)
         difficulty[id] = next
         var r = result
         r.newDifficulty = next
@@ -489,12 +485,25 @@ final class AppModel {
 
     // MARK: Derived scores
 
-    /// Turns accuracy at a difficulty level into a 0…100 skill score. The level
-    /// raises the ceiling (50 at L0 → 100 at L10), so acing an easy game can't max
-    /// the score — you only approach 100 by sustaining accuracy at a high level.
-    static func domainScore(accuracy: Double, level: Double) -> Double {
-        let cap = 50 + min(10, max(0, level)) * 5     // achievable max at this level
-        return min(100, accuracy * cap)
+    static let masteryMin = 1.0
+    static let masteryMax = 10.0
+    static let wpiMax = 5000.0
+
+    /// Converts the user's current mastery level into WPI. Accuracy changes the
+    /// next mastery level through `MasteryLadder`; the visible score is the level
+    /// the user has earned after that adjustment.
+    static func wpiScore(level: Double) -> Double {
+        (min(masteryMax, max(masteryMin, level)) * (wpiMax / masteryMax)).rounded()
+    }
+
+    static func domainScore(level: Double) -> Double {
+        wpiScore(level: level)
+    }
+
+    /// Fit-test baseline: start from the game's seed level, then nudge up or down
+    /// using the same accuracy bands as regular play.
+    static func onboardingMasteryLevel(seed: Double, accuracy: Double) -> Double {
+        min(masteryMax, max(masteryMin, seed + MasteryLadder.delta(for: accuracy)))
     }
 
     /// Collapse a day's workout runs (chronological) into the prescribed lineup:
@@ -523,7 +532,7 @@ final class AppModel {
         var sums: [String: (Double, Int)] = [:]
         for r in results {
             let key = r.domain.rawValue
-            let sc = domainScore(accuracy: r.accuracy, level: levelFor(r.game))
+            let sc = domainScore(level: levelFor(r.game))
             let (s, n) = sums[key] ?? (0, 0)
             sums[key] = (s + sc, n + 1)
         }
