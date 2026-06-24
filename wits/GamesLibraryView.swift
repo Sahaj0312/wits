@@ -264,7 +264,6 @@ private struct GameResultView: View {
     var isNewBest: Bool
     var onReplay: () -> Void
     var onDone: () -> Void
-    @State private var definitionWord: DefinitionWord?
 
     private var accuracyPct: Int? {
         guard game != .wordConnect else { return nil }
@@ -276,9 +275,21 @@ private struct GameResultView: View {
         return Int(v)
     }
     private var bestStat: String? {
+        guard game != .wordConnect else { return nil }
         guard game.statKey != "bestStreak" else { return nil }
         guard let v = result?.raw[game.statKey] else { return nil }
         return game.statLabel(v)
+    }
+    private var wordAccuracy: Double {
+        guard game == .wordConnect else { return 0 }
+        return result?.accuracy ?? 0
+    }
+    private var wordAccuracyPct: Int {
+        Int((wordAccuracy * 100).rounded())
+    }
+    private var wordLevelStart: Int {
+        let level = result?.raw["levelStart"] ?? result?.raw["levelEnd"] ?? 1
+        return min(10, max(1, Int(floor(level))))
     }
     private var wordLevelEnd: Double? {
         guard game == .wordConnect else { return nil }
@@ -286,25 +297,27 @@ private struct GameResultView: View {
     }
     private var wordLevelProgress: Double {
         guard game == .wordConnect else { return 0 }
-        return (result?.raw["boardsSolved"] ?? 0) >= 2 ? 1 : 0
+        guard (result?.raw["levelDelta"] ?? 0) <= 0 else { return 1 }
+        return max(0, min(0.98, wordAccuracy / 0.85))
     }
     private var wordLevelText: String? {
-        guard let level = wordLevelEnd else { return nil }
-        let label = "level \(min(10, max(1, Int(floor(level)))))"
-        return (result?.raw["levelDelta"] ?? 0) > 0 ? "\(label) unlocked" : "\(label) complete"
+        guard game == .wordConnect else { return nil }
+        if (result?.raw["levelDelta"] ?? 0) > 0, let level = wordLevelEnd {
+            let label = "level \(min(10, max(1, Int(floor(level)))))"
+            return "\(label) unlocked"
+        }
+        guard wordLevelStart < 10 else { return "level 10 held" }
+        return "level \(wordLevelStart + 1) locked"
     }
-    private var wordLevelDeltaText: String? {
-        guard game == .wordConnect, let delta = result?.raw["levelDelta"] else { return nil }
-        guard delta > 0 else { return nil }
-        return "+\(Int(delta)) level"
-    }
-    private var guessedWords: [(word: String, kind: String)] {
-        guard game == .wordConnect else { return [] }
-        return result?.text["guessedWords"]?.compactMap { item in
-            let parts = item.split(separator: "|", maxSplits: 1).map(String.init)
-            guard let word = parts.first, !word.isEmpty else { return nil }
-            return (word, parts.count > 1 ? parts[1] : "guess")
-        } ?? []
+    private var wordLevelDetail: String? {
+        guard game == .wordConnect else { return nil }
+        if (result?.raw["levelDelta"] ?? 0) > 0 {
+            return "next board set is ready"
+        }
+        if wordLevelStart >= 10 {
+            return "85% accuracy needed to clear level 10"
+        }
+        return "85% accuracy needed to unlock level \(wordLevelStart + 1)"
     }
 
     var body: some View {
@@ -340,37 +353,37 @@ private struct GameResultView: View {
                                 .font(.system(size: 13, weight: .heavy, design: .rounded))
                                 .foregroundStyle(Color.witsInk)
                             Spacer()
-                            if let wordLevelDeltaText {
-                                Text(wordLevelDeltaText)
-                                    .font(.system(size: 13, weight: .heavy, design: .rounded))
-                                    .foregroundStyle(wordLevelDeltaText.hasPrefix("-") ? Color.witsWarm : Color.witsAccent)
+                            Text("\(wordAccuracyPct)%")
+                                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                                .foregroundStyle((result?.raw["levelDelta"] ?? 0) > 0 ? Color.witsAccent : Color.witsWarm)
+                                .monospacedDigit()
+                        }
+                        ProgressTrack(fraction: wordLevelProgress, animated: false)
+                        if let wordLevelDetail {
+                            HStack {
+                                Text(wordLevelDetail)
+                                    .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(Color.witsMuted)
+                                Spacer()
+                                Text((result?.raw["levelDelta"] ?? 0) > 0 ? "passed" : "target 85%")
+                                    .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(Color.witsFaint)
                                     .monospacedDigit()
                             }
                         }
-                        ProgressTrack(fraction: wordLevelProgress, animated: false)
                     }
                     .padding(.top, 8)
                 }
-                if accuracyPct != nil || bestStreak != nil || bestStat != nil {
+                if game == .wordConnect {
+                    wordConnectStats
+                        .padding(.top, 8)
+                } else if accuracyPct != nil || bestStreak != nil || bestStat != nil {
                     HStack(spacing: 12) {
                         if let a = accuracyPct { stat("\(a)%", "accuracy") }
                         if let s = bestStreak { stat("\(s)", "best streak") }
                         if let bestStat { stat(bestStat, "best stat") }
-                        if game == .wordConnect, let boards = result?.raw["boardsSolved"] {
-                            stat("\(Int(boards))/2", "boards")
-                        }
-                        if game == .wordConnect, let bonus = result?.raw["bonusWordsFound"] {
-                            stat("\(Int(bonus))", "bonus")
-                        }
-                        if game == .wordConnect, let hints = result?.raw["hintsUsed"] {
-                            stat("\(Int(hints))", "hints")
-                        }
                     }
                     .padding(.top, 8)
-                }
-                if !guessedWords.isEmpty {
-                    wordGuessList
-                        .padding(.top, 8)
                 }
             }
             .padding(28)
@@ -387,9 +400,6 @@ private struct GameResultView: View {
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.witsBg.ignoresSafeArea())
-        .sheet(item: $definitionWord) { item in
-            DictionarySheet(term: item.term)
-        }
     }
 
     private var replayTitle: String {
@@ -398,79 +408,18 @@ private struct GameResultView: View {
         return "play next level"
     }
 
-    private var wordGuessList: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("guessed words")
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                Spacer()
-                Text("\(guessedWords.count)")
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsFaint)
-                    .monospacedDigit()
+    private var wordConnectStats: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 4), spacing: 10) {
+            stat("\(wordAccuracyPct)%", "accuracy")
+            if let words = result?.raw["wordsFound"] {
+                stat("\(Int(words))", "words")
             }
-
-            ScrollView {
-                VStack(spacing: 7) {
-                    ForEach(Array(guessedWords.enumerated()), id: \.offset) { _, guess in
-                        guessRow(guess.word, kind: guess.kind)
-                    }
-                }
+            if let boards = result?.raw["boardsSolved"] {
+                stat("\(Int(boards))/2", "boards")
             }
-            .frame(maxHeight: 142)
-        }
-        .padding(12)
-        .background(Color.witsTint.opacity(0.72), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .strokeBorder(Color.witsLine, lineWidth: 1)
-        )
-    }
-
-    private func guessRow(_ word: String, kind: String) -> some View {
-        let hasDefinition = UIReferenceLibraryViewController.dictionaryHasDefinition(forTerm: word.lowercased())
-        return Button {
-            guard hasDefinition else { return }
-            definitionWord = DefinitionWord(term: word.lowercased())
-        } label: {
-            HStack(spacing: 8) {
-                Text(word.lowercased())
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                Spacer(minLength: 8)
-                Text(guessLabel(kind))
-                    .font(.system(size: 10.5, weight: .heavy, design: .rounded))
-                    .foregroundStyle(guessColor(kind))
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(guessColor(kind).opacity(0.12), in: Capsule())
-                Image(systemName: "book.closed.fill")
-                    .font(.system(size: 11, weight: .heavy))
-                    .foregroundStyle(hasDefinition ? Color.witsMuted : Color.witsFaint.opacity(0.45))
+            if let hints = result?.raw["hintsUsed"] {
+                stat("\(Int(hints))", "hints")
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.witsCard.opacity(0.72), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(!hasDefinition)
-    }
-
-    private func guessLabel(_ kind: String) -> String {
-        switch kind {
-        case "required": "grid"
-        case "bonus": "bonus"
-        case "miss": "miss"
-        default: kind
-        }
-    }
-
-    private func guessColor(_ kind: String) -> Color {
-        switch kind {
-        case "required", "bonus": Color.witsAccent
-        case "miss": Color.witsWarm
-        default: Color.witsMuted
         }
     }
 
@@ -485,19 +434,4 @@ private struct GameResultView: View {
                 .foregroundStyle(Color.witsMuted)
         }
     }
-}
-
-private struct DefinitionWord: Identifiable {
-    let term: String
-    var id: String { term }
-}
-
-private struct DictionarySheet: UIViewControllerRepresentable {
-    let term: String
-
-    func makeUIViewController(context: Context) -> UIReferenceLibraryViewController {
-        UIReferenceLibraryViewController(term: term)
-    }
-
-    func updateUIViewController(_ uiViewController: UIReferenceLibraryViewController, context: Context) {}
 }
