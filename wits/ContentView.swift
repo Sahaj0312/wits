@@ -39,13 +39,15 @@ struct DebugGameHarness: View {
             ZStack {
                 if id == .wordConnect {
                     WordConnectSafeAreaBackground()
+                } else if id == .dotsConnect {
+                    DotsConnectSafeAreaBackground()
                 } else {
                     Color.witsBg.ignoresSafeArea()
                 }
                 makeGameView(id, config: .standard(id, difficulty: .seed(for: id), freePlay: true)) { _ in }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, id == .wordConnect ? 0 : max(geo.safeAreaInsets.top, 8))
-                    .padding(.bottom, id == .wordConnect ? 0 : max(geo.safeAreaInsets.bottom, 8))
+                    .padding(.top, id.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.top, 8))
+                    .padding(.bottom, id.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.bottom, 8))
                     .clipped()
             }
         }

@@ -18,7 +18,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     case spotSpeed, colorClash, matchBack, ruleFinder
     // expanded library
     case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
-    case wordConnect
+    case wordConnect, dotsConnect
     // survival-only (no mastery-adjusted workout mode; not in the daily pool)
     case split
 
@@ -27,7 +27,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     /// Games in the daily-workout pool (mastery-adjusted, train + survival modes).
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder,
-         .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect]
+         .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect, .dotsConnect]
     }
     var isLive: Bool { Self.live.contains(self) }
 
@@ -38,6 +38,15 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
 
     /// Tappable in the library (has some playable mode).
     var isPlayable: Bool { isLive || isSurvivalOnly }
+
+    /// Screens that draw their own full-bleed safe-area background and manage
+    /// their own top/bottom spacing.
+    var ownsSafeAreaSurface: Bool {
+        switch self {
+        case .wordConnect, .dotsConnect: true
+        default: false
+        }
+    }
 }
 
 enum CognitiveDomain: String, Codable, CaseIterable, Identifiable {
@@ -65,7 +74,7 @@ extension GameID {
         case .crowdControl: .multitasking
         case .echoGrid, .matchBack, .lastSeen, .pathKeeper: .memory
         case .colorClash, .tileShift: .flexibility
-        case .ruleFinder: .reasoning
+        case .ruleFinder, .dotsConnect: .reasoning
         case .numberRush, .estimator: .math
         case .wordConnect: .language
         case .split: .multitasking
@@ -88,6 +97,7 @@ extension GameID {
         case .lastSeen: "last seen"
         case .pathKeeper: "path keeper"
         case .wordConnect: "word connect"
+        case .dotsConnect: "dots connect"
         case .split: "split"
         }
     }
@@ -109,6 +119,7 @@ extension GameID {
         case .lastSeen: "never tap the same one twice."
         case .pathKeeper: "repeat the hops, in order."
         case .wordConnect: "connect letters into hidden words."
+        case .dotsConnect: "connect matching dots without crossing paths."
         case .split: "fly and pick at once. one slip ends it."
         }
     }
@@ -120,7 +131,7 @@ extension GameID {
         case .spotSpeed: "speed"
         case .echoGrid, .matchBack, .lastSeen, .pathKeeper: "memory"
         case .colorClash, .tileShift: "flexibility"
-        case .ruleFinder: "problem solving"
+        case .ruleFinder, .dotsConnect: "problem solving"
         case .numberRush, .estimator: "math"
         case .wordConnect: "language"
         case .split: "attention"
@@ -144,6 +155,7 @@ extension GameID {
         case .numberRush: "arithmetic"
         case .estimator: "numerical estimation"
         case .wordConnect: "vocabulary"
+        case .dotsConnect: "planning"
         case .split: "dual-tasking"
         }
     }
@@ -165,6 +177,7 @@ extension GameID {
         case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
         case .pathKeeper: "watch a token hop across the board, then repeat its path in the same order."
         case .wordConnect: "connect letters in the wheel to uncover every hidden word in the grid. clear two boards to unlock the next level."
+        case .dotsConnect: "draw paths between matching dots, cover every square, and avoid crossing another path."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         }
     }
@@ -181,6 +194,7 @@ extension GameID {
         case .colorClash: "response inhibition is overriding the automatic answer to give the correct one."
         case .tileShift: "task switching is adapting quickly when the goal keeps changing underneath you."
         case .ruleFinder: "logical reasoning is recognising patterns, drawing conclusions, and making decisions."
+        case .dotsConnect: "planning is building a sequence of moves that satisfies several constraints at the same time."
         case .numberRush: "arithmetic is performing quick mental calculations accurately under time pressure."
         case .estimator: "numerical estimation is judging quantities at a glance, without stopping to count."
         case .wordConnect: "vocabulary is fluent word retrieval: spotting letter patterns, spelling accurately, and finding possibilities quickly."
@@ -205,6 +219,7 @@ extension GameID {
         case .lastSeen: "sparkles"
         case .pathKeeper: "point.topleft.down.to.point.bottomright.curvepath.fill"
         case .wordConnect: "textformat.abc"
+        case .dotsConnect: "point.topleft.down.to.point.bottomright.curvepath.fill"
         case .split: "rectangle.split.1x2.fill"
         }
     }
@@ -226,6 +241,7 @@ extension GameID {
         case .lastSeen: (0x123A4D, 0x0F2A3A)
         case .pathKeeper: (0x1E3A5E, 0x14243F)
         case .wordConnect: (0x315EC8, 0x24306D)
+        case .dotsConnect: (0x6C0588, 0x135DB7)
         case .split: (0x123A33, 0x0F2A2A)
         }
     }
@@ -234,7 +250,7 @@ extension GameID {
     var seedLevel: Double {
         switch self {
         case .crowdControl, .echoGrid, .lastSeen, .pathKeeper, .matchBack: 1
-        case .wordConnect: 1
+        case .wordConnect, .dotsConnect: 1
         default: 2
         }
     }
@@ -252,6 +268,7 @@ extension GameID {
         case .lastSeen: "remembered"
         case .pathKeeper: "maxLen"
         case .wordConnect: "wordsFound"
+        case .dotsConnect: "boardsSolved"
         case .split: "maxLevel"
         default: "bestStreak"
         }
@@ -269,6 +286,7 @@ extension GameID {
         case .lastSeen: "\(Int(v)) recalled"
         case .pathKeeper: "\(Int(v)) steps"
         case .wordConnect: "\(Int(v)) words"
+        case .dotsConnect: "\(Int(v)) boards"
         case .split: "level \(Int(v))"
         default: "streak \(Int(v))"
         }

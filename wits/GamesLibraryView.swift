@@ -207,6 +207,8 @@ private struct GameLauncher: View {
                 ZStack {
                     if game == .wordConnect {
                         WordConnectSafeAreaBackground()
+                    } else if game == .dotsConnect {
+                        DotsConnectSafeAreaBackground()
                     } else {
                         Color.witsBg.ignoresSafeArea()
                     }
@@ -219,8 +221,8 @@ private struct GameLauncher: View {
                     }
                     .id(attempt)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, game == .wordConnect ? 0 : max(geo.safeAreaInsets.top, 8))
-                    .padding(.bottom, game == .wordConnect ? 0 : max(geo.safeAreaInsets.bottom, 8))
+                    .padding(.top, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.top, 8))
+                    .padding(.bottom, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.bottom, 8))
                     .clipped()
                 }
                 .overlay(alignment: .topLeading) {

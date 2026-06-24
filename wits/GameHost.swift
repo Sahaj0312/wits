@@ -58,8 +58,8 @@ struct GameHost: View {
                     .id(stageKey)
                     .transition(.opacity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, stage == .playing ? max(geo.safeAreaInsets.top, 8) : 0)
-                    .padding(.bottom, stage == .playing ? max(geo.safeAreaInsets.bottom, 8) : 0)
+                    .padding(.top, stage == .playing && currentGame?.ownsSafeAreaSurface != true ? max(geo.safeAreaInsets.top, 8) : 0)
+                    .padding(.bottom, stage == .playing && currentGame?.ownsSafeAreaSurface != true ? max(geo.safeAreaInsets.bottom, 8) : 0)
                     .clipped()
             }
             .overlay(alignment: .topLeading) {
