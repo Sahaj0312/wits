@@ -62,12 +62,6 @@ final class AppModel {
     var headlineIndex: Double? = nil
     /// Per-day rollups for the progress chart (ascending by day).
     var progressDays: [DailyProgressRow] = []
-    /// Cumulative lifetime XP — the currency that ranks you against friends.
-    /// Earned by training; computed server-side over full history.
-    var xp: Int = 0
-    var percentile: Int? = nil
-    var friendCode: String? = nil
-    var friends: [FriendInfo] = []
     /// Recent daily lifestyle check-ins (ascending by day), for the activity charts.
     var checkins: [DailyCheckIn] = []
     /// Actual workout games played per day (key yyyy-MM-dd, local), with the level
@@ -99,7 +93,6 @@ final class AppModel {
         refreshReminderSchedule()
         load = .ready
         Task { await reconcile() }
-        Task { await refreshSocial() }
     }
 
     // MARK: Daily check-in (mood + sleep)
@@ -130,57 +123,6 @@ final class AppModel {
         else { checkins.append(entry) }
         saveCache()
         Task { try? await supa.upsertCheckIn(day: key, mood: mood, sleep: sleep) }
-    }
-
-    // MARK: Social (xp + percentile + friends)
-
-    func refreshSocial() async {
-        guard supa.isSignedIn else { return }
-        await refreshXP()
-        if let d = try? await supa.callFunction("social", body: ["action": "percentile"]),
-           let r = try? JSONDecoder().decode(PercentileResp.self, from: d), r.hasData {
-            percentile = r.percentile
-        }
-        await refreshFriends()
-    }
-
-    /// Pull the user's cumulative XP (computed server-side over full history).
-    func refreshXP() async {
-        guard supa.isSignedIn else { return }
-        if let d = try? await supa.callFunction("social", body: ["action": "xp"]),
-           let r = try? JSONDecoder().decode(XPResp.self, from: d) {
-            xp = r.xp
-            saveCache()
-        }
-    }
-
-    func loadFriendCode() async {
-        guard supa.isSignedIn else { return }
-        if let d = try? await supa.callFunction("social", body: ["action": "friendCode"]),
-           let r = try? JSONDecoder().decode(CodeResp.self, from: d) {
-            friendCode = r.code
-        }
-    }
-
-    @discardableResult
-    func addFriend(_ code: String) async -> Bool {
-        guard let d = try? await supa.callFunction("social", body: ["action": "friendAdd", "code": code]),
-              let r = try? JSONDecoder().decode([String: Bool].self, from: d), r["ok"] == true
-        else { return false }
-        await refreshFriends()
-        return true
-    }
-
-    func refreshFriends() async {
-        guard supa.isSignedIn else { return }
-        // Send the device-local "today" so the backend's trained-today / streak
-        // checks line up with how days are written (dayString uses local time, not
-        // UTC). Without this they disagree after UTC midnight (evening in the US).
-        let today = SupabaseManager.dayString(Date())
-        if let d = try? await supa.callFunction("social", body: ["action": "friendList", "today": today]),
-           let r = try? JSONDecoder().decode(FriendListResp.self, from: d) {
-            friends = r.friends
-        }
     }
 
     /// Foreground / midnight: break the streak if a day was missed, refresh the day.
@@ -332,7 +274,6 @@ final class AppModel {
                                                 headlineIndex: headline,
                                                 domainScores: domains,
                                                 workoutGames: lineup)
-            await refreshXP()
         }
     }
 
@@ -365,8 +306,8 @@ final class AppModel {
             try? await supa.upsertDifficulty(game: id, next)
         }
 
-        // Free play earns XP + moves your wits score, but does NOT advance the
-        // daily streak — that only continues by completing the daily workout.
+        // Free play moves your wits score, but does NOT advance the daily streak —
+        // that only continues by completing the daily workout.
         if source == "free_play" { recordDayActivity([result], countsForStreak: false) }
     }
 
@@ -406,8 +347,8 @@ final class AppModel {
     }
 
     /// Fold a just-played game into today's rollup: accumulate domain scores,
-    /// refresh the wits score + improvement chart, persist the prescribed lineup,
-    /// and earn XP. `workout_done` marks an *active* day (any scored game, incl.
+    /// refresh the wits score + improvement chart, and persist the prescribed lineup.
+    /// `workout_done` marks an *active* day (any scored game, incl.
     /// free play) — the journey decides "completed" from games played vs. the
     /// prescribed lineup, not from this flag. The streak advances only when
     /// `countsForStreak` is true (the full daily workout was completed).
@@ -420,8 +361,6 @@ final class AppModel {
 
         let dayKey = SupabaseManager.dayString(Date())
         let existing = progressDays.first(where: { $0.day == dayKey })
-        let firstActivityToday = existing == nil
-
         // accumulate today's domain scores so multiple sessions build the picture
         var domains = existing?.domain_scores ?? [:]
         for (k, v) in domainScores(from: results) { domains[k] = v }
@@ -444,10 +383,6 @@ final class AppModel {
                                                  domain_scores: domains,
                                                  workout_games: lineup))
         }
-        // first activity of the day earns the base XP instantly; later games just
-        // refine the score. The server reconciles to the authoritative per-day total.
-        if firstActivityToday { xp += 100 + Int(headline.rounded()) }
-
         saveCache()
         Task {
             if countsForStreak { try? await supa.upsertStreak(streak) }
@@ -456,7 +391,6 @@ final class AppModel {
                                                 headlineIndex: headline,
                                                 domainScores: domains,
                                                 workoutGames: lineup)
-            await refreshXP()
         }
     }
 
@@ -611,7 +545,6 @@ final class AppModel {
         var today: DailyWorkout
         var headlineIndex: Double?
         var progressDays: [DailyProgressRow]
-        var xp: Int?
         var checkins: [DailyCheckIn]?
         var playedByDay: [String: [PlayedGame]]?
     }
@@ -625,7 +558,6 @@ final class AppModel {
             today: today,
             headlineIndex: headlineIndex,
             progressDays: progressDays,
-            xp: xp,
             checkins: checkins,
             playedByDay: playedByDay
         )
@@ -647,7 +579,6 @@ final class AppModel {
         })
         headlineIndex = state.headlineIndex
         progressDays = state.progressDays
-        xp = state.xp ?? 0
         checkins = state.checkins ?? []
         playedByDay = state.playedByDay ?? [:]
         // keep cached workout only if it's still today's
@@ -690,27 +621,6 @@ final class AppModel {
         return parseDate(s)
     }
 }
-
-// MARK: - Social decode models
-
-struct FriendInfo: Decodable {
-    var name: String
-    var xp: Int
-    var streak: Int
-    var trainedToday: Bool
-    var friendStreak: Int
-}
-
-struct XPResp: Decodable { var xp: Int }
-
-struct PercentileResp: Decodable {
-    var hasData: Bool
-    var percentile: Int?
-    var message: String?
-}
-
-struct CodeResp: Decodable { var code: String? }
-struct FriendListResp: Decodable { var friends: [FriendInfo] }
 
 extension DailyProgressRow {
     var dayDate: Date? {

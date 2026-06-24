@@ -460,24 +460,6 @@ final class SupabaseManager {
         return try JSONDecoder().decode([StreakRow].self, from: data).first
     }
 
-    /// POST to an edge function with the user's bearer token.
-    func callFunction(_ name: String, body: [String: Any] = [:]) async throws -> Data {
-        guard let token = await validAccessToken() else { throw SupabaseError.notSignedIn }
-        let url = SupabaseConfig.url.appendingPathComponent("functions/v1/\(name)")
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
-        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: req)
-        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
-            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
-            throw SupabaseError.message(Self.errorMessage(from: data, status: status))
-        }
-        return data
-    }
-
     static func dayString(_ date: Date) -> String {
         let f = DateFormatter()
         f.calendar = Calendar(identifier: .gregorian)

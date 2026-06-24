@@ -120,7 +120,7 @@ struct UsernameScreen: View {
                 .font(.witsDisplay(30))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("this is the name your friends see on the activity board. it doesn't have to be unique.")
+            Text("this is the name shown on your profile. it doesn't have to be unique.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
@@ -256,4 +256,3 @@ private struct FieldCard<Content: View>: View {
             .shadow(color: .witsShadow, radius: 10, y: 6)
     }
 }
-

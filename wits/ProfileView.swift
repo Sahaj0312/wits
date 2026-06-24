@@ -12,7 +12,6 @@ struct ProfileView: View {
     @Environment(SupabaseManager.self) private var supa
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var showReminder = false
-    @State private var showFriends = false
 
     private var entitlementLabel: String {
         switch app.entitlement {
@@ -45,7 +44,6 @@ struct ProfileView: View {
                 HStack(spacing: 12) {
                     stat(value: "\(app.streak.current)", label: "current streak")
                     stat(value: "\(app.streak.longest)", label: "longest")
-                    stat(value: "\(app.xp)", label: "xp")
                 }
 
                 Button { showReminder = true } label: {
@@ -53,10 +51,6 @@ struct ProfileView: View {
                 }
                 .buttonStyle(.plain)
                 infoRow(icon: "creditcard.fill", title: "plan", value: entitlementLabel)
-                Button { showFriends = true } label: {
-                    infoRow(icon: "person.2.fill", title: "friends", value: app.friends.isEmpty ? "add" : "\(app.friends.count)")
-                }
-                .buttonStyle(.plain)
 
                 Button {
                     supa.signOut()
@@ -83,9 +77,6 @@ struct ProfileView: View {
         .background(Color.witsBg.ignoresSafeArea())
         .sheet(isPresented: $showReminder) {
             ReminderSettingsSheet(app: app)
-        }
-        .sheet(isPresented: $showFriends) {
-            FriendsSheet()
         }
     }
 
