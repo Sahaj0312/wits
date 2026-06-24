@@ -13,6 +13,8 @@ struct WordConnectScreen: View {
     var onResult: (GameResult) -> Void
 
     private static let gameSeconds = 45.0
+    private static let recentPuzzleDefaultsKey = "wits.wordConnect.recentPuzzles"
+    private static let recentPuzzleLimit = 12
 
     private enum Direction { case across, down }
 
@@ -45,6 +47,7 @@ struct WordConnectScreen: View {
         let bonus: [String]
         let difficulty: Int
 
+        var key: String { required.joined(separator: "|") }
         var rows: Int { (cells.keys.map(\.row).max() ?? 0) + 1 }
         var columns: Int { (cells.keys.map(\.col).max() ?? 0) + 1 }
         var entries: [Entry] { Self.layout(required) }
@@ -172,6 +175,7 @@ struct WordConnectScreen: View {
     @State private var dragMoved = false
     @State private var gestureActive = false
     @State private var finished = false
+    @State private var recentPuzzleKeys: [String]
 
     private let startedAt = Date()
     private let level: Double
@@ -180,9 +184,11 @@ struct WordConnectScreen: View {
         self.cfg = cfg
         self.onResult = onResult
         self.level = cfg.difficulty.level
-        let p = Self.makePuzzle(level: cfg.difficulty.level)
+        let recent = Self.loadRecentPuzzleKeys()
+        let p = Self.makePuzzle(level: cfg.difficulty.level, avoiding: recent)
         _puzzle = State(initialValue: p)
         _letters = State(initialValue: p.letters.shuffled())
+        _recentPuzzleKeys = State(initialValue: Self.recordRecentPuzzle(p.key, in: recent))
     }
 
     private var currentWord: String {
@@ -524,12 +530,14 @@ struct WordConnectScreen: View {
     }
 
     private func nextPuzzle() {
-        let p = Self.makePuzzle(level: level + Double(boardsSolved) * 0.35)
+        let p = Self.makePuzzle(level: level + Double(boardsSolved) * 0.35, avoiding: [puzzle.key] + recentPuzzleKeys)
+        let updatedRecent = Self.recordRecentPuzzle(p.key, in: recentPuzzleKeys)
         withAnimation(.easeOut(duration: 0.18)) {
             puzzle = p
             letters = p.letters.shuffled()
             found.removeAll()
             selectedIndices.removeAll()
+            recentPuzzleKeys = updatedRecent
         }
     }
 
@@ -576,10 +584,28 @@ struct WordConnectScreen: View {
         hypot(a.x - b.x, a.y - b.y)
     }
 
-    private static func makePuzzle(level: Double) -> Puzzle {
+    private static func makePuzzle(level: Double, avoiding recent: [String] = []) -> Puzzle {
         let cap = level < 2 ? 1 : level < 5 ? 2 : level < 8 ? 3 : 4
         let pool = bank.filter { $0.difficulty <= cap }
-        return (pool.randomElement() ?? bank[0])
+        let blocked = Set(recent)
+        let eligible = pool.filter { !blocked.contains($0.key) }
+        if let pick = eligible.randomElement() { return pick }
+
+        let currentKey = recent.first
+        return pool.filter { $0.key != currentKey }.randomElement()
+            ?? pool.randomElement()
+            ?? bank[0]
+    }
+
+    private static func loadRecentPuzzleKeys() -> [String] {
+        UserDefaults.standard.stringArray(forKey: recentPuzzleDefaultsKey) ?? []
+    }
+
+    private static func recordRecentPuzzle(_ key: String, in recent: [String]) -> [String] {
+        let updated = ([key] + recent.filter { $0 != key }).prefix(recentPuzzleLimit)
+        let result = Array(updated)
+        UserDefaults.standard.set(result, forKey: recentPuzzleDefaultsKey)
+        return result
     }
 
     private static let bank: [Puzzle] = [
@@ -608,6 +634,66 @@ struct WordConnectScreen: View {
             difficulty: 1
         ),
         Puzzle(
+            letters: ["E", "A", "S", "T"],
+            required: ["EAST", "SEAT", "EATS", "TEAS"],
+            bonus: ["SEA", "SET", "EAT"],
+            difficulty: 1
+        ),
+        Puzzle(
+            letters: ["D", "E", "A", "L"],
+            required: ["DEAL", "LEAD", "DALE"],
+            bonus: ["LAD", "ALE"],
+            difficulty: 1
+        ),
+        Puzzle(
+            letters: ["S", "T", "A", "R"],
+            required: ["STAR", "RATS", "TARS", "ART"],
+            bonus: ["TAR", "SAT"],
+            difficulty: 1
+        ),
+        Puzzle(
+            letters: ["P", "O", "S", "T"],
+            required: ["POST", "STOP", "POTS"],
+            bonus: ["TOP", "POT"],
+            difficulty: 1
+        ),
+        Puzzle(
+            letters: ["M", "I", "L", "E"],
+            required: ["MILE", "LIME", "ELM"],
+            bonus: ["LIE"],
+            difficulty: 1
+        ),
+        Puzzle(
+            letters: ["N", "O", "T", "E"],
+            required: ["NOTE", "TONE", "ONE"],
+            bonus: ["TEN", "TOE"],
+            difficulty: 1
+        ),
+        Puzzle(
+            letters: ["F", "I", "R", "E"],
+            required: ["FIRE", "RIFE", "IRE"],
+            bonus: ["FIR"],
+            difficulty: 1
+        ),
+        Puzzle(
+            letters: ["S", "A", "I", "L"],
+            required: ["SAIL", "AILS", "AIL"],
+            bonus: ["SIL"],
+            difficulty: 1
+        ),
+        Puzzle(
+            letters: ["B", "E", "A", "R"],
+            required: ["BEAR", "BARE", "BRAE", "EAR"],
+            bonus: ["ARE", "BAR"],
+            difficulty: 1
+        ),
+        Puzzle(
+            letters: ["G", "A", "M", "E"],
+            required: ["GAME", "MAGE", "MEGA"],
+            bonus: ["AGE", "GEM"],
+            difficulty: 1
+        ),
+        Puzzle(
             letters: ["T", "R", "A", "I", "N"],
             required: ["TRAIN", "RAIN", "RANT", "TAR"],
             bonus: ["ART", "AIR", "TIN"],
@@ -629,6 +715,78 @@ struct WordConnectScreen: View {
             letters: ["C", "L", "E", "A", "R"],
             required: ["CLEAR", "LACE", "RACE", "REAL"],
             bonus: ["CARE", "EAR", "ARC"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["S", "M", "I", "L", "E"],
+            required: ["SMILE", "MILES", "LIME", "SLIM"],
+            bonus: ["MILE", "ELM"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["H", "E", "A", "R", "T"],
+            required: ["HEART", "EARTH", "HATER", "HEAR", "RATE"],
+            bonus: ["TEAR", "HARE"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["A", "N", "G", "L", "E"],
+            required: ["ANGLE", "ANGEL", "GLEAN", "LANE"],
+            bonus: ["LEAN", "GALE"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["B", "R", "A", "V", "E"],
+            required: ["BRAVE", "BEAR", "RAVE", "AVER"],
+            bonus: ["BARE", "VERB"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["S", "H", "I", "N", "E"],
+            required: ["SHINE", "SINE", "SHIN", "HENS"],
+            bonus: ["HIS", "SIN"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["T", "R", "A", "C", "E"],
+            required: ["TRACE", "REACT", "CATER", "RACE"],
+            bonus: ["CARE", "TEAR"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["P", "A", "I", "N", "T"],
+            required: ["PAINT", "PINT", "PAIN", "ANTI"],
+            bonus: ["TAP", "TIN"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["D", "R", "E", "A", "M"],
+            required: ["DREAM", "ARMED", "READ", "DARE"],
+            bonus: ["MADE", "EAR"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["F", "L", "O", "U", "R"],
+            required: ["FLOUR", "FOUR", "FOUL", "OUR"],
+            bonus: ["FUR"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["C", "H", "A", "I", "R"],
+            required: ["CHAIR", "RICH", "HAIR", "AIR"],
+            bonus: ["CAR", "ARC"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["G", "R", "A", "P", "E"],
+            required: ["GRAPE", "PAGER", "PEAR", "RAGE"],
+            bonus: ["GEAR", "APE"],
+            difficulty: 2
+        ),
+        Puzzle(
+            letters: ["W", "O", "R", "L", "D"],
+            required: ["WORLD", "WORD", "LORD"],
+            bonus: ["OLD", "ROW"],
             difficulty: 2
         ),
         Puzzle(
@@ -656,6 +814,78 @@ struct WordConnectScreen: View {
             difficulty: 3
         ),
         Puzzle(
+            letters: ["C", "L", "O", "U", "D"],
+            required: ["CLOUD", "COLD", "LOUD", "CLOD"],
+            bonus: ["OLD", "COD"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["B", "L", "E", "N", "D"],
+            required: ["BLEND", "BEND", "LEND", "LED"],
+            bonus: ["DEN", "END"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["Q", "U", "I", "E", "T"],
+            required: ["QUIET", "QUITE", "QUIT", "TIE"],
+            bonus: ["UTE"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["S", "T", "R", "E", "A", "M"],
+            required: ["STREAM", "MASTER", "TAMERS", "TEAMS", "TERMS"],
+            bonus: ["SMART", "EARS"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["F", "R", "I", "E", "N", "D"],
+            required: ["FRIEND", "FINDER", "FIRED", "DINER"],
+            bonus: ["FIND", "RIND"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["O", "R", "A", "N", "G", "E"],
+            required: ["ORANGE", "ORGAN", "RANGE", "GROAN"],
+            bonus: ["ANGER", "GEAR"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["C", "A", "S", "T", "L", "E"],
+            required: ["CASTLE", "CLEATS", "STEAL", "LACES"],
+            bonus: ["TALES", "SEAL"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["B", "R", "I", "D", "G", "E"],
+            required: ["BRIDGE", "GIBED", "RIDGE", "BIRD"],
+            bonus: ["DIRE", "GRID"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["P", "O", "C", "K", "E", "T"],
+            required: ["POCKET", "POET", "TOPE", "COKE"],
+            bonus: ["POKE", "TOP"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["G", "A", "R", "D", "E", "N"],
+            required: ["GARDEN", "DANGER", "RANGE", "GRADE"],
+            bonus: ["READ", "GEAR"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["C", "A", "N", "D", "L", "E"],
+            required: ["CANDLE", "DANCE", "CLEAN", "LEND"],
+            bonus: ["LACE", "DEAL"],
+            difficulty: 3
+        ),
+        Puzzle(
+            letters: ["S", "P", "R", "I", "N", "G"],
+            required: ["SPRING", "RINGS", "GRINS", "SIGN"],
+            bonus: ["PING", "SPIN"],
+            difficulty: 3
+        ),
+        Puzzle(
             letters: ["B", "R", "I", "G", "H", "T"],
             required: ["BRIGHT", "BIRTH", "RIGHT", "GIRTH"],
             bonus: ["GIRT", "HIT", "RIB"],
@@ -671,6 +901,78 @@ struct WordConnectScreen: View {
             letters: ["P", "L", "A", "N", "E", "T"],
             required: ["PLANET", "PLANE", "PLANT", "PANEL"],
             bonus: ["LANE", "PEAT", "LEANT"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["T", "R", "A", "V", "E", "L"],
+            required: ["TRAVEL", "LATER", "ALERT", "ALTER"],
+            bonus: ["VALE", "TALE"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["S", "I", "L", "V", "E", "R"],
+            required: ["SILVER", "LIVERS", "LIVER", "VEIL"],
+            bonus: ["RILE", "SIRE"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["F", "O", "R", "E", "S", "T"],
+            required: ["FOREST", "FROST", "STORE", "SOFT"],
+            bonus: ["REST", "TORE"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["A", "N", "C", "H", "O", "R"],
+            required: ["ANCHOR", "ROACH", "RANCH", "CORN"],
+            bonus: ["CHAR", "ARC"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["C", "H", "A", "N", "G", "E"],
+            required: ["CHANGE", "HANG", "ACHE", "EACH"],
+            bonus: ["CAGE", "CAN"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["M", "O", "D", "E", "R", "N"],
+            required: ["MODERN", "DRONE", "DEMON", "MORE"],
+            bonus: ["NODE", "NORM"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["P", "R", "A", "I", "S", "E"],
+            required: ["PRAISE", "RAISE", "ARISE", "SPEAR"],
+            bonus: ["PAIR", "RISE"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["C", "A", "M", "E", "R", "A"],
+            required: ["CAMERA", "CREAM", "RACE", "ACRE"],
+            bonus: ["MARE", "CARE"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["F", "L", "A", "M", "E", "S"],
+            required: ["FLAMES", "FLEAS", "MALES", "SEAL"],
+            bonus: ["MEAL", "SAFE"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["B", "A", "L", "A", "N", "C", "E"],
+            required: ["BALANCE", "CABLE", "CANAL", "LANCE"],
+            bonus: ["CLEAN", "LANE"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["P", "I", "C", "T", "U", "R", "E"],
+            required: ["PICTURE", "PRICE", "TRUCE", "CURE"],
+            bonus: ["TIER", "RICE"],
+            difficulty: 4
+        ),
+        Puzzle(
+            letters: ["M", "U", "S", "I", "C", "A", "L"],
+            required: ["MUSICAL", "CLAIM", "MAILS", "CALM"],
+            bonus: ["SLIM", "SAIL"],
             difficulty: 4
         )
     ]
