@@ -440,60 +440,42 @@ struct TodayView: View {
         HStack(alignment: .center) {
             VStack(alignment: .leading, spacing: 5) {
                 WitsBrandMark()
-                Text("today")
+                Text(Self.largeDateFormatter.string(from: Date()))
                     .font(.witsDisplay(34))
                     .foregroundStyle(Color.witsInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.78)
-                Text(Self.fullHeaderFormatter.string(from: Date()))
+                Text(Self.weekdayHeaderFormatter.string(from: Date()))
                     .font(.witsBody(15, weight: .semibold))
                     .foregroundStyle(Color.witsMuted)
             }
             Spacer()
             streakPill
-            weekButton
         }
     }
 
     private var streakPill: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "flame.fill")
-                .font(.system(size: 14, weight: .heavy))
-                .foregroundStyle(app.streak.current > 0 ? Color.witsWarm : Color.witsFaint)
-            Text("\(app.streak.current)")
-                .font(.system(size: 16, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsInk)
-                .monospacedDigit()
-        }
-        .padding(.horizontal, 13)
-        .padding(.vertical, 10)
-        .background(Color.witsCard, in: Capsule())
-        .shadow(color: .witsShadow, radius: 8, y: 4)
-    }
-
-    private var weekButton: some View {
         Button {
             withAnimation(.snappy(duration: 0.24)) {
                 showWeekTraining.toggle()
             }
         } label: {
-            Image(systemName: "calendar")
-                .font(.system(size: 20, weight: .heavy))
-                .foregroundStyle(Color.witsAccent)
-                .frame(width: 48, height: 48)
-                .background(Color.witsCard, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .overlay(alignment: .topTrailing) {
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 9, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(width: 18, height: 18)
-                        .background(Color.witsWarm, in: Circle())
-                        .offset(x: 4, y: -4)
-                }
-                .shadow(color: .witsShadow, radius: 8, y: 4)
+            HStack(spacing: 6) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundStyle(app.streak.current > 0 ? Color.witsWarm : Color.witsFaint)
+                Text("\(app.streak.current)")
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsInk)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 10)
+            .background(Color.witsCard, in: Capsule())
+            .shadow(color: .witsShadow, radius: 8, y: 4)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("training week")
+        .accessibilityLabel("training week history")
     }
 
     /// Starts or resumes today's workout from the selected-day detail.
@@ -594,9 +576,15 @@ struct TodayView: View {
         return f
     }()
 
-    private static let fullHeaderFormatter: DateFormatter = {
+    private static let largeDateFormatter: DateFormatter = {
         let f = DateFormatter()
-        f.dateFormat = "EEEE, MMMM d"
+        f.dateFormat = "MMMM d"
+        return f
+    }()
+
+    private static let weekdayHeaderFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEEE"
         return f
     }()
 }
