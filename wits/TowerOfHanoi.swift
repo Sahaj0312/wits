@@ -16,7 +16,15 @@ struct TowerOfHanoiScreen: View {
         var stacks: [[Int]]
     }
 
+    private struct LevelSpec {
+        let number: Int
+        let disks: Int
+        let source: Int
+        let target: Int
+    }
+
     @State private var state: TowerState
+    @State private var campaignLevel: Int
     @State private var selectedTower: Int?
     @State private var moves = 0
     @State private var invalidMoves = 0
@@ -30,17 +38,33 @@ struct TowerOfHanoiScreen: View {
     private let startedAt = Date()
     private let baseDiskCount: Int
     private let level: Double
+    private static let campaignLevelCount = 36
+    private static let campaignLevelKey = "wits.towerOfHanoi.currentLevel"
 
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
         self.onResult = onResult
         self.level = cfg.difficulty.level
         self.baseDiskCount = Self.diskCount(for: cfg.difficulty.level)
-        _state = State(initialValue: TowerState(stacks: Self.initialStacks(disks: Self.diskCount(for: cfg.difficulty.level))))
+        let savedLevel = Self.savedCampaignLevel()
+        _campaignLevel = State(initialValue: savedLevel)
+        _state = State(initialValue: TowerState(stacks: Self.initialStacks(for: Self.levelSpec(savedLevel))))
+    }
+
+    private var currentSpec: LevelSpec {
+        cfg.isSurvival ? LevelSpec(number: completedPuzzles + 1, disks: diskCount, source: 0, target: 2) : Self.levelSpec(campaignLevel)
     }
 
     private var diskCount: Int {
-        cfg.isSurvival ? min(6, baseDiskCount + completedPuzzles / 2) : baseDiskCount
+        cfg.isSurvival ? min(6, baseDiskCount + completedPuzzles / 2) : currentSpec.disks
+    }
+
+    private var sourceTower: Int {
+        currentSpec.source
+    }
+
+    private var targetTower: Int {
+        currentSpec.target
     }
 
     private var optimalMoves: Int {
@@ -81,6 +105,7 @@ struct TowerOfHanoiScreen: View {
                         selectedTower: selectedTower,
                         flashTower: flashTower,
                         diskCount: diskCount,
+                        targetTower: targetTower,
                         tapTower: tapTower
                     )
                     .frame(maxWidth: .infinity)
@@ -158,12 +183,14 @@ struct TowerOfHanoiScreen: View {
             HStack {
                 Label("\(diskCount) disks", systemImage: "square.stack.3d.up.fill")
                 Spacer()
+                Text("level \(campaignLevel)/\(Self.campaignLevelCount)")
+                Spacer()
                 Text("optimal \(optimalMoves)")
             }
             .font(.system(size: 13, weight: .heavy, design: .rounded))
             .foregroundStyle(.white.opacity(0.78))
 
-            ProgressView(value: min(1, Double(state.stacks[2].count) / Double(diskCount)))
+            ProgressView(value: min(1, Double(state.stacks[targetTower].count) / Double(diskCount)))
                 .tint(Color(red: 0.24, green: 0.82, blue: 0.20))
                 .background(.white.opacity(0.16), in: Capsule())
         }
@@ -214,13 +241,13 @@ struct TowerOfHanoiScreen: View {
             selectedTower = nil
             moves += 1
         }
-        hint = state.stacks[2].count == diskCount ? "" : "good. keep moving the stack to tower C"
+        hint = state.stacks[targetTower].count == diskCount ? "" : "good. keep moving the stack to tower \(Self.towerName(targetTower))"
         GameFeel.shared.play(.correct(combo: max(1, min(6, moves))))
         checkCompletion()
     }
 
     private func checkCompletion() {
-        guard state.stacks[2].count == diskCount else { return }
+        guard state.stacks[targetTower].count == diskCount else { return }
 
         if cfg.isSurvival {
             completedPuzzles += 1
@@ -233,6 +260,7 @@ struct TowerOfHanoiScreen: View {
         }
 
         finished = true
+        unlockNextCampaignLevel()
         GameFeel.shared.play(.newBest)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
             finish()
@@ -241,7 +269,7 @@ struct TowerOfHanoiScreen: View {
 
     private func resetForNextSurvivalPuzzle() {
         let nextDisks = diskCount
-        state = TowerState(stacks: Self.initialStacks(disks: nextDisks))
+        state = TowerState(stacks: Self.initialStacks(disks: nextDisks, source: 0))
         selectedTower = nil
         moves = 0
         invalidMoves = 0
@@ -273,9 +301,19 @@ struct TowerOfHanoiScreen: View {
             "optimalMoves": Double(optimalMoves),
             "seconds": seconds.rounded(),
             "diskCount": Double(diskCount),
+            "hanoiLevel": Double(campaignLevel),
+            "hanoiLevelCount": Double(Self.campaignLevelCount),
+            "sourceTower": Double(sourceTower),
+            "targetTower": Double(targetTower),
             "invalidMoves": Double(invalidMoves)
         ]
         onResult(result)
+    }
+
+    private func unlockNextCampaignLevel() {
+        guard !cfg.isSurvival, campaignLevel < Self.campaignLevelCount else { return }
+        let next = campaignLevel + 1
+        UserDefaults.standard.set(next, forKey: Self.campaignLevelKey)
     }
 
     private func flash(_ tower: Int) {
@@ -286,7 +324,7 @@ struct TowerOfHanoiScreen: View {
     }
 
     private func showHelp() {
-        hint = "move all disks to tower C. only smaller disks can sit on larger ones"
+        hint = "move all disks to tower \(Self.towerName(targetTower)). only smaller disks can sit on larger ones"
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             if !finished {
                 hint = selectedTower == nil ? "tap a tower to pick up its top disk" : "now tap the tower where this disk should go"
@@ -307,8 +345,39 @@ struct TowerOfHanoiScreen: View {
         min(6, max(2, Int((level + 1) / 2) + 1))
     }
 
-    private static func initialStacks(disks: Int) -> [[Int]] {
-        [Array(stride(from: disks, through: 1, by: -1)), [], []]
+    private static func savedCampaignLevel() -> Int {
+        let saved = UserDefaults.standard.integer(forKey: campaignLevelKey)
+        return min(campaignLevelCount, max(1, saved == 0 ? 1 : saved))
+    }
+
+    private static func levelSpec(_ level: Int) -> LevelSpec {
+        let clamped = min(campaignLevelCount, max(1, level))
+        let disks: Int
+        switch clamped {
+        case 1...6: disks = 2
+        case 7...16: disks = 3
+        case 17...26: disks = 4
+        case 27...32: disks = 5
+        default: disks = 6
+        }
+
+        let routes = [(0, 2), (0, 1), (1, 2), (2, 0), (1, 0), (2, 1)]
+        let route = routes[(clamped - 1) % routes.count]
+        return LevelSpec(number: clamped, disks: disks, source: route.0, target: route.1)
+    }
+
+    private static func initialStacks(for spec: LevelSpec) -> [[Int]] {
+        initialStacks(disks: spec.disks, source: spec.source)
+    }
+
+    private static func initialStacks(disks: Int, source: Int) -> [[Int]] {
+        var stacks: [[Int]] = [[], [], []]
+        stacks[min(2, max(0, source))] = Array(stride(from: disks, through: 1, by: -1))
+        return stacks
+    }
+
+    private static func towerName(_ tower: Int) -> String {
+        ["A", "B", "C"][min(2, max(0, tower))]
     }
 
     private static func clock(_ seconds: Double) -> String {
@@ -322,6 +391,7 @@ private struct HanoiBoard: View {
     var selectedTower: Int?
     var flashTower: Int?
     var diskCount: Int
+    var targetTower: Int
     var tapTower: (Int) -> Void
 
     var body: some View {
@@ -340,7 +410,7 @@ private struct HanoiBoard: View {
                             disks: stacks[index],
                             diskCount: diskCount,
                             selected: selectedTower == index,
-                            highlighted: index == 2,
+                            highlighted: index == targetTower,
                             flashing: flashTower == index
                         )
                         .frame(width: towerWidth, height: towerHeight)

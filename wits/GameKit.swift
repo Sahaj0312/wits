@@ -130,7 +130,7 @@ extension GameID {
         case .pathKeeper: "repeat the hops, in order."
         case .wordConnect: "connect letters into hidden words."
         case .dotsConnect: "connect matching dots without crossing paths."
-        case .towerOfHanoi: "move the stack in as few moves as possible."
+        case .towerOfHanoi: "clear the tower campaign one level at a time."
         case .split: "fly and pick at once. one slip ends it."
         }
     }
@@ -190,7 +190,7 @@ extension GameID {
         case .pathKeeper: "watch a token hop across the board, then repeat its path in the same order."
         case .wordConnect: "connect letters in the wheel to uncover every hidden word in the grid. clear two boards to unlock the next level."
         case .dotsConnect: "draw paths between matching dots, cover every square, and avoid crossing another path."
-        case .towerOfHanoi: "move every disk from tower A to tower C. only the top disk can move, and a larger disk can never sit on a smaller one."
+        case .towerOfHanoi: "clear a 36-level tower campaign. each level gives you a source tower and a target tower; move the stack across in as few moves as possible."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         }
     }

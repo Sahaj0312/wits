@@ -280,9 +280,35 @@ private struct GameResultView: View {
     }
     private var bestStat: String? {
         guard game != .wordConnect else { return nil }
+        guard game != .towerOfHanoi else { return nil }
         guard game.statKey != "bestStreak" else { return nil }
         guard let v = result?.raw[game.statKey] else { return nil }
         return game.statLabel(v)
+    }
+    private var hanoiSeconds: Int? {
+        guard game == .towerOfHanoi, let seconds = result?.raw["seconds"] else { return nil }
+        return Int(seconds.rounded())
+    }
+    private var hanoiMoves: Int? {
+        guard game == .towerOfHanoi, let moves = result?.raw["moves"] else { return nil }
+        return Int(moves.rounded())
+    }
+    private var hanoiOptimalMoves: Int? {
+        guard game == .towerOfHanoi, let optimal = result?.raw["optimalMoves"] else { return nil }
+        return Int(optimal.rounded())
+    }
+    private var hanoiLevelText: String? {
+        guard game == .towerOfHanoi, let level = result?.raw["hanoiLevel"] else { return nil }
+        let count = Int((result?.raw["hanoiLevelCount"] ?? 36).rounded())
+        return "level \(Int(level.rounded()))/\(count)"
+    }
+    private var hanoiMoveDetail: String? {
+        guard let moves = hanoiMoves, let optimal = hanoiOptimalMoves else { return nil }
+        let extra = max(0, moves - optimal)
+        if extra == 0 {
+            return "You matched the minimum number of moves required"
+        }
+        return "You made \(extra) \(extra == 1 ? "move" : "moves") more than the minimum number of moves required"
     }
     private var wordAccuracy: Double {
         guard game == .wordConnect else { return 0 }
@@ -381,6 +407,9 @@ private struct GameResultView: View {
                 if game == .wordConnect {
                     wordConnectStats
                         .padding(.top, 8)
+                } else if game == .towerOfHanoi {
+                    towerOfHanoiStats
+                        .padding(.top, 10)
                 } else if accuracyPct != nil || bestStreak != nil || bestStat != nil {
                     HStack(spacing: 12) {
                         if let a = accuracyPct { stat("\(a)%", "accuracy") }
@@ -407,6 +436,12 @@ private struct GameResultView: View {
     }
 
     private var replayTitle: String {
+        if game == .towerOfHanoi {
+            guard let level = result?.raw["hanoiLevel"],
+                  let count = result?.raw["hanoiLevelCount"],
+                  level < count else { return "play again" }
+            return "next level"
+        }
         guard game == .wordConnect else { return "play again" }
         guard (result?.raw["levelDelta"] ?? 0) > 0 else { return "play again" }
         return "play next level"
@@ -423,6 +458,61 @@ private struct GameResultView: View {
             }
             if let hints = result?.raw["hintsUsed"] {
                 stat("\(Int(hints))", "hints")
+            }
+        }
+    }
+
+    private var towerOfHanoiStats: some View {
+        VStack(spacing: 12) {
+            if let hanoiLevelText {
+                HStack {
+                    Text(hanoiLevelText)
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsAccent)
+                    Spacer()
+                }
+            }
+            hanoiResultRow(
+                icon: "timer",
+                title: "Time",
+                value: hanoiSeconds.map { "\($0) sec" } ?? "—",
+                detail: nil
+            )
+            Divider().overlay(Color.witsLine)
+            hanoiResultRow(
+                icon: "scribble.variable",
+                title: "Moves",
+                value: hanoiMoves.map { "\($0)" } ?? "—",
+                detail: hanoiMoveDetail
+            )
+        }
+        .padding(.top, 4)
+    }
+
+    private func hanoiResultRow(icon: String, title: String, value: String, detail: String?) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .heavy))
+                .foregroundStyle(Color.witsAccent)
+                .frame(width: 24, height: 24)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.witsBody(16, weight: .heavy))
+                        .foregroundStyle(Color.witsInk)
+                    Spacer()
+                    Text(value)
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                        .monospacedDigit()
+                }
+                if let detail {
+                    Text(detail)
+                        .font(.witsBody(13.5))
+                        .foregroundStyle(Color.witsMuted)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }
