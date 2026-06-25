@@ -586,6 +586,7 @@ struct RuleFinderScreen: View {
         r.raw = [
             "complexity": Double(maxTier),
             "avgTier": Double(tierTotal) / Double(max(1, Self.total)),
+            "masteryLevel": cfg.difficulty.level,
             "correct": Double(correct)
         ]
         if let median { r.raw["medianRTms"] = Double(median) }

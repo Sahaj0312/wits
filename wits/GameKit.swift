@@ -289,7 +289,7 @@ extension GameID {
         case .echoGrid: "\(Int(v)) tiles"
         case .spotSpeed: "\(Int(v)) ms"
         case .matchBack: "\(Int(v))-back"
-        case .ruleFinder: "level \(Int(v))"
+        case .ruleFinder: "tier \(Int(v))"
         case .crowdControl: "\(Int(v)) perfect"
         case .lastSeen: "\(Int(v)) recalled"
         case .pathKeeper: "\(Int(v)) steps"
