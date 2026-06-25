@@ -10,8 +10,9 @@
 import SwiftUI
 
 /// Number of progress-bearing question screens (goals + 6 likert + gender +
-/// education + attribution + screen time) — used to fill the progress bar.
-let onboardingQuizTotal = 11.0
+/// education + attribution + screen time + attention history) — used to fill
+/// the progress bar.
+let onboardingQuizTotal = 12.0
 
 enum OnboardingStep: Hashable {
     // 1 — account creation
@@ -22,7 +23,7 @@ enum OnboardingStep: Hashable {
     case likert(Int)
     case stat
     // 4 — demographics
-    case aboutYou, gender, education, attribution, screenTime
+    case aboutYou, gender, education, attribution, screenTime, attentionHistory
     // 5 — fit test
     case meetYou, gauntlet
     case flanker, explainFlanker
@@ -41,7 +42,7 @@ enum OnboardingStep: Hashable {
         .username, .birthdate,
         .welcome, .goals, .calibrate,
         .likert(0), .likert(1), .likert(2), .stat, .likert(3), .likert(4), .likert(5),
-        .aboutYou, .gender, .education, .attribution, .screenTime,
+        .aboutYou, .gender, .education, .attribution, .screenTime, .attentionHistory,
         .meetYou, .gauntlet,
         .flanker, .explainFlanker,
         .tracker, .explainTracker,
@@ -84,6 +85,7 @@ struct OnboardingData {
     var education: String?
     var heardAbout: String?
     var screenTime = 1              // 0–3
+    var attentionHistory: String?
     // goals & self-assessment
     var goals: [String] = []
     var likertAnswers: [Int: Int] = [:]   // statement index → 0–3
@@ -277,6 +279,11 @@ struct OnboardingView: View {
         case .screenTime:
             ScreenTimeScreen { score in
                 data.screenTime = score
+                next()
+            }
+        case .attentionHistory:
+            AttentionHistoryScreen { value in
+                data.attentionHistory = value
                 // End of the demographics section — one write for the whole section.
                 supa.recordCheckpoint(.demographics, merging: demographicsFields)
                 next()

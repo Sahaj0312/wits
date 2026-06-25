@@ -123,6 +123,31 @@ struct AttributionScreen: View {
     }
 }
 
+// MARK: - Attention history
+
+struct AttentionHistoryScreen: View {
+    var onAnswer: (String) -> Void
+
+    private static let options = [
+        "yes",
+        "i think i do",
+        "no",
+        "i prefer not to share",
+        "not sure",
+    ]
+
+    var body: some View {
+        PickerScreen(
+            position: 12,
+            eyebrow: "about you",
+            title: "do you have ADD/ADHD?",
+            sub: "this can affect how you focus and learn.",
+            options: Self.options,
+            onAnswer: onAnswer
+        )
+    }
+}
+
 // MARK: - Shared single-select picker (auto-advances)
 
 struct PickerScreen: View {
