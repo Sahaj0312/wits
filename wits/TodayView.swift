@@ -151,7 +151,7 @@ struct TodayView: View {
     }
 
     private func isWeekDayEnabled(_ date: Date) -> Bool {
-        isSelectable(date)
+        Calendar.current.isDateInToday(date)
     }
 
     private func selectWeekDay(_ offset: Int) {
@@ -692,7 +692,7 @@ private struct WeekTrainingPanel: View {
                     Text("training rhythm")
                         .font(.witsDisplay(22))
                         .foregroundStyle(Color.witsInk)
-                    Text("Pick a day to review its workout.")
+                    Text("Your streak at a glance.")
                         .font(.witsBody(13, weight: .semibold))
                         .foregroundStyle(Color.witsMuted)
                 }
@@ -713,11 +713,11 @@ private struct WeekTrainingPanel: View {
             HStack(alignment: .bottom, spacing: 6) {
                 ForEach(offsets, id: \.self) { offset in
                     let day = dayProvider(offset)
-                    let enabled = isEnabled(day.date)
+                    let selectable = isEnabled(day.date)
                     TrainingWeekDay(
                         day: day,
                         selected: selectedOffset == offset,
-                        enabled: enabled,
+                        selectable: selectable,
                         action: { select(offset) }
                     )
                     .frame(maxWidth: .infinity)
@@ -759,7 +759,7 @@ private struct WeekTrainingPanel: View {
 private struct TrainingWeekDay: View {
     let day: TodayWorkoutDay
     let selected: Bool
-    let enabled: Bool
+    let selectable: Bool
     let action: () -> Void
 
     private var progress: Double {
@@ -782,7 +782,7 @@ private struct TrainingWeekDay: View {
                 TrainingProgressRing(progress: progress,
                                      state: day.state,
                                      selected: selected,
-                                     enabled: enabled)
+                                     available: isVisibleHistoryDay)
 
                 Text(weekday)
                     .font(.system(size: 15.5, weight: selected ? .heavy : .semibold, design: .rounded))
@@ -800,16 +800,20 @@ private struct TrainingWeekDay: View {
                         .frame(width: 42, height: 96)
                 }
             }
-            .opacity(enabled ? 1 : 0.38)
+            .opacity(day.state == .locked ? 0.4 : 1)
         }
         .buttonStyle(.plain)
-        .disabled(!enabled)
-        .accessibilityLabel("\(Self.accessibilityFormatter.string(from: day.date)), \(enabled ? day.statusText : "unavailable")")
+        .disabled(!selectable)
+        .accessibilityLabel("\(Self.accessibilityFormatter.string(from: day.date)), \(day.statusText)")
     }
 
     private var labelColor: Color {
         if selected { return Color.witsInk }
-        return enabled ? Color.witsMuted : Color.witsFaint
+        return day.state == .locked ? Color.witsFaint : Color.witsMuted
+    }
+
+    private var isVisibleHistoryDay: Bool {
+        day.state != .locked
     }
 
     private var dayLabel: String {
@@ -840,7 +844,7 @@ private struct TrainingProgressRing: View {
     let progress: Double
     let state: TodayWorkoutDay.State
     let selected: Bool
-    let enabled: Bool
+    let available: Bool
 
     var body: some View {
         ZStack {
@@ -871,7 +875,7 @@ private struct TrainingProgressRing: View {
     }
 
     private var baseColor: Color {
-        enabled ? Color.witsLine.opacity(selected ? 0.8 : 1) : Color.witsLine
+        available ? Color.witsLine.opacity(selected ? 0.8 : 1) : Color.witsLine
     }
 
     private var accentColor: Color {
