@@ -14,7 +14,7 @@ struct RootShell: View {
     var body: some View {
         TabView(selection: $tab) {
             TodayView()
-                .tabItem { Label("today", systemImage: "bolt.fill") }
+                .tabItem { Label("train", systemImage: "brain.head.profile") }
                 .tag(0)
             GamesLibraryView()
                 .tabItem { Label("games", systemImage: "square.grid.2x2.fill") }
