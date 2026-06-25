@@ -114,6 +114,13 @@ enum DotsConnect: Game {
     }
 }
 
+enum TowerOfHanoi: Game {
+    static let id = GameID.towerOfHanoi
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(TowerOfHanoiScreen(cfg: config, onResult: onComplete))
+    }
+}
+
 /// Single dispatch the host uses to launch any game.
 @MainActor
 func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -133,6 +140,7 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .pathKeeper:  PathKeeper.makeView(config: config, onComplete: onComplete)
     case .wordConnect: WordConnect.makeView(config: config, onComplete: onComplete)
     case .dotsConnect: DotsConnect.makeView(config: config, onComplete: onComplete)
+    case .towerOfHanoi: TowerOfHanoi.makeView(config: config, onComplete: onComplete)
     // Survival-only: launched via SplitSurvivalScreen, never through this path.
     case .split:       AnyView(EmptyView())
     }

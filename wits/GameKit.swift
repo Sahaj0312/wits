@@ -18,7 +18,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     case spotSpeed, colorClash, matchBack, ruleFinder
     // expanded library
     case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
-    case wordConnect, dotsConnect
+    case wordConnect, dotsConnect, towerOfHanoi
     // survival-only (no mastery-adjusted workout mode; not in the daily pool)
     case split
 
@@ -27,7 +27,8 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     /// Games in the daily-workout pool (mastery-adjusted, train + survival modes).
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder,
-         .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect, .dotsConnect]
+         .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect, .dotsConnect,
+         .towerOfHanoi]
     }
     var isLive: Bool { Self.live.contains(self) }
 
@@ -43,7 +44,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     /// their own top/bottom spacing.
     var ownsSafeAreaSurface: Bool {
         switch self {
-        case .wordConnect, .dotsConnect: true
+        case .wordConnect, .dotsConnect, .towerOfHanoi: true
         default: false
         }
     }
@@ -82,7 +83,7 @@ extension GameID {
         case .crowdControl: .multitasking
         case .echoGrid, .matchBack, .lastSeen, .pathKeeper: .memory
         case .colorClash, .tileShift: .flexibility
-        case .ruleFinder, .dotsConnect: .reasoning
+        case .ruleFinder, .dotsConnect, .towerOfHanoi: .reasoning
         case .numberRush, .estimator: .math
         case .wordConnect: .language
         case .split: .multitasking
@@ -106,6 +107,7 @@ extension GameID {
         case .pathKeeper: "path keeper"
         case .wordConnect: "word connect"
         case .dotsConnect: "dots connect"
+        case .towerOfHanoi: "tower of hanoi"
         case .split: "split"
         }
     }
@@ -128,6 +130,7 @@ extension GameID {
         case .pathKeeper: "repeat the hops, in order."
         case .wordConnect: "connect letters into hidden words."
         case .dotsConnect: "connect matching dots without crossing paths."
+        case .towerOfHanoi: "move the stack in as few moves as possible."
         case .split: "fly and pick at once. one slip ends it."
         }
     }
@@ -139,7 +142,7 @@ extension GameID {
         case .spotSpeed: "speed"
         case .echoGrid, .matchBack, .lastSeen, .pathKeeper: "memory"
         case .colorClash, .tileShift: "flexibility"
-        case .ruleFinder, .dotsConnect: "problem solving"
+        case .ruleFinder, .dotsConnect, .towerOfHanoi: "problem solving"
         case .numberRush, .estimator: "math"
         case .wordConnect: "language"
         case .split: "attention"
@@ -164,6 +167,7 @@ extension GameID {
         case .estimator: "numerical estimation"
         case .wordConnect: "vocabulary"
         case .dotsConnect: "planning"
+        case .towerOfHanoi: "sequential planning"
         case .split: "dual-tasking"
         }
     }
@@ -186,6 +190,7 @@ extension GameID {
         case .pathKeeper: "watch a token hop across the board, then repeat its path in the same order."
         case .wordConnect: "connect letters in the wheel to uncover every hidden word in the grid. clear two boards to unlock the next level."
         case .dotsConnect: "draw paths between matching dots, cover every square, and avoid crossing another path."
+        case .towerOfHanoi: "move every disk from tower A to tower C. only the top disk can move, and a larger disk can never sit on a smaller one."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         }
     }
@@ -203,6 +208,7 @@ extension GameID {
         case .tileShift: "task switching is adapting quickly when the goal keeps changing underneath you."
         case .ruleFinder: "logical reasoning is recognising patterns, drawing conclusions, and making decisions."
         case .dotsConnect: "planning is building a sequence of moves that satisfies several constraints at the same time."
+        case .towerOfHanoi: "sequential planning is thinking several moves ahead while respecting a changing set of constraints."
         case .numberRush: "arithmetic is performing quick mental calculations accurately under time pressure."
         case .estimator: "numerical estimation is judging quantities at a glance, without stopping to count."
         case .wordConnect: "vocabulary is fluent word retrieval: spotting letter patterns, spelling accurately, and finding possibilities quickly."
@@ -228,6 +234,7 @@ extension GameID {
         case .pathKeeper: "point.topleft.down.to.point.bottomright.curvepath.fill"
         case .wordConnect: "textformat.abc"
         case .dotsConnect: "point.topleft.down.to.point.bottomright.curvepath.fill"
+        case .towerOfHanoi: "square.stack.3d.up.fill"
         case .split: "rectangle.split.1x2.fill"
         }
     }
@@ -250,6 +257,7 @@ extension GameID {
         case .pathKeeper: (0x1E3A5E, 0x14243F)
         case .wordConnect: (0x315EC8, 0x24306D)
         case .dotsConnect: (0x6C0588, 0x135DB7)
+        case .towerOfHanoi: (0x224D63, 0x123447)
         case .split: (0x123A33, 0x0F2A2A)
         }
     }
@@ -258,7 +266,7 @@ extension GameID {
     var seedLevel: Double {
         switch self {
         case .crowdControl, .echoGrid, .lastSeen, .pathKeeper, .matchBack: 1
-        case .wordConnect, .dotsConnect: 1
+        case .wordConnect, .dotsConnect, .towerOfHanoi: 1
         default: 2
         }
     }
@@ -277,6 +285,7 @@ extension GameID {
         case .pathKeeper: "maxLen"
         case .wordConnect: "wordsFound"
         case .dotsConnect: "boardsSolved"
+        case .towerOfHanoi: "efficiency"
         case .split: "maxLevel"
         default: "bestStreak"
         }
@@ -295,6 +304,7 @@ extension GameID {
         case .pathKeeper: "\(Int(v)) steps"
         case .wordConnect: "\(Int(v)) words"
         case .dotsConnect: "\(Int(v)) boards"
+        case .towerOfHanoi: "\(Int(v))% optimal"
         case .split: "level \(Int(v))"
         default: "streak \(Int(v))"
         }
