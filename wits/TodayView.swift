@@ -776,8 +776,17 @@ private struct TrainingWeekDay: View {
             VStack(spacing: 9) {
                 Text(dayLabel)
                     .font(.system(size: selected ? 12 : 11, weight: .heavy, design: .rounded))
-                    .foregroundStyle(selected ? Color.witsAccent : Color.witsFaint)
-                    .frame(height: 14)
+                    .foregroundStyle(selected ? .white : Color.witsFaint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .padding(.horizontal, selected ? 7 : 0)
+                    .frame(height: 18)
+                    .background {
+                        if selected {
+                            Capsule()
+                                .fill(Color.witsAccent)
+                        }
+                    }
 
                 TrainingProgressRing(progress: progress,
                                      state: day.state,
@@ -793,13 +802,6 @@ private struct TrainingWeekDay: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 96)
-            .background {
-                if selected {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(Color.witsAccent.opacity(0.1))
-                        .frame(width: 42, height: 96)
-                }
-            }
             .opacity(day.state == .locked ? 0.4 : 1)
         }
         .buttonStyle(.plain)
@@ -817,7 +819,7 @@ private struct TrainingWeekDay: View {
     }
 
     private var dayLabel: String {
-        if Calendar.current.isDateInToday(day.date) { return "now" }
+        if Calendar.current.isDateInToday(day.date) { return "today" }
         return Self.dayFormatter.string(from: day.date)
     }
 
@@ -848,6 +850,12 @@ private struct TrainingProgressRing: View {
 
     var body: some View {
         ZStack {
+            if selected {
+                Circle()
+                    .fill(Color.witsAccent.opacity(0.12))
+                    .frame(width: 46, height: 46)
+            }
+
             Circle()
                 .trim(from: 0.08, to: 0.92)
                 .stroke(baseColor, style: StrokeStyle(lineWidth: 3.8, lineCap: .round, dash: [12, 8]))
