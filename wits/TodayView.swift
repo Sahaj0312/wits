@@ -138,7 +138,7 @@ struct TodayView: View {
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             .shadow(color: .black.opacity(0.18), radius: 24, y: 16)
             .padding(.top, 102)
-            .padding(.horizontal, WitsMetrics.screenPadding)
+            .padding(.horizontal, 16)
         }
     }
 
@@ -686,14 +686,14 @@ private struct WeekTrainingPanel: View {
     let close: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .center, spacing: 12) {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 14) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("training rhythm")
-                        .font(.witsDisplay(24))
+                        .font(.witsDisplay(22))
                         .foregroundStyle(Color.witsInk)
                     Text("Pick a day to review its workout.")
-                        .font(.witsBody(13.5, weight: .semibold))
+                        .font(.witsBody(13, weight: .semibold))
                         .foregroundStyle(Color.witsMuted)
                 }
                 Spacer(minLength: 0)
@@ -707,10 +707,10 @@ private struct WeekTrainingPanel: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("close training week")
             }
-            .padding(.top, 20)
+            .padding(.top, 18)
             .padding(.horizontal, 18)
 
-            HStack(alignment: .bottom, spacing: 0) {
+            HStack(alignment: .bottom, spacing: 6) {
                 ForEach(offsets, id: \.self) { offset in
                     let day = dayProvider(offset)
                     let enabled = isEnabled(day.date)
@@ -723,24 +723,24 @@ private struct WeekTrainingPanel: View {
                     .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.horizontal, 10)
+            .padding(.horizontal, 16)
 
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: 15, weight: .heavy))
+                    .font(.system(size: 13, weight: .heavy))
                     .foregroundStyle(Color.witsWarm)
-                    .frame(width: 34, height: 34)
-                    .background(Color.witsWarm.opacity(0.14), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+                    .frame(width: 30, height: 30)
+                    .background(Color.witsWarm.opacity(0.14), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
 
                 Text(streakPrompt)
-                    .font(.witsBody(15.5, weight: .semibold))
+                    .font(.witsBody(14.5, weight: .semibold))
                     .foregroundStyle(Color.witsInk)
                     .lineLimit(2)
                     .minimumScaleFactor(0.86)
 
                 Spacer(minLength: 0)
             }
-            .padding(13)
+            .padding(12)
             .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .padding(.horizontal, 18)
             .padding(.bottom, 18)
@@ -773,11 +773,11 @@ private struct TrainingWeekDay: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 12) {
+            VStack(spacing: 9) {
                 Text(dayLabel)
-                    .font(.system(size: selected ? 13 : 12, weight: .heavy, design: .rounded))
+                    .font(.system(size: selected ? 12 : 11, weight: .heavy, design: .rounded))
                     .foregroundStyle(selected ? Color.witsAccent : Color.witsFaint)
-                    .frame(height: 16)
+                    .frame(height: 14)
 
                 TrainingProgressRing(progress: progress,
                                      state: day.state,
@@ -785,19 +785,19 @@ private struct TrainingWeekDay: View {
                                      enabled: enabled)
 
                 Text(weekday)
-                    .font(.system(size: 18, weight: selected ? .heavy : .semibold, design: .rounded))
+                    .font(.system(size: 15.5, weight: selected ? .heavy : .semibold, design: .rounded))
                     .foregroundStyle(labelColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-                    .frame(height: 23)
+                    .frame(height: 20)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 116)
+            .frame(height: 96)
             .background {
                 if selected {
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
                         .fill(Color.witsAccent.opacity(0.1))
-                        .frame(width: 48, height: 116)
+                        .frame(width: 42, height: 96)
                 }
             }
             .opacity(enabled ? 1 : 0.38)
@@ -846,28 +846,28 @@ private struct TrainingProgressRing: View {
         ZStack {
             Circle()
                 .trim(from: 0.08, to: 0.92)
-                .stroke(baseColor, style: StrokeStyle(lineWidth: 4.5, lineCap: .round, dash: [14, 9]))
+                .stroke(baseColor, style: StrokeStyle(lineWidth: 3.8, lineCap: .round, dash: [12, 8]))
                 .rotationEffect(.degrees(-90))
 
             if progress > 0 {
                 Circle()
                     .trim(from: 0, to: min(1, progress))
-                    .stroke(accentColor, style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
+                    .stroke(accentColor, style: StrokeStyle(lineWidth: 3.8, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             } else if state == .today || state == .inProgress {
                 Circle()
                     .trim(from: 0, to: 0.18)
-                    .stroke(accentColor, style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
+                    .stroke(accentColor, style: StrokeStyle(lineWidth: 3.8, lineCap: .round))
                     .rotationEffect(.degrees(-90))
             }
 
             if state == .done || state == .doneToday {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 16, weight: .heavy))
+                    .font(.system(size: 13, weight: .heavy))
                     .foregroundStyle(accentColor)
             }
         }
-        .frame(width: 46, height: 46)
+        .frame(width: 36, height: 36)
     }
 
     private var baseColor: Color {
