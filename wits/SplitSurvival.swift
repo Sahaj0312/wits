@@ -362,17 +362,36 @@ struct SplitSurvivalScreen: View {
                     .font(.witsBody(14))
                     .foregroundStyle(Color.witsFaint)
                     .multilineTextAlignment(.center)
+                splitIntroStats
+                    .padding(.top, 2)
             }
             .padding(.horizontal, 4)
             .rise(0.08)
             Spacer()
-            Cta(title: "start", action: startRun)
-                .rise(0.1)
-            QuietButton(title: "back", action: onQuit)
-                .padding(.top, 6)
+            HStack(spacing: 14) {
+                Button(action: onQuit) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 16, weight: .heavy))
+                        .foregroundStyle(Color.witsWarm)
+                        .frame(width: 52, height: 52)
+                        .background(Color.witsWarm.opacity(0.12), in: Circle())
+                        .accessibilityLabel("back")
+                }
+                .buttonStyle(.plain)
+                Cta(title: "start", action: startRun)
+            }
+            .rise(0.1)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 16)
+    }
+
+    private var splitIntroStats: some View {
+        HStack(spacing: 10) {
+            SplitStatPill(title: "mode", value: "survival")
+            SplitStatPill(title: "best", value: best > 0 ? "level \(best)" : "—")
+            SplitStatPill(title: "rule", value: "1 slip")
+        }
     }
 
     // MARK: Playing

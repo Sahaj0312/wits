@@ -161,6 +161,7 @@ struct GameHost: View {
             GameCard(
                 game: game,
                 stats: app.gameStats[game],
+                difficulty: app.difficultyFor(game),
                 primaryTitle: index == 0 ? "start" : "play",
                 onPlay: { withAnimation { stage = .playing } },
                 onBack: onQuit,

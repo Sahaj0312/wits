@@ -186,6 +186,7 @@ private struct GameLauncher: View {
             GameCard(
                 game: game,
                 stats: app.gameStats[game],
+                difficulty: app.difficultyFor(game),
                 primaryTitle: "train",
                 onPlay: { phase = .train },
                 onBack: { dismiss() },

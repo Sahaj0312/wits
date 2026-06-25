@@ -4,17 +4,16 @@
 //
 //  The pre-game detail card shown before every game (workout + free play):
 //  themed hero, title, DOMAIN › SUBSKILL breadcrumb, what-it-trains copy, and a
-//  stats block (best score, best stat, rank, total plays). Modelled on the
+//  stats block (level, best score, best stat, total plays). Modelled on the
 //  Lumosity game card, in wits' voice and design language.
 //
 
 import SwiftUI
 
-private let rankNames = ["newcomer", "novice", "skilled", "sharp", "expert", "master"]
-
 struct GameCard: View {
     let game: GameID
     var stats: GameStats?
+    var difficulty: DifficultyState? = nil
     var primaryTitle: String = "play"
     var onPlay: () -> Void
     var onBack: (() -> Void)? = nil
@@ -23,9 +22,16 @@ struct GameCard: View {
     /// Optional content above the hero (e.g. workout progress dots).
     var accessory: AnyView? = nil
 
-    private var rankIndex: Int {
-        let plays = stats?.totalPlays ?? 0
-        return min(rankNames.count - 1, plays / 5)
+    private var masteryLevel: Double {
+        min(10, max(1, difficulty?.level ?? game.seedLevel))
+    }
+
+    private var masteryLevelLabel: String {
+        let rounded = (masteryLevel * 10).rounded() / 10
+        if rounded == rounded.rounded() {
+            return "\(Int(rounded))"
+        }
+        return String(format: "%.1f", rounded)
     }
 
     var body: some View {
@@ -44,10 +50,11 @@ struct GameCard: View {
                         .font(.witsBody(15.5))
                         .foregroundStyle(Color.witsMuted)
                     Divider().overlay(Color.witsLine)
+                    masteryBlock
                     statsBlock
                 }
                 .padding(.horizontal, WitsMetrics.screenPadding)
-                .padding(.top, 18)
+                .padding(.top, 20)
                 .padding(.bottom, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -63,18 +70,34 @@ struct GameCard: View {
         return ZStack(alignment: .bottomLeading) {
             LinearGradient(colors: [Color(hexAny: a), Color(hexAny: b)],
                            startPoint: .top, endPoint: .bottom)
-            Circle().fill(Color.witsAccent.opacity(0.12)).frame(width: 200, height: 200).offset(x: 120, y: -70)
+            Circle().fill(Color.witsAccent.opacity(0.13)).frame(width: 230, height: 230).offset(x: 110, y: -85)
+            Circle().fill(Color.white.opacity(0.05)).frame(width: 110, height: 110).offset(x: -60, y: 20)
             Image(systemName: game.symbol)
-                .font(.system(size: 120, weight: .heavy))
-                .foregroundStyle(.white.opacity(0.07))
-                .offset(x: 150, y: 10)
-            Text(game.displayName)
-                .font(.witsDisplay(34))
-                .foregroundStyle(.white)
-                .padding(.horizontal, WitsMetrics.screenPadding)
-                .padding(.bottom, 18)
+                .font(.system(size: 118, weight: .heavy))
+                .foregroundStyle(.white.opacity(0.08))
+                .offset(x: 154, y: 12)
+            VStack(alignment: .leading, spacing: 12) {
+                Image(systemName: game.symbol)
+                    .font(.system(size: 21, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 48, height: 48)
+                    .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(game.displayName)
+                        .font(.witsDisplay(34))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.72)
+                    Text(game.tagline)
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.66))
+                        .lineLimit(2)
+                }
+            }
+            .padding(.horizontal, WitsMetrics.screenPadding)
+            .padding(.bottom, 20)
         }
-        .frame(height: 210)
+        .frame(height: 238)
         .frame(maxWidth: .infinity)
         .clipped()
     }
@@ -96,58 +119,96 @@ struct GameCard: View {
     // MARK: Stats
 
     private var statsBlock: some View {
-        VStack(spacing: 14) {
-            statRow("best score", value: (stats?.bestScore).flatMap { $0 > 0 ? "\($0)" : nil } ?? "—")
-            statRow("best stat", value: stats?.bestStat.map { game.statLabel($0) } ?? "—")
-            HStack {
-                Text("rank")
-                    .font(.witsBody(15, weight: .semibold))
-                    .foregroundStyle(Color.witsInk)
-                Spacer()
-                HStack(spacing: 5) {
-                    ForEach(0..<rankNames.count, id: \.self) { i in
-                        Circle()
-                            .fill(i <= rankIndex ? Color.witsAccent : Color.witsLine)
-                            .frame(width: 8, height: 8)
-                    }
-                    Text(rankNames[rankIndex])
-                        .font(.system(size: 13.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                        .padding(.leading, 4)
-                }
-            }
-            statRow("total plays", value: "\(stats?.totalPlays ?? 0)")
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 2), spacing: 10) {
+            statTile("best score", value: (stats?.bestScore).flatMap { $0 > 0 ? "\($0)" : nil } ?? "—")
+            statTile("best stat", value: stats?.bestStat.map { game.statLabel($0) } ?? "—")
+            statTile("plays", value: "\(stats?.totalPlays ?? 0)")
             if let sv = stats?.survivalBest, sv > 0 {
-                statRow("survival best", value: "\(sv)")
+                statTile("survival best", value: "\(sv)")
+            } else {
+                statTile("mode", value: onSurvival == nil ? "train" : "train + survival")
             }
         }
     }
 
-    private func statRow(_ label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.witsBody(15, weight: .semibold))
-                .foregroundStyle(Color.witsInk)
-            Spacer()
-            Text(value)
-                .font(.system(size: 15, weight: .heavy, design: .rounded))
+    private var masteryBlock: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("level")
+                    .font(.witsBody(15, weight: .heavy))
+                    .foregroundStyle(Color.witsInk)
+                Spacer(minLength: 8)
+                Text("level \(masteryLevelLabel) of 10")
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsAccent)
+                    .monospacedDigit()
+            }
+            HStack(spacing: 5) {
+                ForEach(1...10, id: \.self) { step in
+                    masterySegment(fill: masteryFill(for: step))
+                }
+            }
+            Text("your starting difficulty for this game")
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.witsMuted)
-                .monospacedDigit()
         }
+        .padding(15)
+        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("level \(masteryLevelLabel) of 10")
+    }
+
+    private func masteryFill(for step: Int) -> Double {
+        min(1, max(0, masteryLevel - Double(step - 1)))
+    }
+
+    private func masterySegment(fill: Double) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.witsLine)
+                Capsule()
+                    .fill(Color.witsAccent)
+                    .frame(width: geo.size.width * fill)
+            }
+        }
+        .frame(height: 8)
+    }
+
+    private func statTile(_ label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(label)
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsFaint)
+            Text(value)
+                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsInk)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.witsCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.witsLine, lineWidth: 1)
+        )
     }
 
     // MARK: Footer
 
     private var footer: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 11) {
             HStack(spacing: 14) {
                 if let onBack {
                     Button(action: onBack) {
-                        HStack(spacing: 5) {
-                            Image(systemName: "chevron.left").font(.system(size: 12, weight: .heavy))
-                            Text("all games").font(.system(size: 13, weight: .bold, design: .rounded))
-                        }
-                        .foregroundStyle(Color.witsWarm)
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 16, weight: .heavy))
+                            .foregroundStyle(Color.witsWarm)
+                            .frame(width: 52, height: 52)
+                            .background(Color.witsWarm.opacity(0.12), in: Circle())
+                            .accessibilityLabel("all games")
                     }
                     .buttonStyle(.plain)
                 }
@@ -155,15 +216,25 @@ struct GameCard: View {
             }
             if let onSurvival {
                 Button(action: onSurvival) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "flame.fill").font(.system(size: 13, weight: .heavy))
-                        Text("survival — 3 lives, no mercy")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                    HStack(spacing: 10) {
+                        Image(systemName: "flame.fill")
+                            .font(.system(size: 14, weight: .heavy))
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text("survival mode")
+                                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                            Text("3 lives, no mercy")
+                                .font(.system(size: 12, weight: .bold, design: .rounded))
+                                .foregroundStyle(Color.witsWarm.opacity(0.72))
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .heavy))
                     }
                     .foregroundStyle(Color.witsWarm)
-                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 18)
                     .padding(.vertical, 13)
-                    .background(Color.witsWarm.opacity(0.12), in: Capsule())
+                    .frame(maxWidth: .infinity, minHeight: 54)
+                    .background(Color.witsWarm.opacity(0.12), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .buttonStyle(.plain)
             }

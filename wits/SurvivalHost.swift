@@ -51,7 +51,7 @@ struct SurvivalHost: View {
                 Color.witsBg.ignoresSafeArea()
                 switch phase {
                 case .card:
-                    GameCard(game: game, stats: stats, primaryTitle: "start survival",
+                    GameCard(game: game, stats: stats, difficulty: seedDifficulty, primaryTitle: "start survival",
                              onPlay: startRun, onBack: onQuit)
                 case .playing:
                     VStack(spacing: 10) {
