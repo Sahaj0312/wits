@@ -18,7 +18,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     case spotSpeed, colorClash, matchBack, ruleFinder
     // expanded library
     case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
-    case wordConnect, dotsConnect, towerOfHanoi
+    case wordConnect, memoryLock, dotsConnect, towerOfHanoi
     // survival-only (no mastery-adjusted workout mode; not in the daily pool)
     case split
 
@@ -28,7 +28,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder,
          .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect, .dotsConnect,
-         .towerOfHanoi]
+         .memoryLock, .towerOfHanoi]
     }
     var isLive: Bool { Self.live.contains(self) }
 
@@ -44,7 +44,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     /// their own top/bottom spacing.
     var ownsSafeAreaSurface: Bool {
         switch self {
-        case .wordConnect, .dotsConnect, .towerOfHanoi: true
+        case .wordConnect, .memoryLock, .dotsConnect, .towerOfHanoi: true
         default: false
         }
     }
@@ -85,7 +85,7 @@ extension GameID {
         case .colorClash, .tileShift: .flexibility
         case .ruleFinder, .dotsConnect, .towerOfHanoi: .reasoning
         case .numberRush, .estimator: .math
-        case .wordConnect: .language
+        case .wordConnect, .memoryLock: .language
         case .split: .multitasking
         }
     }
@@ -106,6 +106,7 @@ extension GameID {
         case .lastSeen: "last seen"
         case .pathKeeper: "path keeper"
         case .wordConnect: "word connect"
+        case .memoryLock: "memory lock"
         case .dotsConnect: "dots connect"
         case .towerOfHanoi: "tower of hanoi"
         case .split: "split"
@@ -129,6 +130,7 @@ extension GameID {
         case .lastSeen: "never tap the same one twice."
         case .pathKeeper: "repeat the hops, in order."
         case .wordConnect: "connect letters into hidden words."
+        case .memoryLock: "solve the word before the clues fade."
         case .dotsConnect: "connect matching dots without crossing paths."
         case .towerOfHanoi: "clear the tower campaign one level at a time."
         case .split: "fly and pick at once. one slip ends it."
@@ -144,7 +146,7 @@ extension GameID {
         case .colorClash, .tileShift: "flexibility"
         case .ruleFinder, .dotsConnect, .towerOfHanoi: "problem solving"
         case .numberRush, .estimator: "math"
-        case .wordConnect: "language"
+        case .wordConnect, .memoryLock: "language"
         case .split: "attention"
         }
     }
@@ -166,6 +168,7 @@ extension GameID {
         case .numberRush: "arithmetic"
         case .estimator: "numerical estimation"
         case .wordConnect: "vocabulary"
+        case .memoryLock: "lexical memory"
         case .dotsConnect: "planning"
         case .towerOfHanoi: "sequential planning"
         case .split: "dual-tasking"
@@ -189,6 +192,7 @@ extension GameID {
         case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
         case .pathKeeper: "watch a token hop across the board, then repeat its path in the same order."
         case .wordConnect: "connect letters in the wheel to uncover every hidden word in the grid. clear two boards to unlock the next level."
+        case .memoryLock: "guess the hidden word. green letters are locked in place, yellow letters are in the word, and gray letters are out — but the color clues fade after a moment."
         case .dotsConnect: "draw paths between matching dots, cover every square, and avoid crossing another path."
         case .towerOfHanoi: "clear a 36-level tower campaign. each level gives you a source tower and a target tower; move the stack across in as few moves as possible."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
@@ -212,6 +216,7 @@ extension GameID {
         case .numberRush: "arithmetic is performing quick mental calculations accurately under time pressure."
         case .estimator: "numerical estimation is judging quantities at a glance, without stopping to count."
         case .wordConnect: "vocabulary is fluent word retrieval: spotting letter patterns, spelling accurately, and finding possibilities quickly."
+        case .memoryLock: "lexical memory is keeping spelling clues in mind while searching for the word that fits them."
         case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
         }
     }
@@ -233,6 +238,7 @@ extension GameID {
         case .lastSeen: "sparkles"
         case .pathKeeper: "point.topleft.down.to.point.bottomright.curvepath.fill"
         case .wordConnect: "textformat.abc"
+        case .memoryLock: "lock.fill"
         case .dotsConnect: "point.topleft.down.to.point.bottomright.curvepath.fill"
         case .towerOfHanoi: "square.stack.3d.up.fill"
         case .split: "rectangle.split.1x2.fill"
@@ -256,6 +262,7 @@ extension GameID {
         case .lastSeen: (0x123A4D, 0x0F2A3A)
         case .pathKeeper: (0x1E3A5E, 0x14243F)
         case .wordConnect: (0x315EC8, 0x24306D)
+        case .memoryLock: (0x3A2350, 0x151C38)
         case .dotsConnect: (0x6C0588, 0x135DB7)
         case .towerOfHanoi: (0x224D63, 0x123447)
         case .split: (0x123A33, 0x0F2A2A)
@@ -266,7 +273,7 @@ extension GameID {
     var seedLevel: Double {
         switch self {
         case .crowdControl, .echoGrid, .lastSeen, .pathKeeper, .matchBack: 1
-        case .wordConnect, .dotsConnect, .towerOfHanoi: 1
+        case .wordConnect, .memoryLock, .dotsConnect, .towerOfHanoi: 1
         default: 2
         }
     }
@@ -284,6 +291,7 @@ extension GameID {
         case .lastSeen: "remembered"
         case .pathKeeper: "maxLen"
         case .wordConnect: "wordsFound"
+        case .memoryLock: "wordsSolved"
         case .dotsConnect: "boardsSolved"
         case .towerOfHanoi: "efficiency"
         case .split: "maxLevel"
@@ -303,6 +311,7 @@ extension GameID {
         case .lastSeen: "\(Int(v)) recalled"
         case .pathKeeper: "\(Int(v)) steps"
         case .wordConnect: "\(Int(v)) words"
+        case .memoryLock: "\(Int(v)) solved"
         case .dotsConnect: "\(Int(v)) boards"
         case .towerOfHanoi: "\(Int(v))% optimal"
         case .split: "level \(Int(v))"

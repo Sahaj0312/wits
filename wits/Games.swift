@@ -107,6 +107,13 @@ enum WordConnect: Game {
     }
 }
 
+enum MemoryLock: Game {
+    static let id = GameID.memoryLock
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(MemoryLockScreen(cfg: config, onResult: onComplete))
+    }
+}
+
 enum DotsConnect: Game {
     static let id = GameID.dotsConnect
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -139,6 +146,7 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .lastSeen:    LastSeen.makeView(config: config, onComplete: onComplete)
     case .pathKeeper:  PathKeeper.makeView(config: config, onComplete: onComplete)
     case .wordConnect: WordConnect.makeView(config: config, onComplete: onComplete)
+    case .memoryLock:  MemoryLock.makeView(config: config, onComplete: onComplete)
     case .dotsConnect: DotsConnect.makeView(config: config, onComplete: onComplete)
     case .towerOfHanoi: TowerOfHanoi.makeView(config: config, onComplete: onComplete)
     // Survival-only: launched via SplitSurvivalScreen, never through this path.
