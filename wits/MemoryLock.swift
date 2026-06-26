@@ -41,6 +41,8 @@ struct MemoryLockScreen: View {
     @State private var missedWords: [String] = []
     @State private var locked = false
     @State private var finished = false
+    @State private var answerReveal: String?
+    @State private var missShakeTrigger = 0
 
     private let startedAt = Date()
     private let level: Double
@@ -78,19 +80,13 @@ struct MemoryLockScreen: View {
                            availableHeight: availableHeight,
                            compact: compact,
                            cramped: cramped)
+                    .witsShake(trigger: missShakeTrigger, intensity: cramped ? 7 : 11)
                     .padding(.top, cramped ? 6 : compact ? 22 : 28)
                     .overlay(alignment: .top) {
-                        if !message.isEmpty {
-                            Text(message)
-                                .font(.system(size: 12, weight: .heavy, design: .rounded))
-                                .foregroundStyle(Color.witsInk)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
-                                .background(Color.witsTint, in: Capsule())
-                                .offset(y: compact ? -18 : -22)
-                                .transition(.opacity)
-                        }
+                        statusOverlay(compact: compact)
                     }
+                    .animation(.spring(response: 0.3, dampingFraction: 0.82), value: answerReveal)
+                    .animation(.easeOut(duration: 0.16), value: message)
 
                 Spacer(minLength: 0)
 
@@ -103,6 +99,24 @@ struct MemoryLockScreen: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .background(Color.witsBg.ignoresSafeArea())
+    }
+
+    @ViewBuilder
+    private func statusOverlay(compact: Bool) -> some View {
+        if let answerReveal {
+            MemoryLockAnswerReveal(word: answerReveal, compact: compact)
+                .offset(y: compact ? -12 : -16)
+                .transition(.scale(scale: 0.92).combined(with: .opacity))
+        } else if !message.isEmpty {
+            Text(message)
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsInk)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(Color.witsTint, in: Capsule())
+                .offset(y: compact ? -18 : -22)
+                .transition(.opacity)
+        }
     }
 
     private var topBar: some View {
@@ -256,6 +270,7 @@ struct MemoryLockScreen: View {
         guesses.append(guess)
         visibleClueIDs.insert(guess.id)
         current = ""
+        message = ""
         totalGuesses += 1
 
         if guessWord == target {
@@ -268,12 +283,12 @@ struct MemoryLockScreen: View {
             return
         }
 
-        message = "clues fade in 1s"
         fade(guess.id)
     }
 
     private func solve(guessCount: Int) {
         locked = true
+        answerReveal = nil
         wordsSolved += 1
         roundsPlayed += 1
         streak += 1
@@ -296,14 +311,16 @@ struct MemoryLockScreen: View {
         roundsPlayed += 1
         streak = 0
         missedWords.append(target)
-        message = "word was \(target.uppercased())"
+        message = ""
+        answerReveal = target.uppercased()
+        missShakeTrigger += 1
         cfg.report(.miss)
         revealAllClues()
-        scheduleNextRound()
+        scheduleNextRound(after: 1.8)
     }
 
-    private func scheduleNextRound() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.05) {
+    private func scheduleNextRound(after delay: Double = 1.05) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             if cfg.isSurvival {
                 startRound()
             } else if roundsPlayed >= Self.roundsPerRun {
@@ -321,6 +338,7 @@ struct MemoryLockScreen: View {
         current = ""
         locked = false
         message = ""
+        answerReveal = nil
     }
 
     private func fade(_ id: UUID) {
@@ -414,6 +432,43 @@ struct MemoryLockScreen: View {
         "energy", "future", "growth", "hidden", "impact", "jungle", "kernel", "legend", "motion", "number",
         "object", "prompt", "rhythm", "sample", "target", "unlock", "vision", "wonder", "writer", "zipper"
     ]
+}
+
+private struct MemoryLockAnswerReveal: View {
+    let word: String
+    let compact: Bool
+
+    private var tileSize: CGFloat { compact ? 28 : 34 }
+    private var letters: [String] { Array(word.uppercased()).map(String.init) }
+
+    var body: some View {
+        VStack(spacing: compact ? 6 : 8) {
+            Text("word was")
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsBg.opacity(0.72))
+
+            HStack(spacing: 5) {
+                ForEach(Array(letters.enumerated()), id: \.offset) { _, letter in
+                    Text(letter)
+                        .font(.system(size: compact ? 16 : 18, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsBg)
+                        .frame(width: tileSize, height: tileSize)
+                        .background(Color.witsBg.opacity(0.14),
+                                    in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .strokeBorder(Color.witsAccent.opacity(0.38), lineWidth: 1)
+                        )
+                }
+            }
+        }
+        .padding(.horizontal, compact ? 14 : 16)
+        .padding(.vertical, compact ? 10 : 12)
+        .background(Color.witsInk, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .shadow(color: Color.witsShadow, radius: 14, y: 8)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("word was \(word)")
+    }
 }
 
 private struct MemoryLockGuessRow: View {
