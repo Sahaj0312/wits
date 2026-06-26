@@ -15,6 +15,8 @@ struct GameCard: View {
     var stats: GameStats?
     var difficulty: DifficultyState? = nil
     var primaryTitle: String = "play"
+    var showsLevelProgress: Bool = true
+    var modeLabel: String = "train"
     var onPlay: () -> Void
     var onBack: (() -> Void)? = nil
     /// Optional content above the hero (e.g. workout progress dots).
@@ -70,7 +72,9 @@ struct GameCard: View {
                         .font(.witsBody(15.5))
                         .foregroundStyle(Color.witsMuted)
                     Divider().overlay(Color.witsLine)
-                    masteryBlock
+                    if showsLevelProgress {
+                        masteryBlock
+                    }
                     statsBlock
                 }
                 .padding(.horizontal, WitsMetrics.screenPadding)
@@ -150,7 +154,7 @@ struct GameCard: View {
             statTile("best score", value: (stats?.bestScore).flatMap { $0 > 0 ? "\($0)" : nil } ?? "—")
             statTile("best stat", value: stats?.bestStat.map { game.statLabel($0) } ?? "—")
             statTile("plays", value: "\(stats?.totalPlays ?? 0)")
-            statTile("mode", value: "train")
+            statTile("mode", value: modeLabel)
         }
     }
 

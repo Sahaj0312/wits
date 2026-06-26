@@ -171,23 +171,16 @@ final class AppModel {
     @discardableResult
     func recordGameResult(_ result: GameResult, source: String = "workout", workoutID: String? = nil) -> GameResult {
         let id = result.game
+        if id.isStandalone {
+            return recordStandaloneGameResult(result, source: source)
+        }
         let current = difficulty[id] ?? .seed(for: id)
         let scored = ScoringEngine.score(result, previous: current)
         let next = scored.next
         difficulty[id] = next
         let r = scored.result
 
-        var st = gameStats[id] ?? GameStats()
-        st.totalPlays += 1
-        st.bestScore = max(st.bestScore, r.baseScoreValue)
-        if let v = r.raw[id.statKey] {
-            if let cur = st.bestStat {
-                st.bestStat = id.statLowerIsBetter ? min(cur, v) : max(cur, v)
-            } else {
-                st.bestStat = v
-            }
-        }
-        gameStats[id] = st
+        recordStats(for: r)
 
         saveCache()
         Task {
@@ -196,6 +189,35 @@ final class AppModel {
         }
 
         return r
+    }
+
+    /// Standalone modes are saved for history/stats, but intentionally bypass WPI,
+    /// mastery, adaptive difficulty, and daily score rollups.
+    @discardableResult
+    func recordStandaloneGameResult(_ result: GameResult, source: String = "standalone") -> GameResult {
+        var r = result
+        r.baseScore = r.baseScore ?? r.score
+        recordStats(for: r)
+        saveCache()
+        Task {
+            try? await supa.saveSession(r, source: source)
+        }
+        return r
+    }
+
+    private func recordStats(for result: GameResult) {
+        let id = result.game
+        var st = gameStats[id] ?? GameStats()
+        st.totalPlays += 1
+        st.bestScore = max(st.bestScore, result.baseScoreValue)
+        if let v = result.raw[id.statKey] {
+            if let cur = st.bestStat {
+                st.bestStat = id.statLowerIsBetter ? min(cur, v) : max(cur, v)
+            } else {
+                st.bestStat = v
+            }
+        }
+        gameStats[id] = st
     }
 
     // MARK: Daily challenge (surprise extra game)

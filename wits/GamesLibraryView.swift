@@ -19,7 +19,7 @@ struct GamesLibraryView: View {
 
     private var filteredGames: [GameID] {
         GameID.allCases.filter { game in
-            game.isLive && (filter == nil || game.domain == filter)
+            game.isPlayable && (filter == nil || game.domain == filter)
         }
     }
 
@@ -132,6 +132,7 @@ struct GamesLibraryView: View {
     }
 
     private func gameBadgeLabel(_ g: GameID) -> String {
+        if g.isStandalone { return "survival" }
         guard g.isLive else { return "soon" }
         return g.domain == .multitasking ? "multitask" : g.domain.label
     }
@@ -176,49 +177,63 @@ private struct GameLauncher: View {
             GameCard(
                 game: game,
                 stats: app.gameStats[game],
-                difficulty: app.difficultyFor(game),
-                primaryTitle: "train",
+                difficulty: game.usesAdaptiveLevelDisplay ? app.difficultyFor(game) : nil,
+                primaryTitle: game.isStandalone ? "play" : "train",
+                showsLevelProgress: game.usesAdaptiveLevelDisplay,
+                modeLabel: game.isStandalone ? "survival" : "train",
                 onPlay: { phase = .train },
                 onBack: { dismiss() }
             )
         case .train:
-            GeometryReader { geo in
-                ZStack {
-                    if game == .wordConnect {
-                        WordConnectSafeAreaBackground()
-                    } else if game == .dotsConnect {
-                        DotsConnectSafeAreaBackground()
-                    } else {
-                        Color.witsBg.ignoresSafeArea()
-                    }
-                    makeGameView(game, config: .standard(game, difficulty: app.difficultyFor(game), freePlay: true)) { r in
-                        let previousBest = app.gameStats[game]?.bestScore ?? 0
-                        app.recordGameResult(r, source: "free_play")
-                        lastResult = r
-                        lastNewBest = r.score > previousBest
-                        withAnimation(.easeOut(duration: 0.2)) { phase = .result }
-                    }
-                    .id(attempt)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.top, 8))
-                    .padding(.bottom, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.bottom, 8))
-                    .clipped()
-                }
-                .overlay(alignment: .topLeading) {
-                    if !game.usesEmbeddedQuitControl {
-                        Button { dismiss() } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 15, weight: .heavy))
-                                .foregroundStyle(Color.witsFaint)
-                                .padding(12)
+            if game == .split {
+                SplitSurvivalScreen(
+                    best: splitBestLevel,
+                    startsImmediately: true,
+                    onRunComplete: { level, depth, trials in
+                        let result = splitResult(level: level, depth: depth, trials: trials)
+                        app.recordStandaloneGameResult(result)
+                    },
+                    onQuit: { dismiss() }
+                )
+            } else {
+                GeometryReader { geo in
+                    ZStack {
+                        if game == .wordConnect {
+                            WordConnectSafeAreaBackground()
+                        } else if game == .dotsConnect {
+                            DotsConnectSafeAreaBackground()
+                        } else {
+                            Color.witsBg.ignoresSafeArea()
                         }
-                        .padding(.leading, 8)
-                        .padding(.top, max(geo.safeAreaInsets.top, 8))
+                        makeGameView(game, config: .standard(game, difficulty: app.difficultyFor(game), freePlay: true)) { r in
+                            let previousBest = app.gameStats[game]?.bestScore ?? 0
+                            app.recordGameResult(r, source: "free_play")
+                            lastResult = r
+                            lastNewBest = r.score > previousBest
+                            withAnimation(.easeOut(duration: 0.2)) { phase = .result }
+                        }
+                        .id(attempt)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.top, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.top, 8))
+                        .padding(.bottom, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.bottom, 8))
+                        .clipped()
+                    }
+                    .overlay(alignment: .topLeading) {
+                        if !game.usesEmbeddedQuitControl {
+                            Button { dismiss() } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 15, weight: .heavy))
+                                    .foregroundStyle(Color.witsFaint)
+                                    .padding(12)
+                            }
+                            .padding(.leading, 8)
+                            .padding(.top, max(geo.safeAreaInsets.top, 8))
+                        }
                     }
                 }
+                .onAppear { GameFeel.shared.warmUp() }
+                .onDisappear { GameFeel.shared.teardown() }
             }
-            .onAppear { GameFeel.shared.warmUp() }
-            .onDisappear { GameFeel.shared.teardown() }
         case .result:
             GameResultView(
                 game: game,
@@ -228,6 +243,22 @@ private struct GameLauncher: View {
                 onDone: { dismiss() }
             )
         }
+    }
+
+    private func splitResult(level: Int, depth: Double, trials: Int) -> GameResult {
+        var result = GameResult(game: .split, score: level, baseScore: level, accuracy: 0, trials: max(1, trials))
+        result.raw = [
+            "survival": 1,
+            "maxLevel": Double(level),
+            "levelDepth": max(0, min(1, depth)),
+            "picks": Double(trials)
+        ]
+        return result
+    }
+
+    private var splitBestLevel: Int {
+        let stats = app.gameStats[.split]
+        return max(stats?.bestScore ?? 0, Int(stats?.bestStat ?? 0))
     }
 }
 

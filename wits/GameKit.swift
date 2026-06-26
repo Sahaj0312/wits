@@ -19,7 +19,8 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     // expanded library
     case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
     case wordConnect, memoryLock, dotsConnect, towerOfHanoi
-    // retired modes kept for cache/backward-compat identifiers; not surfaced.
+    // Standalone survival mode. Playable in the library, not prescribed in daily
+    // workouts, and not connected to WPI/mastery scoring.
     case split
 
     var id: String { rawValue }
@@ -32,8 +33,14 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     }
     var isLive: Bool { Self.live.contains(self) }
 
+    static var standalone: [GameID] { [.split] }
+    var isStandalone: Bool { Self.standalone.contains(self) }
+
     /// Tappable in the library (has some playable mode).
-    var isPlayable: Bool { isLive }
+    var isPlayable: Bool { isLive || isStandalone }
+
+    /// Uses the standard pre-game card but hides adaptive level UI.
+    var usesAdaptiveLevelDisplay: Bool { isLive }
 
     /// Screens that draw their own full-bleed safe-area background and manage
     /// their own top/bottom spacing.
