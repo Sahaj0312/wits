@@ -24,12 +24,33 @@ struct GameCard: View {
         min(10, max(1, difficulty?.level ?? game.seedLevel))
     }
 
-    private var masteryLevelLabel: String {
-        let rounded = (masteryLevel * 10).rounded() / 10
-        if rounded == rounded.rounded() {
-            return "\(Int(rounded))"
-        }
-        return String(format: "%.1f", rounded)
+    private var currentLevelNumber: Int {
+        min(10, max(1, Int(floor(masteryLevel))))
+    }
+
+    private var nextLevelNumber: Int {
+        min(10, currentLevelNumber + 1)
+    }
+
+    private var levelProgress: Double {
+        guard masteryLevel < 10 else { return 1 }
+        return min(1, max(0, masteryLevel - Double(currentLevelNumber)))
+    }
+
+    private var levelProgressPercent: Int {
+        Int((levelProgress * 100).rounded())
+    }
+
+    private var levelProgressSummary: String {
+        currentLevelNumber >= 10 ? "max level" : "\(levelProgressPercent)%"
+    }
+
+    private var currentLevelLabel: String {
+        "level \(currentLevelNumber)"
+    }
+
+    private var nextLevelLabel: String {
+        currentLevelNumber >= 10 ? "max" : "level \(nextLevelNumber)"
     }
 
     var body: some View {
@@ -136,20 +157,25 @@ struct GameCard: View {
     private var masteryBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .firstTextBaseline) {
-                Text("level")
+                Text("level progress")
                     .font(.witsBody(15, weight: .heavy))
                     .foregroundStyle(Color.witsInk)
                 Spacer(minLength: 8)
-                Text("level \(masteryLevelLabel) of 10")
+                Text(levelProgressSummary)
                     .font(.system(size: 14, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsAccent)
                     .monospacedDigit()
             }
-            HStack(spacing: 5) {
-                ForEach(1...10, id: \.self) { step in
-                    masterySegment(fill: masteryFill(for: step))
-                }
+            ProgressTrack(fraction: levelProgress, animated: false)
+                .frame(height: 8)
+            HStack {
+                Text(currentLevelLabel)
+                Spacer(minLength: 8)
+                Text(nextLevelLabel)
             }
+            .font(.system(size: 12, weight: .heavy, design: .rounded))
+            .foregroundStyle(Color.witsMuted)
+            .monospacedDigit()
             Text("your starting difficulty for this game")
                 .font(.system(size: 12, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.witsMuted)
@@ -157,23 +183,14 @@ struct GameCard: View {
         .padding(15)
         .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("level \(masteryLevelLabel) of 10")
+        .accessibilityLabel(levelAccessibilityLabel)
     }
 
-    private func masteryFill(for step: Int) -> Double {
-        min(1, max(0, masteryLevel - Double(step - 1)))
-    }
-
-    private func masterySegment(fill: Double) -> some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                Capsule().fill(Color.witsLine)
-                Capsule()
-                    .fill(Color.witsAccent)
-                    .frame(width: geo.size.width * fill)
-            }
+    private var levelAccessibilityLabel: String {
+        if currentLevelNumber >= 10 {
+            return "level 10, max level"
         }
-        .frame(height: 8)
+        return "\(currentLevelLabel), \(levelProgressPercent) percent toward \(nextLevelLabel)"
     }
 
     private func statTile(_ label: String, value: String) -> some View {
