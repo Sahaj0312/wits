@@ -103,10 +103,70 @@ final class ScoringTests: XCTestCase {
         XCTAssertEqual(scored.next.level, 2)
     }
 
-    func testCrossGameCalibrationUsesGameSpecificNorms() {
+    func testLaunchCalibrationUsesFullScaleAndSharedCeiling() {
+        XCTAssertEqual(ScoringCalibrator.calibratedAbility(game: .matchBack, mastery: 10), 5000)
+        XCTAssertEqual(ScoringCalibrator.calibratedAbility(game: .numberRush, mastery: 10), 5000)
+        XCTAssertEqual(ScoringCalibrator.calibratedAbility(game: .matchBack, mastery: 5), 2500)
+    }
+
+    func testHeadlineDoesNotDiluteMeasuredDomainsWithUntrainedDomains() {
+        let scores = [
+            CognitiveDomain.focus.rawValue: 3500.0,
+            CognitiveDomain.memory.rawValue: 3500.0,
+            CognitiveDomain.math.rawValue: 3500.0,
+            CognitiveDomain.language.rawValue: 3500.0
+        ]
+        let confidence = Dictionary(uniqueKeysWithValues: scores.keys.map { ($0, 1.0) })
+
+        let headline = ScoringAggregator.headline(domainScores: scores, confidence: confidence)
+
+        XCTAssertGreaterThanOrEqual(headline ?? 0, 3400)
+    }
+
+    func testPersistentGameStateAggregationUsesAccumulatedConfidence() {
+        let states: [GameID: DifficultyState] = [
+            .arrowStorm: DifficultyState(level: 7, mastery: 7, confidence: 1, sessionsPlayed: 8),
+            .spotSpeed: DifficultyState(level: 7, mastery: 7, confidence: 1, sessionsPlayed: 8)
+        ]
+
+        let rollup = ScoringAggregator.aggregateGameStates(states)
+
+        XCTAssertEqual(rollup.counts[CognitiveDomain.focus.rawValue], 2)
+        XCTAssertEqual(rollup.confidence[CognitiveDomain.focus.rawValue], 2)
+        XCTAssertGreaterThan(rollup.scores[CognitiveDomain.focus.rawValue] ?? 0, 3000)
+    }
+
+    func testMatchBackNeverResponderDoesNotRaiseChallengeLevel() {
+        let prior = DifficultyState(level: 5, mastery: 5, confidence: 1)
+        var result = GameResult(game: .matchBack, score: 0, accuracy: 0.5, trials: 20)
+        result.raw = ["hits": 0, "misses": 10, "falseAlarms": 0, "correctRejections": 10]
+
+        let scored = ScoringEngine.score(result, previous: prior)
+
+        XCTAssertLessThan(scored.next.level, prior.level)
+    }
+
+    func testEstimatorPerfectSlowRunDoesNotLoseMastery() {
+        let prior = DifficultyState(level: 5, mastery: 5, confidence: 1)
+        var result = GameResult(game: .estimator, score: 0, accuracy: 1, trials: 16, durationMs: 120_000)
+        result.raw = ["correct": 16, "wrong": 0, "timeOnTaskMs": 120_000]
+
+        let scored = ScoringEngine.score(result, previous: prior)
+
+        XCTAssertGreaterThanOrEqual(scored.next.mastery, prior.mastery)
+    }
+
+    func testMissingLiveGamesDoNotUseAccuracyFallbackPolicy() {
+        XCTAssertFalse(ScoringPolicies.policy(for: .crowdControl) is AccuracyPolicy)
+        XCTAssertFalse(ScoringPolicies.policy(for: .echoGrid) is AccuracyPolicy)
+        XCTAssertFalse(ScoringPolicies.policy(for: .pathKeeper) is AccuracyPolicy)
+        XCTAssertFalse(ScoringPolicies.policy(for: .estimator) is ThroughputPolicy)
+    }
+
+    func testEqualMasteryMapsConsistentlyAcrossLaunchPriors() {
         let arrow = ScoringCalibrator.calibratedAbility(game: .arrowStorm, mastery: 7)
         let word = ScoringCalibrator.calibratedAbility(game: .wordConnect, mastery: 7)
 
-        XCTAssertNotEqual(arrow, word)
+        XCTAssertEqual(arrow, word)
     }
 }

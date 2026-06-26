@@ -35,6 +35,7 @@ protocol GameScoringPolicy {
     var stepSize: Double { get }
     var maxUp: Double { get }
     var maxDown: Double { get }
+    var abilitySignalWeight: Double { get }
 
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun
     func nextLevel(from result: GameResult, prior: DifficultyState, run: ScoredRun) -> Double
@@ -45,16 +46,23 @@ extension GameScoringPolicy {
     var stepSize: Double { 0.30 }
     var maxUp: Double { 0.35 }
     var maxDown: Double { 0.25 }
+    var abilitySignalWeight: Double { 0 }
 
     func nextLevel(from result: GameResult, prior: DifficultyState, run: ScoredRun) -> Double {
-        MasteryLadder.adjust(prior, accuracy: result.accuracy).level
+        let delta = adaptiveDelta(for: run)
+        let candidate = DifficultyState.clamp(prior.level + delta)
+        let weight = ScoringMath.clamp(abilitySignalWeight * run.confidence * 0.50, 0, 0.45)
+        guard weight > 0 else { return candidate }
+        return DifficultyState.clamp(candidate * (1 - weight) + DifficultyState.clamp(run.abilitySignal) * weight)
     }
 
     func nextState(from result: GameResult, prior: DifficultyState, run: ScoredRun) -> DifficultyState {
-        let error = ScoringMath.clamp(run.performance, 0, 1) - targetQuality
-        let rawDelta = stepSize * ScoringMath.clamp(run.confidence, 0, 1) * error / 0.20
-        let delta = ScoringMath.clamp(rawDelta, -maxDown, maxUp)
-        let nextMastery = DifficultyState.clamp(prior.masteryOrLevel + delta)
+        let delta = adaptiveDelta(for: run)
+        let performanceMastery = DifficultyState.clamp(prior.masteryOrLevel + delta)
+        let weight = ScoringMath.clamp(abilitySignalWeight * run.confidence, 0, 0.70)
+        let nextMastery = weight > 0
+            ? DifficultyState.clamp(performanceMastery * (1 - weight) + DifficultyState.clamp(run.abilitySignal) * weight)
+            : performanceMastery
 
         let oldDir = prior.lastDirection
         let dir = delta > 0.0001 ? 1 : (delta < -0.0001 ? -1 : 0)
@@ -74,6 +82,12 @@ extension GameScoringPolicy {
             scoringVersion: ScoringVersion.current
         )
     }
+
+    func adaptiveDelta(for run: ScoredRun) -> Double {
+        let error = ScoringMath.clamp(run.performance, 0, 1) - targetQuality
+        let rawDelta = stepSize * ScoringMath.clamp(run.confidence, 0, 1) * error / 0.20
+        return ScoringMath.clamp(rawDelta, -maxDown, maxUp)
+    }
 }
 
 enum ScoringPolicies {
@@ -83,8 +97,14 @@ enum ScoringPolicies {
             SpotSpeedPolicy()
         case .matchBack:
             MatchBackPolicy()
-        case .numberRush, .estimator, .arrowStorm, .tileShift, .oddOneOut, .colorClash:
+        case .numberRush, .arrowStorm, .tileShift, .oddOneOut, .colorClash:
             ThroughputPolicy(game: game)
+        case .estimator:
+            EstimatorPolicy()
+        case .crowdControl:
+            CrowdControlPolicy()
+        case .echoGrid, .pathKeeper:
+            SequenceRecallPolicy(game: game)
         case .lastSeen:
             LastSeenPolicy()
         case .towerOfHanoi:
@@ -161,14 +181,15 @@ enum ScoringCalibrator {
     }
 
     private static func normForGame(_ game: GameID) -> (mean: Double, sd: Double) {
-        // Design-time empirical-Bayes prior until real population norms exist.
-        (mean: min(9, game.seedLevel + 3), sd: 2.0)
+        // Launch prior until real population norms exist. Keep the full 0...5000
+        // scale usable and avoid seed-level-specific ceilings.
+        (mean: 5.0, sd: 1.0)
     }
 }
 
 enum ScoringAggregator {
     static let neutralWPI = 2500.0
-    static let shrinkage = 1.0
+    static let shrinkage = 0.10
 
     static func mergeDailyScores(existingScores: [String: Double],
                                  existingConfidence: [String: Double],
@@ -195,14 +216,48 @@ enum ScoringAggregator {
         return (scores, confidence, counts)
     }
 
+    static func aggregateGameStates(_ states: [GameID: DifficultyState]) -> (scores: [String: Double], confidence: [String: Double], counts: [String: Int]) {
+        var sums: [String: Double] = [:]
+        var weights: [String: Double] = [:]
+        var counts: [String: Int] = [:]
+
+        for (game, state) in states where state.sessionsPlayed > 0 || state.confidence > 0 {
+            let key = game.domain.rawValue
+            let weight = ScoringMath.clamp(state.confidence, 0.10, 1.0)
+            let score = ScoringCalibrator.calibratedAbility(game: game, mastery: state.mastery)
+            sums[key, default: 0] += score * weight
+            weights[key, default: 0] += weight
+            counts[key, default: 0] += 1
+        }
+
+        var scores: [String: Double] = [:]
+        for (key, sum) in sums {
+            scores[key] = ScoringMath.round(sum / max(0.001, weights[key] ?? 0))
+        }
+        return (scores, weights, counts)
+    }
+
+    static func displayDomainScore(_ score: Double, confidence: Double) -> Double {
+        let c = max(0, confidence)
+        return ScoringMath.round((c * score + shrinkage * neutralWPI) / max(0.001, c + shrinkage))
+    }
+
+    static func displayDomainScores(domainScores: [String: Double], confidence: [String: Double]) -> [String: Double] {
+        var displayed: [String: Double] = [:]
+        for (key, score) in domainScores {
+            displayed[key] = displayDomainScore(score, confidence: confidence[key] ?? 1)
+        }
+        return displayed
+    }
+
     static func headline(domainScores: [String: Double], confidence: [String: Double]) -> Double? {
         guard !domainScores.isEmpty else { return nil }
-        let values = CognitiveDomain.allCases.map { domain -> Double in
+        let values = CognitiveDomain.allCases.compactMap { domain -> Double? in
             let key = domain.rawValue
-            guard let score = domainScores[key] else { return neutralWPI }
-            let c = max(0, confidence[key] ?? 1)
-            return (c * score + shrinkage * neutralWPI) / (c + shrinkage)
+            guard let score = domainScores[key] else { return nil }
+            return displayDomainScore(score, confidence: confidence[key] ?? 1)
         }
+        guard !values.isEmpty else { return nil }
         return ScoringMath.round(values.reduce(0, +) / Double(values.count))
     }
 
@@ -224,6 +279,58 @@ struct AccuracyPolicy: GameScoringPolicy {
             confidence: confidence,
             abilitySignal: prior.level,
             metrics: ["policyConfidence": confidence]
+        )
+    }
+}
+
+struct EstimatorPolicy: GameScoringPolicy {
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let trials = max(1, result.trials)
+        let accuracy = ScoringMath.clamp(result.accuracy, 0, 1)
+        let confidence = ScoringMath.clamp(Double(trials) / 16.0, 0.35, 1.0)
+        return ScoredRun(
+            performance: accuracy,
+            confidence: confidence,
+            abilitySignal: prior.masteryOrLevel,
+            metrics: ["estimatorAccuracy": accuracy]
+        )
+    }
+}
+
+struct CrowdControlPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.15 }
+
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let correct = result.raw["correct"] ?? max(0, result.accuracy * Double(max(1, result.trials)))
+        let wrong = result.raw["wrong"] ?? max(0, Double(max(1, result.trials)) - correct)
+        let total = max(1, correct + wrong)
+        let accuracy = ScoringMath.clamp(correct / total, 0, 1)
+        let quality = ScoringMath.clamp(0.85 * accuracy + 0.15 * min(1, correct / max(3, prior.level + 2)), 0, 1)
+        return ScoredRun(
+            performance: quality,
+            confidence: ScoringMath.clamp(total / 10.0, 0.35, 1.0),
+            abilitySignal: ScoringMath.clamp(prior.level + (accuracy - 0.70) * 2.0, 1, 10),
+            metrics: ["trackingAccuracy": accuracy]
+        )
+    }
+}
+
+struct SequenceRecallPolicy: GameScoringPolicy {
+    let game: GameID
+    var abilitySignalWeight: Double { 0.35 }
+
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let correct = result.raw["correct"] ?? result.raw["perfect"] ?? max(0, result.accuracy * Double(max(1, result.trials)))
+        let wrong = result.raw["wrong"] ?? max(0, Double(max(1, result.trials)) - correct)
+        let near = result.raw["nearMisses"] ?? 0
+        let total = max(1, correct + wrong + near)
+        let quality = ScoringMath.clamp((correct + 0.45 * near) / total, 0, 1)
+        let signal = result.raw["maxSpan"] ?? result.raw["maxLen"] ?? prior.level
+        return ScoredRun(
+            performance: quality,
+            confidence: ScoringMath.clamp(total / 8.0, 0.35, 1.0),
+            abilitySignal: ScoringMath.clamp(signal, 1, 10),
+            metrics: ["sequenceQuality": quality, "sequenceSignal": signal]
         )
     }
 }
@@ -262,15 +369,16 @@ struct ThroughputPolicy: GameScoringPolicy {
 }
 
 struct SpotSpeedPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.45 }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let startMs = max(120, 600 - prior.level * 40)
         let finalMs = result.threshold ?? result.raw["thresholdMs"] ?? startMs
         let accuracy = ScoringMath.clamp(result.accuracy, 0, 1)
-        let gain = ScoringMath.clamp((startMs - finalMs) / 220.0, -0.5, 1.0)
-        let thresholdScore = ScoringMath.clamp(0.5 + gain * 0.5, 0, 1)
-        let performance = ScoringMath.clamp(0.70 * accuracy + 0.30 * thresholdScore, 0, 1)
         let confidence = ScoringMath.clamp(Double(max(1, result.trials)) / 18.0, 0.45, 0.90)
         let ability = ScoringMath.clamp(1 + log2(700.0 / max(80.0, finalMs)) * 2.2, 1, 10)
+        let thresholdScore = ScoringMath.logistic(ScoringMath.logit(targetQuality) + (ability - prior.masteryOrLevel) * 0.75)
+        let performance = ScoringMath.clamp(0.55 * accuracy + 0.45 * thresholdScore, 0, 1)
         return ScoredRun(
             performance: performance,
             confidence: confidence,
@@ -282,6 +390,7 @@ struct SpotSpeedPolicy: GameScoringPolicy {
 
 struct MatchBackPolicy: GameScoringPolicy {
     var targetQuality: Double { 0.68 }
+    var abilitySignalWeight: Double { 0.10 }
 
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let hits = result.raw["hits"] ?? max(0, result.accuracy * Double(result.trials))
@@ -312,6 +421,8 @@ struct MatchBackPolicy: GameScoringPolicy {
 }
 
 struct LastSeenPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.30 }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let total = max(1, Double(result.trials))
         let correct = result.raw["correct"] ?? max(0, result.accuracy * total)
@@ -330,6 +441,8 @@ struct LastSeenPolicy: GameScoringPolicy {
 }
 
 struct RuleFinderPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.25 }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let accuracy = ScoringMath.clamp(result.accuracy, 0, 1)
         let avgTier = result.raw["avgTier"] ?? result.threshold ?? 1
@@ -359,6 +472,8 @@ struct RuleFinderPolicy: GameScoringPolicy {
 }
 
 struct DotsPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.20 }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let boards = result.raw["boardsSolved"] ?? 0
         let perRun = max(1, Double(result.trials))
@@ -377,6 +492,8 @@ struct DotsPolicy: GameScoringPolicy {
 }
 
 struct TowerPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.20 }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let moves = max(1, result.raw["moves"] ?? Double(result.trials))
         let optimal = max(1, result.raw["optimalMoves"] ?? moves)
@@ -396,6 +513,8 @@ struct TowerPolicy: GameScoringPolicy {
 }
 
 struct WordConnectPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.35 }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let solved = result.raw["boardsSolved"] ?? 0
         let perRun = 2.0
@@ -423,6 +542,8 @@ struct WordConnectPolicy: GameScoringPolicy {
 }
 
 struct MemoryLockPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.25 }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let solved = result.raw["wordsSolved"] ?? max(0, result.accuracy * Double(max(1, result.trials)))
         let total = max(1, Double(result.trials))
@@ -522,7 +643,8 @@ enum ScoringDiagnostics {
         testDailyAggregation()
         testBonusIsolation()
         testWordConnectLevelPersistence()
-        testCrossGameCalibration()
+        testLaunchCalibrationUsesFullScale()
+        testMatchBackLevelAntiGaming()
     }
 
     private static func testContinuousUpdate() {
@@ -597,10 +719,19 @@ enum ScoringDiagnostics {
         assert(scored.next.level == 2, "WordConnect must persist the unlocked level")
     }
 
-    private static func testCrossGameCalibration() {
+    private static func testLaunchCalibrationUsesFullScale() {
         let a = ScoringCalibrator.calibratedAbility(game: .arrowStorm, mastery: 7)
         let b = ScoringCalibrator.calibratedAbility(game: .wordConnect, mastery: 7)
-        assert(a != b, "Game-specific norms should make equal mastery map differently across games")
+        assert(a == b, "Launch calibration should not create seed-specific ceilings")
+        assert(ScoringCalibrator.calibratedAbility(game: .matchBack, mastery: 10) == 5000, "Mastery 10 should reach the top of the WPI scale")
+    }
+
+    private static func testMatchBackLevelAntiGaming() {
+        let prior = DifficultyState(level: 5, mastery: 5, confidence: 1)
+        var result = GameResult(game: .matchBack, score: 0, accuracy: 0.5, trials: 20)
+        result.raw = ["hits": 0, "misses": 10, "falseAlarms": 0, "correctRejections": 10]
+        let scored = ScoringEngine.score(result, previous: prior)
+        assert(scored.next.level < prior.level, "Never-responding should not raise MatchBack challenge level")
     }
 }
 #endif

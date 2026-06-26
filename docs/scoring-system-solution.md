@@ -221,11 +221,14 @@ A_g  = clamp(2500 + 500·z_g, 0, 5000)     // 2500 = pop mean, 500 = 1 SD; keeps
 Now `A_g = 3000` means the same thing — half an SD above the mean *for that game* —
 everywhere, so averaging is finally valid.
 
-**Cold-start without a population dataset** — empirical-Bayes with design-time priors,
-shrinking toward the prior until real data lands:
+**Cold-start without a population dataset** — use a shared launch prior first, then
+replace it with empirical-Bayes game norms once real data lands. Do **not** set the
+launch prior from `seedLevel`; that creates different ceilings and compresses the
+visible 0–5000 range.
 
 ```
-μ_g⁰ = min(9, seedLevel_g + 3)     σ_g⁰ = 2.0
+launch: μ_g⁰ = 5.0, σ_g⁰ = 1.0        // mastery 5 = 2500; mastery 10 = 5000
+future: μ_g⁰ = game-specific design prior, σ_g⁰ = observed spread
 μ_g  = (n·μ̂_g + k·μ_g⁰) / (n + k)                  // k ≈ 50 pseudo-count
 σ_g  = blend(σ̂_g, σ_g⁰, n, k)
 ```
@@ -253,13 +256,14 @@ C_d = Σ_{g∈d} w_g                            // domain confidence
 ```
 
 ### Domain → Headline
-Equal domain weighting (the "balanced brain" framing), each domain **shrunk toward the
-population mean by its confidence**, so an untrained or stale domain reverts to neutral
-instead of dragging the number down or freezing it high:
+Equal domain weighting over measured domains (the "balanced brain" framing), each
+measured domain **shrunk toward the population mean by its confidence**. Untrained
+domains stay visible as "not trained yet" but do not mathematically pin the headline
+to 2500; coverage/confidence labels carry that uncertainty.
 
 ```
 D_d* = (C_d · D_d + k_d · 2500) / (C_d + k_d)
-Headline = mean_d D_d*
+Headline = mean_{measured d} D_d*
 ```
 
 **[decision] One headline definition, deleting the proposal's two-formula split.** The
@@ -478,7 +482,8 @@ with XCTest coverage for the scoring engine invariants:
 - Same-day domain aggregation uses **all** counted sessions (no overwrite).
 - Bonus multipliers don't change base score or best-performance.
 - WordConnect persists the level its UI reports.
-- Cross-game: equal `mastery` in two games with different `(μ_g, σ_g)` → different `A_g`.
+- Launch calibration uses the full 0–5000 scale and does not create seed-specific ceilings.
+- Headline is not diluted by untrained domains; coverage is exposed separately.
 
 Still worth adding as the UI and migration paths mature:
 

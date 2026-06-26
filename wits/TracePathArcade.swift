@@ -28,6 +28,8 @@ final class TracePathArcade: ArcadeGame {
     private var phaseT = 0.0
     private var span = 3
     private var showStep = 0.6
+    private var maxSpan = 0
+    private var perfectRounds = 0
 
     init(id: GameID, reverse: Bool) { self.id = id; self.reverse = reverse }
 
@@ -77,6 +79,8 @@ final class TracePathArcade: ArcadeGame {
         phase = .reveal; phaseT = 0
         let correct = zip(entered, expected).reduce(0) { $0 + ($1.0 == $1.1 ? 1 : 0) }
         if correct == expected.count {
+            perfectRounds += 1
+            maxSpan = max(maxSpan, expected.count)
             span = min(8, span + 1)
             return Resolution(kind: .hit, points: 60 * expected.count)
         }
@@ -135,6 +139,13 @@ final class TracePathArcade: ArcadeGame {
                 .foregroundStyle(Color.witsFaint)
                 .padding(.bottom, 8)
         }.allowsHitTesting(false))
+    }
+
+    func resultMetrics(scene: ArcadeScene, hits: Int, misses: Int, nearMisses: Int) -> [String: Double] {
+        [
+            "maxSpan": Double(maxSpan),
+            "perfectRounds": Double(perfectRounds)
+        ]
     }
 
     // MARK: Round setup

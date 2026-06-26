@@ -177,7 +177,14 @@ struct PathKeeperScreen: View {
         var r = GameResult(game: .pathKeeper, score: score, accuracy: acc)
         r.trials = Self.totalTrials
         r.startedAt = startedAt
-        r.raw = ["maxLen": Double(maxLen), "perfect": Double(perfect)]
+        r.durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+        r.raw = [
+            "maxLen": Double(maxLen),
+            "perfect": Double(perfect),
+            "correct": Double(correctTaps),
+            "wrong": Double(max(0, totalTaps - correctTaps)),
+            "timeOnTaskMs": Double(r.durationMs)
+        ]
         onResult(r)
     }
 }

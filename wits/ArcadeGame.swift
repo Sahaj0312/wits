@@ -66,6 +66,9 @@ protocol ArcadeGame: AnyObject {
 
     /// Add fixed chrome (buckets, lanes, prompts) once when the scene loads.
     func setupScene(_ scene: SKScene, style: ArcadeStyle)
+
+    /// Extra game-specific metrics to merge into GameResult.raw at finish.
+    func resultMetrics(scene: ArcadeScene, hits: Int, misses: Int, nearMisses: Int) -> [String: Double]
 }
 
 extension ArcadeGame {
@@ -85,4 +88,5 @@ extension ArcadeGame {
     }
     func refreshNode(_ node: SKNode, _ e: ArcadeEntity, style: ArcadeStyle) {}
     func setupScene(_ scene: SKScene, style: ArcadeStyle) {}
+    func resultMetrics(scene: ArcadeScene, hits: Int, misses: Int, nearMisses: Int) -> [String: Double] { [:] }
 }
