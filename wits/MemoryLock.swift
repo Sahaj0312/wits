@@ -29,7 +29,7 @@ struct MemoryLockScreen: View {
     @State private var current = ""
     @State private var guesses: [SubmittedGuess] = []
     @State private var visibleClueIDs: Set<UUID> = []
-    @State private var message = "use the clues before they fade"
+    @State private var message = ""
     @State private var roundsPlayed = 0
     @State private var wordsSolved = 0
     @State private var wordsMissed = 0
@@ -52,10 +52,10 @@ struct MemoryLockScreen: View {
         self.cfg = cfg
         self.onResult = onResult
         self.level = cfg.difficulty.level
-        self.wordLength = cfg.difficulty.level >= 6 ? 6 : 5
-        self.maxGuesses = cfg.difficulty.level >= 6 ? 7 : 6
+        self.wordLength = 5
+        self.maxGuesses = 6
         self.clueSeconds = max(0.85, 2.45 - cfg.difficulty.level * 0.16)
-        _target = State(initialValue: Self.pickWord(length: cfg.difficulty.level >= 6 ? 6 : 5))
+        _target = State(initialValue: Self.pickWord(length: 5))
     }
 
     private var progressText: String {
@@ -68,35 +68,35 @@ struct MemoryLockScreen: View {
             let safeBottom = geo.safeAreaInsets.bottom
             let availableHeight = geo.size.height - safeTop - safeBottom
             let compact = availableHeight < 790
-            let keyboardHeight: CGFloat = compact ? 126 : 140
-            let chromeHeight: CGFloat = cfg.isSurvival ? 44 : 92
-            let boardMaxHeight = max(300, min(compact ? 370 : 410,
-                                               availableHeight - keyboardHeight - chromeHeight))
-            VStack(spacing: compact ? 8 : 10) {
+            VStack(spacing: 0) {
                 if !cfg.isSurvival {
                     topBar
                 }
 
-                roundHeader
-
-                board(width: geo.size.width - WitsMetrics.screenPadding * 2,
-                      maxHeight: boardMaxHeight,
-                      compact: compact)
-
-                Text(message)
-                    .font(.witsBody(13, weight: .semibold))
-                    .foregroundStyle(Color.witsMuted)
-                    .frame(height: compact ? 14 : 18)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                wordleGrid(width: geo.size.width - (compact ? 28 : 24),
+                           availableHeight: availableHeight,
+                           compact: compact)
+                    .padding(.top, compact ? 22 : 28)
+                    .overlay(alignment: .top) {
+                        if !message.isEmpty {
+                            Text(message)
+                                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Color.witsInk)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(Color.witsTint, in: Capsule())
+                                .offset(y: compact ? -18 : -22)
+                                .transition(.opacity)
+                        }
+                    }
 
                 Spacer(minLength: 0)
 
                 keyboard(compact: compact)
+                    .padding(.horizontal, compact ? 8 : 10)
             }
-            .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.top, safeTop + (cfg.isSurvival ? 6 : 4))
-            .padding(.bottom, safeBottom + (compact ? 4 : 6))
+            .padding(.bottom, safeBottom + (compact ? 8 : 10))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .background(Color.witsBg.ignoresSafeArea())
@@ -117,46 +117,21 @@ struct MemoryLockScreen: View {
             }
             ProgressTrack(fraction: Double(roundsPlayed) / Double(Self.roundsPerRun), animated: true)
         }
+        .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.leading, cfg.isSurvival ? 0 : 42)
     }
 
-    private var roundHeader: some View {
-        HStack(spacing: 8) {
-            statusChip(icon: "lock.fill", text: "\(wordLength) letters")
-            statusChip(icon: "eye.slash.fill", text: String(format: "%.1fs clues", clueSeconds))
-            Spacer(minLength: 6)
-            statusChip(icon: "checkmark.seal.fill", text: "\(wordsSolved) solved")
-        }
-    }
-
-    private func statusChip(icon: String, text: String) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: icon)
-                .font(.system(size: 10, weight: .heavy))
-                .foregroundStyle(Color.witsAccent)
-            Text(text)
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsInk)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.witsTint, in: Capsule())
-    }
-
-    private func board(width: CGFloat, maxHeight: CGFloat, compact: Bool) -> some View {
-        let outerPadding: CGFloat = compact ? 10 : 12
-        let rowSpacing: CGFloat = compact ? 5 : 6
-        let cellSpacing: CGFloat = compact ? 5 : 6
-        let widthAvailable = width - outerPadding * 2 - CGFloat(wordLength - 1) * cellSpacing
-        let heightAvailable = maxHeight - outerPadding * 2 - CGFloat(maxGuesses - 1) * rowSpacing
-        let maxTile: CGFloat = compact ? 52 : 56
+    private func wordleGrid(width: CGFloat, availableHeight: CGFloat, compact: Bool) -> some View {
+        let rowSpacing: CGFloat = compact ? 5 : 7
+        let cellSpacing: CGFloat = compact ? 5 : 7
+        let widthAvailable = width - CGFloat(wordLength - 1) * cellSpacing
+        let heightBudget = availableHeight * (compact ? 0.56 : 0.58)
+        let heightAvailable = heightBudget - CGFloat(maxGuesses - 1) * rowSpacing
+        let maxTile: CGFloat = compact ? 70 : 76
         let tile = min(maxTile,
                        max(36, floor(widthAvailable / CGFloat(wordLength))),
                        max(36, floor(heightAvailable / CGFloat(maxGuesses))))
-        let height = tile * CGFloat(maxGuesses) + rowSpacing * CGFloat(maxGuesses - 1) + outerPadding * 2
+        let height = tile * CGFloat(maxGuesses) + rowSpacing * CGFloat(maxGuesses - 1)
 
         return VStack(spacing: rowSpacing) {
             ForEach(0..<maxGuesses, id: \.self) { row in
@@ -172,8 +147,6 @@ struct MemoryLockScreen: View {
         }
         .frame(maxWidth: .infinity)
         .frame(height: height)
-        .padding(outerPadding)
-        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
     }
 
     private func letters(for row: Int) -> [String] {
@@ -203,17 +176,17 @@ struct MemoryLockScreen: View {
 
     private func keyboard(compact: Bool) -> some View {
         let rows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
-        return VStack(spacing: compact ? 5 : 6) {
+        return VStack(spacing: compact ? 6 : 8) {
             ForEach(rows, id: \.self) { row in
-                HStack(spacing: compact ? 4 : 5) {
+                HStack(spacing: compact ? 5 : 6) {
                     if row == "ZXCVBNM" {
-                        key("enter", width: compact ? 46 : 50, compact: compact)
+                        key("enter", width: compact ? 54 : 60, compact: compact)
                     }
                     ForEach(Array(row).map(String.init), id: \.self) { letter in
                         key(letter, compact: compact)
                     }
                     if row == "ZXCVBNM" {
-                        key("delete", width: compact ? 46 : 50, compact: compact)
+                        key("delete", width: compact ? 54 : 60, compact: compact)
                     }
                 }
             }
@@ -225,8 +198,8 @@ struct MemoryLockScreen: View {
             Group {
                 switch value {
                 case "enter":
-                    Image(systemName: "checkmark")
-                        .font(.system(size: compact ? 14 : 15, weight: .heavy))
+                    Text("enter")
+                        .font(.system(size: compact ? 10 : 11, weight: .heavy, design: .rounded))
                 case "delete":
                     Image(systemName: "delete.left.fill")
                         .font(.system(size: compact ? 14 : 15, weight: .heavy))
@@ -235,12 +208,12 @@ struct MemoryLockScreen: View {
                         .font(.system(size: compact ? 15 : 16, weight: .heavy, design: .rounded))
                 }
             }
-            .foregroundStyle(value == "enter" ? .white : Color.witsInk)
+            .foregroundStyle(Color.white)
             .frame(width: width)
             .frame(maxWidth: width == nil ? .infinity : nil)
-            .frame(height: compact ? 40 : 44)
-            .background(value == "enter" ? Color.witsAccent : Color.witsTint,
-                        in: RoundedRectangle(cornerRadius: compact ? 9 : 10, style: .continuous))
+            .frame(height: compact ? 58 : 64)
+            .background(value == "enter" ? Color.witsAccent : Color.witsFaint.opacity(0.58),
+                        in: RoundedRectangle(cornerRadius: 5, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(locked || finished)
@@ -337,7 +310,7 @@ struct MemoryLockScreen: View {
         visibleClueIDs = []
         current = ""
         locked = false
-        message = "use the clues before they fade"
+        message = ""
     }
 
     private func fade(_ id: UUID) {
@@ -441,9 +414,9 @@ private struct MemoryLockGuessRow: View {
                     .foregroundStyle(foreground(for: index))
                     .frame(width: tileSize, height: tileSize)
                     .background(background(for: index),
-                        in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: 4, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
                             .strokeBorder(border(for: index), lineWidth: 1.5)
                     )
             }
