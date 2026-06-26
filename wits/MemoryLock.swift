@@ -54,7 +54,7 @@ struct MemoryLockScreen: View {
         self.level = cfg.difficulty.level
         self.wordLength = 5
         self.maxGuesses = 6
-        self.clueSeconds = max(0.85, 2.45 - cfg.difficulty.level * 0.16)
+        self.clueSeconds = 1.0
         _target = State(initialValue: Self.pickWord(length: 5))
     }
 
@@ -262,7 +262,7 @@ struct MemoryLockScreen: View {
             return
         }
 
-        message = String(format: "clues fade in %.1fs", clueSeconds)
+        message = "clues fade in 1s"
         fade(guess.id)
     }
 
