@@ -55,7 +55,7 @@ struct GameCard: View {
                     statsBlock
                 }
                 .padding(.horizontal, WitsMetrics.screenPadding)
-                .padding(.top, 20)
+                .padding(.top, 2)
                 .padding(.bottom, 12)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
