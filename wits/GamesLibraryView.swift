@@ -18,7 +18,9 @@ struct GamesLibraryView: View {
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
     private var filteredGames: [GameID] {
-        GameID.allCases.filter { filter == nil || $0.domain == filter }
+        GameID.allCases.filter { game in
+            game.isLive && (filter == nil || game.domain == filter)
+        }
     }
 
     var body: some View {
@@ -50,17 +52,7 @@ struct GamesLibraryView: View {
         }
         .background(Color.witsBg.ignoresSafeArea())
         .fullScreenCover(item: $launch) { g in
-            if g.isSurvivalOnly {
-                SplitSurvivalScreen(
-                    best: app.gameStats[g]?.survivalBest ?? 0,
-                    onRunComplete: { level, depth, trials in
-                        app.recordSplitRun(levelReached: level, depth: depth, trials: trials)
-                    },
-                    onQuit: { launch = nil }
-                )
-            } else {
-                GameLauncher(game: g)
-            }
+            GameLauncher(game: g)
         }
         .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
     }
@@ -140,7 +132,6 @@ struct GamesLibraryView: View {
     }
 
     private func gameBadgeLabel(_ g: GameID) -> String {
-        if g.isSurvivalOnly { return "survival" }
         guard g.isLive else { return "soon" }
         return g.domain == .multitasking ? "multitask" : g.domain.label
     }
@@ -167,8 +158,7 @@ private struct FilterChip: View {
     }
 }
 
-/// Pre-game chooser: the card with Train vs Survival, then runs the chosen mode
-/// in a single full-screen cover (no double card).
+/// Pre-game chooser: the card, then a single train run in a full-screen cover.
 private struct GameLauncher: View {
     let game: GameID
     @Environment(AppModel.self) private var app
@@ -178,7 +168,7 @@ private struct GameLauncher: View {
     @State private var lastNewBest = false
     @State private var attempt = 0   // bump to force a fresh game instance on replay
 
-    private enum Phase { case card, train, survival, result }
+    private enum Phase { case card, train, result }
 
     var body: some View {
         switch phase {
@@ -189,8 +179,7 @@ private struct GameLauncher: View {
                 difficulty: app.difficultyFor(game),
                 primaryTitle: "train",
                 onPlay: { phase = .train },
-                onBack: { dismiss() },
-                onSurvival: { phase = .survival }
+                onBack: { dismiss() }
             )
         case .train:
             GeometryReader { geo in
@@ -237,15 +226,6 @@ private struct GameLauncher: View {
                 isNewBest: lastNewBest,
                 onReplay: { attempt += 1; withAnimation(.easeOut(duration: 0.2)) { phase = .train } },
                 onDone: { dismiss() }
-            )
-        case .survival:
-            SurvivalHost(
-                game: game,
-                seedDifficulty: app.difficultyFor(game),
-                stats: app.gameStats[game],
-                onRunComplete: { score, trials in app.recordSurvivalRun(game: game, score: score, trials: trials) },
-                onQuit: { dismiss() },
-                startImmediately: true
             )
         }
     }

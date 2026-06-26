@@ -17,8 +17,6 @@ struct GameCard: View {
     var primaryTitle: String = "play"
     var onPlay: () -> Void
     var onBack: (() -> Void)? = nil
-    /// When set, shows a second "survival" action.
-    var onSurvival: (() -> Void)? = nil
     /// Optional content above the hero (e.g. workout progress dots).
     var accessory: AnyView? = nil
 
@@ -131,11 +129,7 @@ struct GameCard: View {
             statTile("best score", value: (stats?.bestScore).flatMap { $0 > 0 ? "\($0)" : nil } ?? "—")
             statTile("best stat", value: stats?.bestStat.map { game.statLabel($0) } ?? "—")
             statTile("plays", value: "\(stats?.totalPlays ?? 0)")
-            if let sv = stats?.survivalBest, sv > 0 {
-                statTile("survival best", value: "\(sv)")
-            } else {
-                statTile("mode", value: onSurvival == nil ? "train" : "train + survival")
-            }
+            statTile("mode", value: "train")
         }
     }
 
@@ -209,30 +203,6 @@ struct GameCard: View {
     private var footer: some View {
         VStack(spacing: 11) {
             Cta(title: primaryTitle, action: onPlay)
-            if let onSurvival {
-                Button(action: onSurvival) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 14, weight: .heavy))
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text("survival mode")
-                                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                            Text("3 lives, no mercy")
-                                .font(.system(size: 12, weight: .bold, design: .rounded))
-                                .foregroundStyle(Color.witsWarm.opacity(0.72))
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 12, weight: .heavy))
-                    }
-                    .foregroundStyle(Color.witsWarm)
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 13)
-                    .frame(maxWidth: .infinity, minHeight: 54)
-                    .background(Color.witsWarm.opacity(0.12), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-                .buttonStyle(.plain)
-            }
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.top, 8)

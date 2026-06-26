@@ -280,20 +280,14 @@ final class ToneSynth {
 // MARK: - Per-game reporting
 
 extension GameConfig {
-    /// Single call site a game uses for each decision. In workout/free-play the
-    /// game plays its own juice; in survival it forwards the outcome to the host
-    /// (which owns lives/combo/score and plays the feedback — so we don't double).
+    /// Single call site a game uses for each decision.
     @MainActor
     func report(_ kind: TrialOutcome.Kind, points: Int = 0, combo: Int = 0) {
-        if isSurvival {
-            onOutcome?(TrialOutcome(kind: kind, points: points))
-        } else {
-            switch kind {
-            case .hit: GameFeel.shared.play(.correct(combo: combo))
-            case .miss: GameFeel.shared.play(.wrong)
-            case .nearMiss: GameFeel.shared.play(.nearMiss)
-            case .timeout: GameFeel.shared.play(.timeout)
-            }
+        switch kind {
+        case .hit: GameFeel.shared.play(.correct(combo: combo))
+        case .miss: GameFeel.shared.play(.wrong)
+        case .nearMiss: GameFeel.shared.play(.nearMiss)
+        case .timeout: GameFeel.shared.play(.timeout)
         }
     }
 }

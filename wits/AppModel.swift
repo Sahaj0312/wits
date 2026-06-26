@@ -166,71 +166,9 @@ final class AppModel {
 
     // MARK: Game / workout events
 
-    var survivalBest: (GameID) -> Int { { [gameStats] id in gameStats[id]?.survivalBest ?? 0 } }
-
-    /// Called when a survival run ends. Records the best + a tagged session, but
-    /// NEVER touches the adaptive mastery level (survival must not move difficulty).
-    func recordSurvivalRun(game id: GameID, score: Int, trials: Int) {
-        var st = gameStats[id] ?? GameStats()
-        st.survivalRuns += 1
-        st.survivalBest = max(st.survivalBest, score)
-        gameStats[id] = st
-        saveCache()
-        var r = GameResult(game: id, score: score, accuracy: 0)
-        r.trials = trials
-        r.raw = ["survival": 1]
-        Task { try? await supa.saveSession(r, source: "survival") }
-    }
-
-    /// A finished "split" run. Records the survival best (level reached) like any
-    /// survival game, AND folds a multitasking WPI signal into today's rollup so
-    /// it feeds the weakness engine — but never the mastery ladder. Best-of-day.
-    func recordSplitRun(levelReached: Int, depth: Double, trials: Int) {
-        recordSurvivalRun(game: .split, score: levelReached, trials: trials)
-        let effLevel = min(Self.masteryMax, max(Self.masteryMin, Double(levelReached) + max(0, min(1, depth))))
-        foldDomainScore(.multitasking, Self.domainScore(level: effLevel))
-    }
-
-    /// Merge one domain score into today's progress (best-of-day) without touching
-    /// the mastery ladder — for survival games that still measure a cognitive domain.
-    /// Marks the day active (`workout_done`) so it shows on the progress charts;
-    /// it does NOT count as a workout game, so the journey still reads it as a
-    /// non-workout day.
-    private func foldDomainScore(_ domain: CognitiveDomain, _ score: Double) {
-        let dayKey = SupabaseManager.dayString(Date())
-        let existing = progressDays.first { $0.day == dayKey }
-        var domains = existing?.domain_scores ?? [:]
-        domains[domain.rawValue] = max(domains[domain.rawValue] ?? 0, score.rounded())
-        let headline = Self.headline(from: domains)
-        headlineIndex = headline
-        let played = existing?.games_played ?? 0
-        let lineup = existing?.workout_games
-
-        if let i = progressDays.firstIndex(where: { $0.day == dayKey }) {
-            progressDays[i].workout_done = true
-            progressDays[i].domain_scores = domains
-            progressDays[i].headline_index = headline
-        } else {
-            progressDays.append(DailyProgressRow(day: dayKey, workout_done: true,
-                                                 games_played: played,
-                                                 headline_index: headline,
-                                                 domain_scores: domains,
-                                                 workout_games: lineup))
-        }
-        saveCache()
-        Task {
-            try? await supa.upsertDailyProgress(day: dayKey, workoutDone: true,
-                                                gamesPlayed: played,
-                                                headlineIndex: headline,
-                                                domainScores: domains,
-                                                workoutGames: lineup)
-        }
-    }
-
     /// Called as each game in a workout finishes: persist the run + advance the
     /// game's persisted mastery level.
     func recordGameResult(_ result: GameResult, source: String = "workout", workoutID: String? = nil) {
-        assert(source != "survival", "survival runs must go through recordSurvivalRun (mastery must not move)")
         let id = result.game
         let current = difficulty[id] ?? .seed(for: id)
         let next = advanceDifficulty(for: id, current, accuracy: result.accuracy)

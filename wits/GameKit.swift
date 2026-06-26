@@ -19,12 +19,12 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     // expanded library
     case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
     case wordConnect, memoryLock, dotsConnect, towerOfHanoi
-    // survival-only (no mastery-adjusted workout mode; not in the daily pool)
+    // retired modes kept for cache/backward-compat identifiers; not surfaced.
     case split
 
     var id: String { rawValue }
 
-    /// Games in the daily-workout pool (mastery-adjusted, train + survival modes).
+    /// Games in the daily-workout pool (mastery-adjusted train mode).
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder,
          .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect, .dotsConnect,
@@ -32,13 +32,8 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     }
     var isLive: Bool { Self.live.contains(self) }
 
-    /// Games that exist only as a survival/arcade run — no train mode, never
-    /// prescribed in the daily workout, but they still feed the weakness engine.
-    static var survivalOnly: [GameID] { [.split] }
-    var isSurvivalOnly: Bool { Self.survivalOnly.contains(self) }
-
     /// Tappable in the library (has some playable mode).
-    var isPlayable: Bool { isLive || isSurvivalOnly }
+    var isPlayable: Bool { isLive }
 
     /// Screens that draw their own full-bleed safe-area background and manage
     /// their own top/bottom spacing.
@@ -325,8 +320,6 @@ struct GameStats: Codable {
     var bestScore: Int = 0
     var totalPlays: Int = 0
     var bestStat: Double? = nil
-    var survivalBest: Int = 0      // best survival run score (defaulted → old cache decodes)
-    var survivalRuns: Int = 0
 }
 
 // MARK: - Adaptive difficulty
@@ -454,7 +447,7 @@ struct GameResult: Codable, Equatable {
 
 // MARK: - Config
 
-enum GameMode: String, Codable { case workout, freePlay, survival }
+enum GameMode: String, Codable { case workout, freePlay }
 
 /// A single decision's outcome, emitted by a game in survival so the host can
 /// own lives/combo/score. `points` is the game's base points for that decision.
@@ -470,21 +463,12 @@ struct GameConfig {
     var targetDurationSec: Double = 45
     var mode: GameMode = .workout
     var rewardSeed: UInt64 = 0
-    /// Survival only: the game pushes each decision up; the host owns lives/score.
-    /// In survival, a game runs forever (no self-end) and self-escalates as it goes.
-    var onOutcome: ((TrialOutcome) -> Void)? = nil
-
     /// Back-compat: existing call sites read `isFreePlay`.
     var isFreePlay: Bool { mode == .freePlay }
-    var isSurvival: Bool { mode == .survival }
+    var isSurvival: Bool { false }
 
     static func standard(_ g: GameID, difficulty: DifficultyState, freePlay: Bool = false) -> GameConfig {
         GameConfig(difficulty: difficulty, mode: freePlay ? .freePlay : .workout)
-    }
-
-    static func survival(_ g: GameID, difficulty: DifficultyState,
-                         onOutcome: @escaping (TrialOutcome) -> Void) -> GameConfig {
-        GameConfig(difficulty: difficulty, mode: .survival, onOutcome: onOutcome)
     }
 }
 

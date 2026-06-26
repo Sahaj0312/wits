@@ -4,9 +4,8 @@
 //
 //  The shared host for every arcade game: owns the display-synced loop, spawning
 //  + escalation, the field Canvas, gesture overlay, juice, and ALL engine
-//  plumbing. Each decision flows through cfg.report (juice in workout, outcome
-//  stream to SurvivalHost in survival). On a workout timeout it builds the
-//  GameResult; in survival it loops forever and never self-ends.
+//  plumbing. Each decision flows through cfg.report for juice; on timeout it
+//  builds the GameResult.
 //
 
 import SwiftUI
