@@ -249,15 +249,10 @@ final class AppModel {
 
         let dayKey = SupabaseManager.dayString(Date())
         let existing = progressDays.first(where: { $0.day == dayKey })
-        let merged = ScoringAggregator.mergeDailyScores(
-            existingScores: existing?.domain_scores ?? [:],
-            existingConfidence: existing?.domain_confidence ?? [:],
-            existingCounts: existing?.domain_session_counts ?? [:],
-            results: results
-        )
-        let domains = merged.scores
-        let domainConfidence = merged.confidence
-        let domainCounts = merged.counts
+        let rollup = ScoringAggregator.aggregateGameStates(difficulty)
+        let domains = rollup.scores
+        let domainConfidence = rollup.confidence
+        let domainCounts = rollup.counts
         let rawHeadline = ScoringAggregator.headline(domainScores: domains, confidence: domainConfidence)
             ?? Self.headline(from: domains)
         let anchored = Self.migrationAnchoredHeadline(unanchored: rawHeadline,

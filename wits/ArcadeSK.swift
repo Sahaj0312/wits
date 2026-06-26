@@ -303,13 +303,15 @@ final class ArcadeSKScene: SKScene {
         res.threshold = model.spawner.speed
         res.startedAt = startedAt
         res.durationMs = Int(cfg.targetDurationSec * 1000)
-        res.raw = [
+        var metrics: [String: Double] = [
             "bestStreak": Double(bestCombo),
             "correct": Double(hits),
-            "wrong": Double(misses + near),
+            "wrong": Double(misses),
             "nearMisses": Double(near),
             "timeOnTaskMs": cfg.targetDurationSec * 1000
         ]
+        metrics.merge(game.resultMetrics(scene: model, hits: hits, misses: misses, nearMisses: near)) { _, new in new }
+        res.raw = metrics
         onResult(res)
     }
 

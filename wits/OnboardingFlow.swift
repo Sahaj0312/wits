@@ -434,11 +434,8 @@ struct OnboardingView: View {
         let scoredFitTests = fitTestResults().map {
             ScoringEngine.score($0, previous: .seed(for: $0.game))
         }
-        let rollup = ScoringAggregator.mergeDailyScores(
-            existingScores: [:],
-            existingConfidence: [:],
-            existingCounts: [:],
-            results: scoredFitTests.map(\.result)
+        let rollup = ScoringAggregator.aggregateGameStates(
+            Dictionary(uniqueKeysWithValues: scoredFitTests.map { ($0.result.game, $0.next) })
         )
         let domains = rollup.scores
         let headline = ScoringAggregator.headline(domainScores: domains, confidence: rollup.confidence)

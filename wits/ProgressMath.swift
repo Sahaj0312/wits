@@ -56,7 +56,8 @@ enum ProgressMath {
     static func domainSeries(_ days: [DailyProgressRow], _ domain: CognitiveDomain) -> [SeriesPoint] {
         let pairs: [(Date, Double)] = sortedDays(days).compactMap { row in
             guard let v = row.domain_scores?[domain.rawValue], let d = row.dayDate else { return nil }
-            return (d, v)
+            let c = row.domain_confidence?[domain.rawValue] ?? 1
+            return (d, ScoringAggregator.displayDomainScore(v, confidence: c))
         }
         let smooth = ewma(pairs.map { $0.1 })
         return zip(pairs, smooth).map { SeriesPoint(day: $0.0, value: $1.rounded()) }
@@ -67,7 +68,10 @@ enum ProgressMath {
         let rows = sortedDays(days)
         var result: [CognitiveDomain: Double] = [:]
         for domain in CognitiveDomain.allCases {
-            let raw = rows.compactMap { $0.domain_scores?[domain.rawValue] }
+            let raw = rows.compactMap { row -> Double? in
+                guard let score = row.domain_scores?[domain.rawValue] else { return nil }
+                return ScoringAggregator.displayDomainScore(score, confidence: row.domain_confidence?[domain.rawValue] ?? 1)
+            }
             if let last = ewma(raw).last {
                 result[domain] = (last).rounded()
             }
