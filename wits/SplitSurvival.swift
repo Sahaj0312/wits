@@ -368,22 +368,24 @@ struct SplitSurvivalScreen: View {
             .padding(.horizontal, 4)
             .rise(0.08)
             Spacer()
-            HStack(spacing: 14) {
-                Button(action: onQuit) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 16, weight: .heavy))
-                        .foregroundStyle(Color.witsWarm)
-                        .frame(width: 52, height: 52)
-                        .background(Color.witsWarm.opacity(0.12), in: Circle())
-                        .accessibilityLabel("back")
-                }
-                .buttonStyle(.plain)
-                Cta(title: "start", action: startRun)
-            }
-            .rise(0.1)
+            Cta(title: "start", action: startRun)
+                .rise(0.1)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 16)
+        .overlay(alignment: .topLeading) {
+            Button(action: onQuit) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(.black.opacity(0.28), in: Circle())
+                    .accessibilityLabel("close")
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 44)
+            .padding(.leading, 12)
+        }
     }
 
     private var splitIntroStats: some View {

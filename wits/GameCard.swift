@@ -61,6 +61,13 @@ struct GameCard: View {
             footer
         }
         .background(Color.witsBg.ignoresSafeArea())
+        .overlay(alignment: .topLeading) {
+            if let onBack {
+                closeButton(action: onBack)
+                    .padding(.top, 44)
+                    .padding(.leading, 12)
+            }
+        }
     }
 
     // MARK: Hero
@@ -200,20 +207,7 @@ struct GameCard: View {
 
     private var footer: some View {
         VStack(spacing: 11) {
-            HStack(spacing: 14) {
-                if let onBack {
-                    Button(action: onBack) {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 16, weight: .heavy))
-                            .foregroundStyle(Color.witsWarm)
-                            .frame(width: 52, height: 52)
-                            .background(Color.witsWarm.opacity(0.12), in: Circle())
-                            .accessibilityLabel("all games")
-                    }
-                    .buttonStyle(.plain)
-                }
-                Cta(title: primaryTitle, action: onPlay)
-            }
+            Cta(title: primaryTitle, action: onPlay)
             if let onSurvival {
                 Button(action: onSurvival) {
                     HStack(spacing: 10) {
@@ -242,6 +236,18 @@ struct GameCard: View {
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.top, 8)
         .padding(.bottom, 14)
+    }
+
+    private func closeButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 15, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(.black.opacity(0.28), in: Circle())
+                .accessibilityLabel("close")
+        }
+        .buttonStyle(.plain)
     }
 }
 
