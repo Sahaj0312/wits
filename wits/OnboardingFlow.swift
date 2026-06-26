@@ -429,29 +429,81 @@ struct OnboardingView: View {
             rows.append(["game": "echo grid", "score": s.score, "percentile": result.tests[2].pct,
                          "accuracy": accuracy(s.correctTaps, s.totalTaps)])
         }
-        // Seed the activity baseline from the fit test so the dashboard starts with
-        // real WPI numbers (focus / multitasking / memory) instead of an empty state.
-        let focusAcc = data.flanker.map { accuracy($0.right, $0.right + $0.wrong) } ?? 0.5
-        let multiAcc = data.tracker.map { accuracy($0.correctPicks, $0.totalTargets) } ?? 0.5
-        let memAcc = data.span.map { accuracy($0.correctTaps, $0.totalTaps) } ?? 0.5
-        let domains: [String: Double] = [
-            CognitiveDomain.focus.rawValue:
-                AppModel.domainScore(level: AppModel.onboardingMasteryLevel(seed: GameID.arrowStorm.seedLevel,
-                                                                             accuracy: focusAcc)).rounded(),
-            CognitiveDomain.multitasking.rawValue:
-                AppModel.domainScore(level: AppModel.onboardingMasteryLevel(seed: GameID.crowdControl.seedLevel,
-                                                                             accuracy: multiAcc)).rounded(),
-            CognitiveDomain.memory.rawValue:
-                AppModel.domainScore(level: AppModel.onboardingMasteryLevel(seed: GameID.echoGrid.seedLevel,
-                                                                             accuracy: memAcc)).rounded(),
-        ]
-        let headline = (domains.values.reduce(0, +) / Double(domains.count) * 10).rounded() / 10
+        // Seed the activity baseline through the same calibrated scoring pipeline
+        // used by the main app, so onboarding and WPI do not diverge.
+        let scoredFitTests = fitTestResults().map {
+            ScoringEngine.score($0, previous: .seed(for: $0.game))
+        }
+        let rollup = ScoringAggregator.mergeDailyScores(
+            existingScores: [:],
+            existingConfidence: [:],
+            existingCounts: [:],
+            results: scoredFitTests.map(\.result)
+        )
+        let domains = rollup.scores
+        let headline = ScoringAggregator.headline(domainScores: domains, confidence: rollup.confidence)
+            ?? (domains.values.reduce(0, +) / Double(max(1, domains.count)) * 10).rounded() / 10
         let day = Self.dateString(Date())
         Task {
             try? await supa.saveGameScores(rows)
+            for fit in scoredFitTests {
+                try? await supa.upsertDifficulty(game: fit.result.game, fit.next)
+            }
             try? await supa.upsertDailyProgress(day: day, workoutDone: true, gamesPlayed: 3,
-                                                headlineIndex: headline, domainScores: domains)
+                                                headlineIndex: headline,
+                                                domainScores: domains,
+                                                domainConfidence: rollup.confidence,
+                                                domainSessionCounts: rollup.counts,
+                                                headlineConfidence: ScoringAggregator.headlineConfidence(rollup.confidence),
+                                                coverageCount: rollup.confidence.filter { $0.value > 0 }.count)
         }
+    }
+
+    private func fitTestResults() -> [GameResult] {
+        var results: [GameResult] = []
+        if let f = data.flanker {
+            let total = f.right + f.wrong
+            var r = GameResult(game: .arrowStorm,
+                               score: f.score,
+                               accuracy: accuracy(f.right, total),
+                               trials: total,
+                               durationMs: 45_000)
+            r.raw = [
+                "bestStreak": Double(f.bestStreak),
+                "correct": Double(f.right),
+                "wrong": Double(f.wrong),
+                "timeOnTaskMs": 45_000
+            ]
+            results.append(r)
+        }
+        if let t = data.tracker {
+            var r = GameResult(game: .crowdControl,
+                               score: t.correctPicks * 250,
+                               accuracy: accuracy(t.correctPicks, t.totalTargets),
+                               trials: t.rounds)
+            r.threshold = Double(t.perfectRounds)
+            r.raw = [
+                "perfectRounds": Double(t.perfectRounds),
+                "totalTargets": Double(t.totalTargets),
+                "correctPicks": Double(t.correctPicks)
+            ]
+            results.append(r)
+        }
+        if let s = data.span {
+            var r = GameResult(game: .echoGrid,
+                               score: s.score,
+                               accuracy: accuracy(s.correctTaps, s.totalTaps),
+                               trials: s.trials)
+            r.threshold = Double(s.maxSpan)
+            r.raw = [
+                "maxSpan": Double(s.maxSpan),
+                "perfectTrials": Double(s.perfectTrials),
+                "correctTaps": Double(s.correctTaps),
+                "totalTaps": Double(s.totalTaps)
+            ]
+            results.append(r)
+        }
+        return results
     }
 
     private func complete() {

@@ -99,9 +99,14 @@ struct ProfileRow: Decodable {
 struct DifficultyRow: Decodable {
     var game: String
     var level: Double
+    var mastery: Double?
+    var confidence: Double?
+    var variance: Double?
     var reversals: Int?
     var last_direction: Int?
     var sessions_played: Int?
+    var last_played: String?
+    var scoring_version: String?
 }
 
 struct DailyProgressRow: Codable {
@@ -110,6 +115,12 @@ struct DailyProgressRow: Codable {
     var games_played: Int?
     var headline_index: Double?
     var domain_scores: [String: Double]?
+    var domain_confidence: [String: Double]?
+    var domain_session_counts: [String: Int]?
+    var headline_confidence: Double?
+    var coverage_count: Int?
+    var migration_offset: Double?
+    var scoring_version: String?
     /// The prescribed workout lineup for the day (GameID raw values), so a past
     /// day's recap can show every prescribed game — including ones not completed.
     var workout_games: [String]?
@@ -315,7 +326,7 @@ final class SupabaseManager {
     /// to, so a day's recap can show that exact lineup (vs. free play / replays).
     func saveSession(_ r: GameResult, source: String, workoutID: String? = nil) async throws {
         guard let id = userID else { throw SupabaseError.notSignedIn }
-        var row: [String: Any] = [
+        var legacyRow: [String: Any] = [
             "user_id": id,
             "game": r.game.rawValue,
             "domain": r.domain.rawValue,
@@ -325,46 +336,107 @@ final class SupabaseManager {
             "trials": r.trials,
             "started_at": Self.iso.string(from: r.startedAt),
         ]
-        if let workoutID { row["workout_id"] = workoutID }
-        if let t = r.threshold { row["threshold"] = t }
-        if let rt = r.medianRTms { row["median_rt_ms"] = rt }
-        if let d = r.newDifficulty?.level { row["difficulty"] = d }
-        if !r.raw.isEmpty { row["details"] = r.raw }
-        try await restWrite(table: "game_sessions", body: [row], prefer: "return=minimal")
+        if let workoutID { legacyRow["workout_id"] = workoutID }
+        if let t = r.threshold { legacyRow["threshold"] = t }
+        if let rt = r.medianRTms { legacyRow["median_rt_ms"] = rt }
+        if let d = r.newDifficulty?.level { legacyRow["difficulty"] = d }
+        if !r.raw.isEmpty { legacyRow["details"] = r.raw }
+
+        var row = legacyRow
+        row["base_score"] = r.baseScoreValue
+        row["bonus_multiplier"] = r.bonusMultiplier
+        row["display_score"] = r.displayScoreValue
+        if let v = r.performanceQuality { row["performance_quality"] = v }
+        if let v = r.performanceConfidence { row["performance_confidence"] = v }
+        if let v = r.abilitySignal {
+            row["ability_signal"] = v
+            row["challenge_level"] = r.challengeLevel ?? v
+        }
+        if let v = r.previousDifficulty?.level { row["difficulty_before"] = v }
+        if let v = r.newDifficulty?.level { row["difficulty_after"] = v }
+        if let v = r.previousDifficulty?.mastery { row["mastery_before"] = v }
+        if let v = r.newDifficulty?.mastery { row["mastery_after"] = v }
+        if let v = r.varianceAfter { row["variance_after"] = v }
+        if let v = r.calibratedAbility { row["a_g"] = v }
+        if let v = r.wpiDelta { row["wpi_delta"] = v }
+        if let v = r.scoringVersion { row["scoring_version"] = v }
+
+        do {
+            try await restWrite(table: "game_sessions", body: [row], prefer: "return=minimal")
+        } catch {
+            try await restWrite(table: "game_sessions", body: [legacyRow], prefer: "return=minimal")
+        }
     }
 
     func upsertDifficulty(game: GameID, _ s: DifficultyState) async throws {
         guard let id = userID else { throw SupabaseError.notSignedIn }
-        let row: [String: Any] = [
+        let legacyRow: [String: Any] = [
             "user_id": id, "game": game.rawValue,
             "level": s.level, "reversals": s.reversals,
             "last_direction": s.lastDirection, "sessions_played": s.sessionsPlayed,
             "updated_at": Self.iso.string(from: Date()),
         ]
-        try await restWrite(
-            table: "game_difficulty", body: [row],
-            prefer: "resolution=merge-duplicates,return=minimal",
-            query: [URLQueryItem(name: "on_conflict", value: "user_id,game")]
-        )
+        var row = legacyRow
+        row["mastery"] = s.mastery
+        row["confidence"] = s.confidence
+        row["variance"] = s.variance
+        if let last = s.lastPlayed { row["last_played"] = Self.iso.string(from: last) }
+        row["scoring_version"] = s.scoringVersion
+        let query = [URLQueryItem(name: "on_conflict", value: "user_id,game")]
+        do {
+            try await restWrite(
+                table: "game_difficulty", body: [row],
+                prefer: "resolution=merge-duplicates,return=minimal",
+                query: query
+            )
+        } catch {
+            try await restWrite(
+                table: "game_difficulty", body: [legacyRow],
+                prefer: "resolution=merge-duplicates,return=minimal",
+                query: query
+            )
+        }
     }
 
     func upsertDailyProgress(day: String, workoutDone: Bool, gamesPlayed: Int,
                              headlineIndex: Double?, domainScores: [String: Double],
+                             domainConfidence: [String: Double] = [:],
+                             domainSessionCounts: [String: Int] = [:],
+                             headlineConfidence: Double? = nil,
+                             coverageCount: Int? = nil,
+                             migrationOffset: Double? = nil,
                              workoutGames: [String]? = nil) async throws {
         guard let id = userID else { throw SupabaseError.notSignedIn }
-        var row: [String: Any] = [
+        var legacyRow: [String: Any] = [
             "user_id": id, "day": day,
             "workout_done": workoutDone, "games_played": gamesPlayed,
             "domain_scores": domainScores,
             "updated_at": Self.iso.string(from: Date()),
         ]
-        if let h = headlineIndex { row["headline_index"] = h }
-        if let workoutGames { row["workout_games"] = workoutGames }
-        try await restWrite(
-            table: "daily_progress", body: [row],
-            prefer: "resolution=merge-duplicates,return=minimal",
-            query: [URLQueryItem(name: "on_conflict", value: "user_id,day")]
-        )
+        if let h = headlineIndex { legacyRow["headline_index"] = h }
+        if let workoutGames { legacyRow["workout_games"] = workoutGames }
+
+        var row = legacyRow
+        row["domain_confidence"] = domainConfidence
+        row["domain_session_counts"] = domainSessionCounts
+        if let headlineConfidence { row["headline_confidence"] = headlineConfidence }
+        if let coverageCount { row["coverage_count"] = coverageCount }
+        if let migrationOffset { row["migration_offset"] = migrationOffset }
+        row["scoring_version"] = ScoringVersion.current
+        let query = [URLQueryItem(name: "on_conflict", value: "user_id,day")]
+        do {
+            try await restWrite(
+                table: "daily_progress", body: [row],
+                prefer: "resolution=merge-duplicates,return=minimal",
+                query: query
+            )
+        } catch {
+            try await restWrite(
+                table: "daily_progress", body: [legacyRow],
+                prefer: "resolution=merge-duplicates,return=minimal",
+                query: query
+            )
+        }
     }
 
     func upsertStreak(_ s: StreakState) async throws {

@@ -1,0 +1,606 @@
+//
+//  Scoring.swift
+//  wits
+//
+//  Calibrated WPI scoring. Raw points stay game-local; WPI flows from
+//  game-specific performance into confidence-weighted mastery and domain scores.
+//
+
+import Foundation
+
+enum ScoringVersion {
+    static let current = "v2_policy_calibrated"
+}
+
+struct ScoredRun: Codable, Equatable {
+    var performance: Double
+    var confidence: Double
+    var abilitySignal: Double
+    var metrics: [String: Double] = [:]
+}
+
+struct ScoredSession: Codable, Equatable {
+    var result: GameResult
+    var baseScore: Int
+    var bonusMultiplier: Int
+    var displayScore: Int
+    var run: ScoredRun
+    var previous: DifficultyState
+    var next: DifficultyState
+    var aG: Double
+}
+
+protocol GameScoringPolicy {
+    var targetQuality: Double { get }
+    var stepSize: Double { get }
+    var maxUp: Double { get }
+    var maxDown: Double { get }
+
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun
+    func nextLevel(from result: GameResult, prior: DifficultyState, run: ScoredRun) -> Double
+}
+
+extension GameScoringPolicy {
+    var targetQuality: Double { 0.80 }
+    var stepSize: Double { 0.30 }
+    var maxUp: Double { 0.35 }
+    var maxDown: Double { 0.25 }
+
+    func nextLevel(from result: GameResult, prior: DifficultyState, run: ScoredRun) -> Double {
+        MasteryLadder.adjust(prior, accuracy: result.accuracy).level
+    }
+
+    func nextState(from result: GameResult, prior: DifficultyState, run: ScoredRun) -> DifficultyState {
+        let error = ScoringMath.clamp(run.performance, 0, 1) - targetQuality
+        let rawDelta = stepSize * ScoringMath.clamp(run.confidence, 0, 1) * error / 0.20
+        let delta = ScoringMath.clamp(rawDelta, -maxDown, maxUp)
+        let nextMastery = DifficultyState.clamp(prior.masteryOrLevel + delta)
+
+        let oldDir = prior.lastDirection
+        let dir = delta > 0.0001 ? 1 : (delta < -0.0001 ? -1 : 0)
+        var reversals = prior.reversals
+        if dir != 0, oldDir != 0, dir != oldDir { reversals += 1 }
+
+        let nextConfidence = min(1, prior.confidence + run.confidence * (1 - prior.confidence) * 0.35)
+        return DifficultyState(
+            level: nextLevel(from: result, prior: prior, run: run),
+            mastery: nextMastery,
+            confidence: nextConfidence,
+            variance: max(0.05, 1 - nextConfidence),
+            reversals: reversals,
+            lastDirection: dir == 0 ? oldDir : dir,
+            sessionsPlayed: prior.sessionsPlayed + 1,
+            lastPlayed: result.startedAt,
+            scoringVersion: ScoringVersion.current
+        )
+    }
+}
+
+enum ScoringPolicies {
+    static func policy(for game: GameID) -> any GameScoringPolicy {
+        switch game {
+        case .spotSpeed:
+            SpotSpeedPolicy()
+        case .matchBack:
+            MatchBackPolicy()
+        case .numberRush, .estimator, .arrowStorm, .tileShift, .oddOneOut, .colorClash:
+            ThroughputPolicy(game: game)
+        case .lastSeen:
+            LastSeenPolicy()
+        case .towerOfHanoi:
+            TowerPolicy()
+        case .dotsConnect:
+            DotsPolicy()
+        case .wordConnect:
+            WordConnectPolicy()
+        case .ruleFinder:
+            RuleFinderPolicy()
+        case .memoryLock:
+            MemoryLockPolicy()
+        default:
+            AccuracyPolicy()
+        }
+    }
+}
+
+enum ScoringEngine {
+    static func score(_ result: GameResult, previous: DifficultyState) -> ScoredSession {
+        var r = result
+        let base = r.baseScore ?? r.score
+        let multiplier = max(1, r.bonusMultiplier)
+        let policy = ScoringPolicies.policy(for: r.game)
+        let run = policy.score(r, prior: previous)
+        let next = policy.nextState(from: r, prior: previous, run: run)
+        let aG = ScoringCalibrator.calibratedAbility(game: r.game, mastery: next.mastery)
+        let priorAG = ScoringCalibrator.calibratedAbility(game: r.game, mastery: previous.masteryOrLevel)
+
+        r.baseScore = base
+        r.bonusMultiplier = multiplier
+        r.previousDifficulty = previous
+        r.newDifficulty = next
+        r.performanceQuality = run.performance
+        r.performanceConfidence = run.confidence
+        r.abilitySignal = run.abilitySignal
+        r.challengeLevel = previous.level
+        r.calibratedAbility = aG
+        r.wpiDelta = aG - priorAG
+        r.varianceAfter = next.variance
+        r.scoringVersion = ScoringVersion.current
+        r.raw.merge(run.metrics) { _, new in new }
+        r.raw["baseScore"] = Double(base)
+        r.raw["bonusMultiplier"] = Double(multiplier)
+        r.raw["displayScore"] = Double(r.score)
+        r.raw["performanceQuality"] = run.performance
+        r.raw["performanceConfidence"] = run.confidence
+        r.raw["abilitySignal"] = run.abilitySignal
+        r.raw["masteryBefore"] = previous.masteryOrLevel
+        r.raw["masteryAfter"] = next.mastery
+        r.raw["calibratedAbility"] = aG
+        r.raw["wpiDelta"] = aG - priorAG
+
+        return ScoredSession(
+            result: r,
+            baseScore: base,
+            bonusMultiplier: multiplier,
+            displayScore: r.score,
+            run: run,
+            previous: previous,
+            next: next,
+            aG: aG
+        )
+    }
+}
+
+enum ScoringCalibrator {
+    static let maxWPI = 5000.0
+
+    static func calibratedAbility(game: GameID, mastery: Double) -> Double {
+        let norm = normForGame(game)
+        let z = (DifficultyState.clamp(mastery) - norm.mean) / max(0.5, norm.sd)
+        return ScoringMath.round(ScoringMath.clamp(2500 + 500 * z, 0, maxWPI))
+    }
+
+    private static func normForGame(_ game: GameID) -> (mean: Double, sd: Double) {
+        // Design-time empirical-Bayes prior until real population norms exist.
+        (mean: min(9, game.seedLevel + 3), sd: 2.0)
+    }
+}
+
+enum ScoringAggregator {
+    static let neutralWPI = 2500.0
+    static let shrinkage = 1.0
+
+    static func mergeDailyScores(existingScores: [String: Double],
+                                 existingConfidence: [String: Double],
+                                 existingCounts: [String: Int],
+                                 results: [GameResult]) -> (scores: [String: Double], confidence: [String: Double], counts: [String: Int]) {
+        var scores = existingScores
+        var confidence = existingConfidence
+        var counts = existingCounts
+
+        for result in results {
+            let key = result.domain.rawValue
+            let score = result.calibratedAbility
+                ?? result.newDifficulty.map { ScoringCalibrator.calibratedAbility(game: result.game, mastery: $0.mastery) }
+                ?? ScoringCalibrator.calibratedAbility(game: result.game, mastery: result.game.seedLevel)
+            let weight = max(0.10, min(1.0, result.performanceConfidence ?? 0.5))
+            let oldWeight = max(0, confidence[key] ?? 0)
+            let oldScore = scores[key] ?? neutralWPI
+            let newWeight = oldWeight + weight
+            scores[key] = ScoringMath.round((oldScore * oldWeight + score * weight) / max(0.001, newWeight))
+            confidence[key] = newWeight
+            counts[key, default: 0] += 1
+        }
+
+        return (scores, confidence, counts)
+    }
+
+    static func headline(domainScores: [String: Double], confidence: [String: Double]) -> Double? {
+        guard !domainScores.isEmpty else { return nil }
+        let values = CognitiveDomain.allCases.map { domain -> Double in
+            let key = domain.rawValue
+            guard let score = domainScores[key] else { return neutralWPI }
+            let c = max(0, confidence[key] ?? 1)
+            return (c * score + shrinkage * neutralWPI) / (c + shrinkage)
+        }
+        return ScoringMath.round(values.reduce(0, +) / Double(values.count))
+    }
+
+    static func headlineConfidence(_ confidence: [String: Double]) -> Double {
+        guard !CognitiveDomain.allCases.isEmpty else { return 0 }
+        let capped = CognitiveDomain.allCases.reduce(0.0) { partial, domain in
+            partial + min(1, max(0, confidence[domain.rawValue] ?? 0))
+        }
+        return ScoringMath.round(capped / Double(CognitiveDomain.allCases.count), places: 3)
+    }
+}
+
+struct AccuracyPolicy: GameScoringPolicy {
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let trials = max(1, result.trials)
+        let confidence = ScoringMath.clamp(Double(trials) / 12.0, 0.30, 1.0)
+        return ScoredRun(
+            performance: ScoringMath.clamp(result.accuracy, 0, 1),
+            confidence: confidence,
+            abilitySignal: prior.level,
+            metrics: ["policyConfidence": confidence]
+        )
+    }
+}
+
+struct ThroughputPolicy: GameScoringPolicy {
+    let game: GameID
+    var targetQuality: Double { 0.80 }
+
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let trials = max(1, result.trials)
+        let correct = max(0, result.raw["correct"] ?? (result.accuracy * Double(trials)))
+        let seconds = max(10, (result.raw["timeOnTaskMs"] ?? Double(result.durationMs)) / 1000.0)
+        let rcs = correct / seconds
+        let ref = rcsReference(level: prior.level)
+        let logRatio = log(max(0.01, rcs) / max(0.01, ref))
+        let performance = ScoringMath.logistic(ScoringMath.logit(targetQuality) + logRatio)
+        let confidence = ScoringMath.clamp(min(Double(trials) / 18.0, seconds / 45.0), 0.35, 1.0)
+        return ScoredRun(
+            performance: performance,
+            confidence: confidence,
+            abilitySignal: prior.level,
+            metrics: ["rcs": rcs, "rcsRef": ref, "timeOnTaskMs": seconds * 1000]
+        )
+    }
+
+    private func rcsReference(level: Double) -> Double {
+        switch game {
+        case .numberRush:
+            return 0.12 + level * 0.035
+        case .estimator:
+            return 0.14 + level * 0.025
+        default:
+            return 0.18 + level * 0.04
+        }
+    }
+}
+
+struct SpotSpeedPolicy: GameScoringPolicy {
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let startMs = max(120, 600 - prior.level * 40)
+        let finalMs = result.threshold ?? result.raw["thresholdMs"] ?? startMs
+        let accuracy = ScoringMath.clamp(result.accuracy, 0, 1)
+        let gain = ScoringMath.clamp((startMs - finalMs) / 220.0, -0.5, 1.0)
+        let thresholdScore = ScoringMath.clamp(0.5 + gain * 0.5, 0, 1)
+        let performance = ScoringMath.clamp(0.70 * accuracy + 0.30 * thresholdScore, 0, 1)
+        let confidence = ScoringMath.clamp(Double(max(1, result.trials)) / 18.0, 0.45, 0.90)
+        let ability = ScoringMath.clamp(1 + log2(700.0 / max(80.0, finalMs)) * 2.2, 1, 10)
+        return ScoredRun(
+            performance: performance,
+            confidence: confidence,
+            abilitySignal: ability,
+            metrics: ["thresholdMs": finalMs, "thresholdScore": thresholdScore]
+        )
+    }
+}
+
+struct MatchBackPolicy: GameScoringPolicy {
+    var targetQuality: Double { 0.68 }
+
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let hits = result.raw["hits"] ?? max(0, result.accuracy * Double(result.trials))
+        let misses = result.raw["misses"] ?? 0
+        let falseAlarms = result.raw["falseAlarms"] ?? 0
+        let total = Double(max(1, result.trials))
+        let correctRejections = max(0, total - hits - misses - falseAlarms)
+        let hitRate = ScoringMath.clampedRate(hits, hits + misses)
+        let falseAlarmRate = ScoringMath.clampedRate(falseAlarms, falseAlarms + correctRejections)
+        let dPrime = ScoringMath.inverseNormalCDF(hitRate) - ScoringMath.inverseNormalCDF(falseAlarmRate)
+        let responses = hits + falseAlarms
+        let performance = responses <= 0 ? 0 : ScoringMath.logistic(dPrime / 1.35)
+        let evidence = hits + misses + falseAlarms
+        let confidence = ScoringMath.clamp(evidence / 8.0, 0.35, 1.0)
+        return ScoredRun(
+            performance: performance,
+            confidence: confidence,
+            abilitySignal: result.threshold ?? prior.level,
+            metrics: [
+                "dPrime": dPrime,
+                "hits": hits,
+                "misses": misses,
+                "falseAlarms": falseAlarms,
+                "correctRejections": correctRejections
+            ]
+        )
+    }
+}
+
+struct LastSeenPolicy: GameScoringPolicy {
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let total = max(1, Double(result.trials))
+        let correct = result.raw["correct"] ?? max(0, result.accuracy * total)
+        let wrong = result.raw["wrong"] ?? max(0, total - correct)
+        let remembered = result.raw["remembered"] ?? correct
+        let accuracy = ScoringMath.clamp(correct / max(1, correct + wrong), 0, 1)
+        let memoryLoad = ScoringMath.clamp(remembered / max(3, prior.level + 2), 0, 1.2)
+        let quality = ScoringMath.clamp(0.75 * accuracy + 0.25 * min(1, memoryLoad), 0, 1)
+        return ScoredRun(
+            performance: quality,
+            confidence: ScoringMath.clamp(total / 14.0, 0.35, 1),
+            abilitySignal: ScoringMath.clamp(remembered, 1, 10),
+            metrics: ["remembered": remembered, "memoryLoad": memoryLoad]
+        )
+    }
+}
+
+struct RuleFinderPolicy: GameScoringPolicy {
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let accuracy = ScoringMath.clamp(result.accuracy, 0, 1)
+        let avgTier = result.raw["avgTier"] ?? result.threshold ?? 1
+        let median = Double(result.medianRTms ?? Int(result.raw["medianRTms"] ?? 0))
+        let par = parMedianMs(tier: avgTier)
+        let speed: Double
+        if median > 0 {
+            speed = ScoringMath.clamp(par / median, 0.5, 1.25)
+        } else {
+            speed = 1.0
+        }
+        let normSpeed = ScoringMath.clamp((speed - 0.5) / 0.75, 0, 1)
+        let performance = ScoringMath.clamp(0.80 * accuracy + 0.20 * normSpeed, 0, 1)
+        let confidence = ScoringMath.clamp(Double(max(1, result.trials)) / 10.0, 0.45, 1.0)
+        return ScoredRun(
+            performance: performance,
+            confidence: confidence,
+            abilitySignal: ScoringMath.clamp(avgTier * 2, 1, 10),
+            metrics: ["speedScore": normSpeed, "avgTier": avgTier]
+        )
+    }
+
+    private func parMedianMs(tier: Double) -> Double {
+        let t = Int(ScoringMath.clamp(tier.rounded(), 1, 5))
+        return [0, 6000, 8000, 10500, 13500, 16500][t]
+    }
+}
+
+struct DotsPolicy: GameScoringPolicy {
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let boards = result.raw["boardsSolved"] ?? 0
+        let perRun = max(1, Double(result.trials))
+        let completion = ScoringMath.clamp(boards / perRun, 0, 1)
+        let mistakes = result.raw["mistakes"] ?? 0
+        let hints = result.raw["hintsUsed"] ?? 0
+        let quality = ScoringMath.clamp(completion - min(0.25, mistakes * 0.03) - min(0.25, hints * 0.10), 0, 1)
+        let confidence = boards > 0 ? 0.75 + 0.25 * completion : 0.35
+        return ScoredRun(
+            performance: quality,
+            confidence: confidence,
+            abilitySignal: result.raw["puzzleDifficulty"] ?? prior.level,
+            metrics: ["completion": completion]
+        )
+    }
+}
+
+struct TowerPolicy: GameScoringPolicy {
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let moves = max(1, result.raw["moves"] ?? Double(result.trials))
+        let optimal = max(1, result.raw["optimalMoves"] ?? moves)
+        let seconds = max(1, result.raw["seconds"] ?? Double(result.durationMs) / 1000.0)
+        let targetSeconds = optimal * 2.65
+        let invalid = result.raw["invalidMoves"] ?? 0
+        let moveEfficiency = min(1, optimal / moves)
+        let timeEfficiency = min(1, targetSeconds / seconds)
+        let quality = ScoringMath.clamp(0.75 * moveEfficiency + 0.25 * timeEfficiency - min(0.35, invalid * 0.10), 0, 1)
+        return ScoredRun(
+            performance: quality,
+            confidence: 1.0,
+            abilitySignal: ScoringMath.clamp((result.raw["hanoiLevel"] ?? prior.level) / 3.6, 1, 10),
+            metrics: ["moveEfficiency": moveEfficiency, "timeEfficiency": timeEfficiency]
+        )
+    }
+}
+
+struct WordConnectPolicy: GameScoringPolicy {
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let solved = result.raw["boardsSolved"] ?? 0
+        let perRun = 2.0
+        let completion = ScoringMath.clamp(solved / perRun, 0, 1)
+        let attempts = max(1, Double(result.trials))
+        let correct = (result.raw["requiredWordsFound"] ?? 0) + (result.raw["bonusWordsFound"] ?? 0)
+        let accuracy = ScoringMath.clamp(correct / attempts, 0, 1)
+        let hints = result.raw["hintsUsed"] ?? 0
+        let quality = ScoringMath.clamp(0.65 * completion + 0.35 * accuracy - min(0.25, hints * 0.08), 0, 1)
+        let confidence = solved >= perRun ? 1.0 : 0.55
+        return ScoredRun(
+            performance: quality,
+            confidence: confidence,
+            abilitySignal: result.raw["levelEnd"] ?? result.raw["levelStart"] ?? prior.level,
+            metrics: ["completion": completion, "wordAccuracy": accuracy]
+        )
+    }
+
+    func nextLevel(from result: GameResult, prior: DifficultyState, run: ScoredRun) -> Double {
+        if let levelEnd = result.raw["levelEnd"] {
+            return DifficultyState.clamp(levelEnd)
+        }
+        return DifficultyState.clamp((result.raw["levelStart"] ?? prior.level).rounded(.down))
+    }
+}
+
+struct MemoryLockPolicy: GameScoringPolicy {
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let solved = result.raw["wordsSolved"] ?? max(0, result.accuracy * Double(max(1, result.trials)))
+        let total = max(1, Double(result.trials))
+        let completion = ScoringMath.clamp(solved / total, 0, 1)
+        let guesses = result.raw["guesses"] ?? total
+        let efficiency = ScoringMath.clamp(1 - max(0, guesses - solved) / max(1, guesses), 0, 1)
+        let quality = ScoringMath.clamp(0.75 * completion + 0.25 * efficiency, 0, 1)
+        return ScoredRun(
+            performance: quality,
+            confidence: ScoringMath.clamp(total / 4.0, 0.45, 1),
+            abilitySignal: result.raw["wordLength"] ?? prior.level,
+            metrics: ["completion": completion, "solveEfficiency": efficiency]
+        )
+    }
+}
+
+enum ScoringMath {
+    static func clamp(_ value: Double, _ lo: Double, _ hi: Double) -> Double {
+        min(hi, max(lo, value.isFinite ? value : lo))
+    }
+
+    static func round(_ value: Double, places: Int = 0) -> Double {
+        let scale = pow(10.0, Double(places))
+        return (value * scale).rounded() / scale
+    }
+
+    static func logistic(_ x: Double) -> Double {
+        1 / (1 + exp(-clamp(x, -40, 40)))
+    }
+
+    static func logit(_ p: Double) -> Double {
+        let q = clamp(p, 0.001, 0.999)
+        return log(q / (1 - q))
+    }
+
+    static func clampedRate(_ numerator: Double, _ denominator: Double) -> Double {
+        let n = max(1, denominator)
+        let raw = numerator / n
+        let edge = 1 / (2 * n)
+        return clamp(raw, edge, 1 - edge)
+    }
+
+    // Peter J. Acklam's inverse-normal approximation.
+    static func inverseNormalCDF(_ p: Double) -> Double {
+        let p = clamp(p, 0.000001, 0.999999)
+        let a = [
+            -3.969683028665376e+01, 2.209460984245205e+02,
+            -2.759285104469687e+02, 1.383577518672690e+02,
+            -3.066479806614716e+01, 2.506628277459239e+00
+        ]
+        let b = [
+            -5.447609879822406e+01, 1.615858368580409e+02,
+            -1.556989798598866e+02, 6.680131188771972e+01,
+            -1.328068155288572e+01
+        ]
+        let c = [
+            -7.784894002430293e-03, -3.223964580411365e-01,
+            -2.400758277161838e+00, -2.549732539343734e+00,
+            4.374664141464968e+00, 2.938163982698783e+00
+        ]
+        let d = [
+            7.784695709041462e-03, 3.224671290700398e-01,
+            2.445134137142996e+00, 3.754408661907416e+00
+        ]
+        let plow = 0.02425
+        let phigh = 1 - plow
+        if p < plow {
+            let q = sqrt(-2 * log(p))
+            return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+                / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+        }
+        if p > phigh {
+            let q = sqrt(-2 * log(1 - p))
+            return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5])
+                / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+        }
+        let q = p - 0.5
+        let r = q * q
+        return (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q
+            / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1)
+    }
+}
+
+#if DEBUG
+enum ScoringDiagnostics {
+    private static var hasRun = false
+
+    static func runDebugAssertions() {
+        guard !hasRun else { return }
+        hasRun = true
+
+        testContinuousUpdate()
+        testConfidenceWeighting()
+        testClamping()
+        testDPrimeAntiGaming()
+        testRCSMonotonicity()
+        testDailyAggregation()
+        testBonusIsolation()
+        testWordConnectLevelPersistence()
+        testCrossGameCalibration()
+    }
+
+    private static func testContinuousUpdate() {
+        let prior = DifficultyState(level: 5, mastery: 5, confidence: 1)
+        let policy = AccuracyPolicy()
+        let low = GameResult(game: .memoryLock, score: 0, accuracy: 0.849, trials: 20)
+        let high = GameResult(game: .memoryLock, score: 0, accuracy: 0.851, trials: 20)
+        let lowNext = policy.nextState(from: low, prior: prior, run: policy.score(low, prior: prior))
+        let highNext = policy.nextState(from: high, prior: prior, run: policy.score(high, prior: prior))
+        assert(abs(highNext.mastery - lowNext.mastery) < 0.01, "Scoring cliff near 85% returned")
+        assert(highNext.mastery >= lowNext.mastery, "Higher quality must not lower mastery")
+    }
+
+    private static func testConfidenceWeighting() {
+        let prior = DifficultyState(level: 5, mastery: 5, confidence: 0)
+        let policy = AccuracyPolicy()
+        let thin = GameResult(game: .memoryLock, score: 0, accuracy: 0.95, trials: 2)
+        let solid = GameResult(game: .memoryLock, score: 0, accuracy: 0.95, trials: 20)
+        let thinNext = policy.nextState(from: thin, prior: prior, run: policy.score(thin, prior: prior))
+        let solidNext = policy.nextState(from: solid, prior: prior, run: policy.score(solid, prior: prior))
+        assert((solidNext.mastery - prior.mastery) > (thinNext.mastery - prior.mastery), "Confidence should scale mastery movement")
+    }
+
+    private static func testClamping() {
+        let prior = DifficultyState(level: 10, mastery: 10, confidence: 1)
+        let policy = AccuracyPolicy()
+        let result = GameResult(game: .memoryLock, score: 0, accuracy: 1, trials: 20)
+        let next = policy.nextState(from: result, prior: prior, run: policy.score(result, prior: prior))
+        assert((1...10).contains(next.mastery), "Mastery escaped the 1...10 bounds")
+    }
+
+    private static func testDPrimeAntiGaming() {
+        var result = GameResult(game: .matchBack, score: 0, accuracy: 0.5, trials: 20)
+        result.raw = ["hits": 0, "misses": 10, "falseAlarms": 0, "correctRejections": 10]
+        let run = MatchBackPolicy().score(result, prior: .seed(for: .matchBack))
+        assert(run.performance <= 0.01, "Never-responding should not score as real skill")
+    }
+
+    private static func testRCSMonotonicity() {
+        let policy = ThroughputPolicy(game: .numberRush)
+        let prior = DifficultyState(level: 3, mastery: 3)
+        var fast = GameResult(game: .numberRush, score: 0, accuracy: 1, trials: 10, durationMs: 45_000)
+        fast.raw = ["correct": 10, "timeOnTaskMs": 45_000]
+        var slow = GameResult(game: .numberRush, score: 0, accuracy: 1, trials: 10, durationMs: 45_000)
+        slow.raw = ["correct": 5, "timeOnTaskMs": 45_000]
+        assert(policy.score(fast, prior: prior).performance > policy.score(slow, prior: prior).performance, "RCS should reward higher correct/sec")
+    }
+
+    private static func testDailyAggregation() {
+        var a = GameResult(game: .arrowStorm, score: 0, accuracy: 1)
+        a.calibratedAbility = 3000
+        a.performanceConfidence = 1
+        var b = GameResult(game: .spotSpeed, score: 0, accuracy: 1)
+        b.calibratedAbility = 1000
+        b.performanceConfidence = 1
+        let merged = ScoringAggregator.mergeDailyScores(existingScores: [:], existingConfidence: [:], existingCounts: [:], results: [a, b])
+        assert(merged.scores[CognitiveDomain.focus.rawValue] == 2000, "Same-domain sessions should aggregate, not overwrite")
+        assert(merged.counts[CognitiveDomain.focus.rawValue] == 2, "Domain session count should include both sessions")
+    }
+
+    private static func testBonusIsolation() {
+        var result = GameResult(game: .numberRush, score: 300, baseScore: 100, bonusMultiplier: 3, accuracy: 1, trials: 10, durationMs: 45_000)
+        result.raw = ["correct": 10, "timeOnTaskMs": 45_000]
+        let scored = ScoringEngine.score(result, previous: .seed(for: .numberRush))
+        assert(scored.baseScore == 100 && scored.displayScore == 300, "Base/display score split broke")
+    }
+
+    private static func testWordConnectLevelPersistence() {
+        var result = GameResult(game: .wordConnect, score: 0, accuracy: 0.9, trials: 10)
+        result.raw = ["boardsSolved": 2, "requiredWordsFound": 9, "levelStart": 1, "levelEnd": 2]
+        let scored = ScoringEngine.score(result, previous: .seed(for: .wordConnect))
+        assert(scored.next.level == 2, "WordConnect must persist the unlocked level")
+    }
+
+    private static func testCrossGameCalibration() {
+        let a = ScoringCalibrator.calibratedAbility(game: .arrowStorm, mastery: 7)
+        let b = ScoringCalibrator.calibratedAbility(game: .wordConnect, mastery: 7)
+        assert(a != b, "Game-specific norms should make equal mastery map differently across games")
+    }
+}
+#endif

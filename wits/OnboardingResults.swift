@@ -159,7 +159,7 @@ struct ResultScreen: View {
                         .font(.system(size: 60, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsWarm)
                         .monospacedDigit()
-                    Text("attention age")
+                    Text("fit baseline")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.witsMuted)
                 }
@@ -168,20 +168,20 @@ struct ResultScreen: View {
             .padding(.bottom, 20)
             VStack(spacing: 12) {
                 HStack {
-                    Text("you scored higher than")
+                    Text("starting estimate")
                         .font(.witsBody(14))
                         .foregroundStyle(Color.witsMuted)
                     Spacer()
-                    Text("\(min(97, max(3, 100 - result.percentile)))% of people")
+                    Text("\(min(97, max(3, 100 - result.percentile))) / 100")
                         .font(.system(size: 14.5, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsAccent)
                 }
                 HStack {
-                    Text("vs your actual age")
+                    Text("baseline status")
                         .font(.witsBody(14))
                         .foregroundStyle(Color.witsMuted)
                     Spacer()
-                    Text(result.gap > 0 ? "+\(result.gap) years to gain" : "right on track!")
+                    Text(result.gap > 0 ? "room to grow" : "right on track")
                         .font(.system(size: 14.5, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsInk)
                 }
@@ -194,7 +194,7 @@ struct ResultScreen: View {
                         .foregroundStyle(Color.witsAccent)
                         .frame(width: 20, height: 20)
                         .background(Color.witsAccent.opacity(0.16), in: Circle())
-                    Text("your strongest area: \(result.best.skill). you scored higher than \(result.best.pct)% of people on \(result.best.name).")
+                    Text("your strongest area today: \(result.best.skill). \(result.best.name) is your best fit-test signal so far.")
                         .font(.system(size: 13.5, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.witsMuted)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -283,7 +283,7 @@ struct BreakdownScreen: View {
                 .font(.witsDisplay(32))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("here's how you scored on each game compared to other people.")
+            Text("here's your starting baseline for each fit-test game.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
@@ -309,14 +309,14 @@ struct BreakdownScreen: View {
                                     value: curvesShown
                                 )
                             VStack(alignment: .leading, spacing: 1) {
-                                Text("higher than")
+                                Text("fit score")
                                     .font(.witsBody(12.5))
                                     .foregroundStyle(Color.witsMuted)
                                 Text("\(test.pct)%")
                                     .font(.system(size: 30, weight: .heavy, design: .rounded))
                                     .foregroundStyle(Color.witsAccent)
                                     .monospacedDigit()
-                                Text("of people")
+                                Text("baseline")
                                     .font(.witsBody(12.5))
                                     .foregroundStyle(Color.witsMuted)
                             }
@@ -584,10 +584,6 @@ struct ProjectionScreen: View {
         }
     }
 
-    private var futureAge: Int {
-        max(18, result.age - max(6, Int((Double(result.gap) * 0.6).rounded())))
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
@@ -596,7 +592,7 @@ struct ProjectionScreen: View {
                 .font(.witsDisplay(32))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("with just 5 minutes a day, your attention age could improve from \(Text("\(result.age)").foregroundStyle(Color.witsWarm).bold()) to \(Text("\(futureAge)").foregroundStyle(Color.witsAccent).bold()) in 30 days.")
+            Text("with just 5 minutes a day, these starting baselines can become stronger training signals over the next 30 days.")
                 .font(.witsBody(16))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)

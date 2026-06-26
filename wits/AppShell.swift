@@ -40,10 +40,18 @@ struct ActivityTab: View {
     private var headlinePoints: [SeriesPoint] { ProgressMath.headlineSeries(app.progressDays) }
     private var domainScores: [CognitiveDomain: Double] { ProgressMath.latestDomainScores(app.progressDays) }
     private var heroScore: Double? { ProgressMath.headline(app.progressDays) }
-    private var domainRows: [(domain: CognitiveDomain, value: Double)] {
-        CognitiveDomain.allCases.compactMap { d in domainScores[d].map { (d, $0) } }
+    private var latestProgress: DailyProgressRow? {
+        app.progressDays.filter { $0.workout_done == true }.sorted { ($0.dayDate ?? .distantPast) < ($1.dayDate ?? .distantPast) }.last
     }
-
+    private var coverageCount: Int {
+        latestProgress?.coverage_count ?? domainScores.count
+    }
+    private var wpiStateLabel: String {
+        guard heroScore != nil else { return "WPI" }
+        if coverageCount <= 2 { return "calibrating" }
+        if coverageCount <= 4 { return "early estimate" }
+        return "WPI"
+    }
     /// Single headline number, top-right.
     private var wpiBadge: some View {
         VStack(spacing: 1) {
@@ -51,7 +59,7 @@ struct ActivityTab: View {
                 .font(.system(size: 34, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.witsAccent)
                 .monospacedDigit()
-            Text("WPI")
+            Text(wpiStateLabel)
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.witsMuted)
         }
@@ -98,9 +106,13 @@ struct ActivityTab: View {
                     VStack(spacing: 10) {
                         MetricBar(label: "overall", value: heroScore ?? 0,
                                   series: headlinePoints, emphasized: true)
-                        ForEach(domainRows, id: \.domain) { row in
-                            MetricBar(label: row.domain.label, value: row.value,
-                                      series: ProgressMath.domainSeries(app.progressDays, row.domain))
+                        ForEach(CognitiveDomain.allCases) { domain in
+                            if let value = domainScores[domain] {
+                                MetricBar(label: domain.label, value: value,
+                                          series: ProgressMath.domainSeries(app.progressDays, domain))
+                            } else {
+                                untrainedDomainRow(domain)
+                            }
                         }
                     }
                 }
@@ -130,6 +142,21 @@ struct ActivityTab: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardSurface()
+    }
+
+    private func untrainedDomainRow(_ domain: CognitiveDomain) -> some View {
+        HStack {
+            Text(domain.label)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.witsInk)
+            Spacer()
+            Text("not trained yet")
+                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .foregroundStyle(Color.witsFaint)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity)
+        .cardSurface()
     }
 }
 
@@ -162,19 +189,19 @@ private struct ScoringInfoSheet: View {
                 VStack(alignment: .leading, spacing: 10) {
                     infoRow(icon: "bolt.fill",
                             title: "WPI is your training score",
-                            body: "WPI is based on the mastery level you have earned in each skill area. It is separate from the points you see inside a game.")
+                            body: "WPI estimates your current skill from recent performance, measured against each game's own difficulty.")
                     divider
                     infoRow(icon: "number",
-                            title: "Skill score = mastery × 500",
-                            body: "Each game has a mastery level from 1 to 10. A level 4 skill is about 2000 WPI; level 10 is 5000.")
+                            title: "Points and WPI are separate",
+                            body: "Points reward one round. WPI moves more slowly from accuracy, speed, challenge, and confidence.")
                     divider
                     infoRow(icon: "arrow.up.arrow.down",
-                            title: "Scores can move down",
-                            body: "Strong runs raise mastery. Weaker runs lower it gently, so WPI reflects current performance instead of only showing your best ever result.")
+                            title: "Scores can move both ways",
+                            body: "Strong runs raise your estimate. Weaker or stale areas become less certain, so WPI reflects current training.")
                     divider
                     infoRow(icon: "chart.bar.fill",
                             title: "Overall is an average",
-                            body: "Your overall WPI is the average of trained skill scores. New skill areas appear after you play games in those areas.")
+                            body: "Each skill area has its own score out of 5000. New areas calibrate as you train them.")
                 }
                 .padding(14)
                 .cardSurface()

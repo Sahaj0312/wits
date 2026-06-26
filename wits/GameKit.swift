@@ -324,18 +324,70 @@ struct GameStats: Codable {
 
 // MARK: - Adaptive difficulty
 
-/// Persisted per-user, per-game mastery state. `level` is a continuous 1…10
-/// parameter each game interprets in its own units (response window, span
-/// length, # of targets, …). The same level is also the official scoring signal:
-/// WPI contribution = `level * 500`.
+/// Persisted per-user, per-game state. `level` controls the next run's challenge;
+/// `mastery` is the score estimate used by WPI.
 struct DifficultyState: Codable, Equatable {
     var level: Double
+    var mastery: Double
+    var confidence: Double
+    var variance: Double
     var reversals: Int = 0
     var lastDirection: Int = 0
     var sessionsPlayed: Int = 0
+    var lastPlayed: Date? = nil
+    var scoringVersion: String = "v1_legacy"
+
+    init(level: Double,
+         mastery: Double? = nil,
+         confidence: Double = 0,
+         variance: Double = 1,
+         reversals: Int = 0,
+         lastDirection: Int = 0,
+         sessionsPlayed: Int = 0,
+         lastPlayed: Date? = nil,
+         scoringVersion: String = "v1_legacy") {
+        let clamped = Self.clamp(level)
+        self.level = clamped
+        self.mastery = Self.clamp(mastery ?? clamped)
+        self.confidence = min(1, max(0, confidence))
+        self.variance = max(0.05, variance)
+        self.reversals = reversals
+        self.lastDirection = lastDirection
+        self.sessionsPlayed = sessionsPlayed
+        self.lastPlayed = lastPlayed
+        self.scoringVersion = scoringVersion
+    }
 
     static func seed(for g: GameID) -> DifficultyState {
-        DifficultyState(level: g.seedLevel)
+        DifficultyState(level: g.seedLevel, mastery: g.seedLevel, variance: 1.2)
+    }
+
+    var masteryOrLevel: Double { mastery.isFinite ? mastery : level }
+
+    static func clamp(_ value: Double) -> Double {
+        min(10, max(1, value.isFinite ? value : 1))
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case level, mastery, confidence, variance, reversals, lastDirection, sessionsPlayed, lastPlayed, scoringVersion
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let decodedLevel = try c.decode(Double.self, forKey: .level)
+        let sessions = try c.decodeIfPresent(Int.self, forKey: .sessionsPlayed) ?? 0
+        let decodedMastery = try c.decodeIfPresent(Double.self, forKey: .mastery)
+        let decodedConfidence = try c.decodeIfPresent(Double.self, forKey: .confidence)
+            ?? min(1, Double(sessions) / 8.0)
+        self.init(level: decodedLevel,
+                  mastery: decodedMastery,
+                  confidence: decodedConfidence,
+                  variance: try c.decodeIfPresent(Double.self, forKey: .variance) ?? max(0.2, 1.0 - decodedConfidence),
+                  reversals: try c.decodeIfPresent(Int.self, forKey: .reversals) ?? 0,
+                  lastDirection: try c.decodeIfPresent(Int.self, forKey: .lastDirection) ?? 0,
+                  sessionsPlayed: sessions,
+                  lastPlayed: try c.decodeIfPresent(Date.self, forKey: .lastPlayed),
+                  scoringVersion: try c.decodeIfPresent(String.self, forKey: .scoringVersion) ?? "v1_legacy")
     }
 }
 
@@ -374,36 +426,71 @@ enum MasteryLadder {
 struct GameResult: Codable, Equatable {
     let game: GameID
     var score: Int
+    var baseScore: Int? = nil
+    var bonusMultiplier: Int = 1
     var accuracy: Double            // 0...1 — the mastery adjustment signal
     var medianRTms: Int? = nil
     var threshold: Double? = nil    // converged difficulty parameter this run
     var trials: Int = 0
     var newDifficulty: DifficultyState? = nil
+    var previousDifficulty: DifficultyState? = nil
+    var performanceQuality: Double? = nil
+    var performanceConfidence: Double? = nil
+    var abilitySignal: Double? = nil
+    var challengeLevel: Double? = nil
+    var calibratedAbility: Double? = nil
+    var wpiDelta: Double? = nil
+    var varianceAfter: Double? = nil
+    var scoringVersion: String? = nil
     var startedAt: Date = Date()
     var durationMs: Int = 0
     var raw: [String: Double] = [:] // game-specific extras → game_sessions.details
     var text: [String: [String]] = [:]
 
     var domain: CognitiveDomain { game.domain }
+    var baseScoreValue: Int { baseScore ?? score }
+    var displayScoreValue: Int { score }
 
     init(game: GameID,
          score: Int,
+         baseScore: Int? = nil,
+         bonusMultiplier: Int = 1,
          accuracy: Double,
          medianRTms: Int? = nil,
          threshold: Double? = nil,
          trials: Int = 0,
          newDifficulty: DifficultyState? = nil,
+         previousDifficulty: DifficultyState? = nil,
+         performanceQuality: Double? = nil,
+         performanceConfidence: Double? = nil,
+         abilitySignal: Double? = nil,
+         challengeLevel: Double? = nil,
+         calibratedAbility: Double? = nil,
+         wpiDelta: Double? = nil,
+         varianceAfter: Double? = nil,
+         scoringVersion: String? = nil,
          startedAt: Date = Date(),
          durationMs: Int = 0,
          raw: [String: Double] = [:],
          text: [String: [String]] = [:]) {
         self.game = game
         self.score = score
+        self.baseScore = baseScore
+        self.bonusMultiplier = bonusMultiplier
         self.accuracy = accuracy
         self.medianRTms = medianRTms
         self.threshold = threshold
         self.trials = trials
         self.newDifficulty = newDifficulty
+        self.previousDifficulty = previousDifficulty
+        self.performanceQuality = performanceQuality
+        self.performanceConfidence = performanceConfidence
+        self.abilitySignal = abilitySignal
+        self.challengeLevel = challengeLevel
+        self.calibratedAbility = calibratedAbility
+        self.wpiDelta = wpiDelta
+        self.varianceAfter = varianceAfter
+        self.scoringVersion = scoringVersion
         self.startedAt = startedAt
         self.durationMs = durationMs
         self.raw = raw
@@ -411,18 +498,32 @@ struct GameResult: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case game, score, accuracy, medianRTms, threshold, trials, newDifficulty, startedAt, durationMs, raw, text
+        case game, score, baseScore, bonusMultiplier, accuracy, medianRTms, threshold, trials
+        case newDifficulty, previousDifficulty, performanceQuality, performanceConfidence
+        case abilitySignal, challengeLevel, calibratedAbility, wpiDelta, varianceAfter
+        case scoringVersion, startedAt, durationMs, raw, text
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         game = try c.decode(GameID.self, forKey: .game)
         score = try c.decode(Int.self, forKey: .score)
+        baseScore = try c.decodeIfPresent(Int.self, forKey: .baseScore)
+        bonusMultiplier = try c.decodeIfPresent(Int.self, forKey: .bonusMultiplier) ?? 1
         accuracy = try c.decode(Double.self, forKey: .accuracy)
         medianRTms = try c.decodeIfPresent(Int.self, forKey: .medianRTms)
         threshold = try c.decodeIfPresent(Double.self, forKey: .threshold)
         trials = try c.decodeIfPresent(Int.self, forKey: .trials) ?? 0
         newDifficulty = try c.decodeIfPresent(DifficultyState.self, forKey: .newDifficulty)
+        previousDifficulty = try c.decodeIfPresent(DifficultyState.self, forKey: .previousDifficulty)
+        performanceQuality = try c.decodeIfPresent(Double.self, forKey: .performanceQuality)
+        performanceConfidence = try c.decodeIfPresent(Double.self, forKey: .performanceConfidence)
+        abilitySignal = try c.decodeIfPresent(Double.self, forKey: .abilitySignal)
+        challengeLevel = try c.decodeIfPresent(Double.self, forKey: .challengeLevel)
+        calibratedAbility = try c.decodeIfPresent(Double.self, forKey: .calibratedAbility)
+        wpiDelta = try c.decodeIfPresent(Double.self, forKey: .wpiDelta)
+        varianceAfter = try c.decodeIfPresent(Double.self, forKey: .varianceAfter)
+        scoringVersion = try c.decodeIfPresent(String.self, forKey: .scoringVersion)
         startedAt = try c.decodeIfPresent(Date.self, forKey: .startedAt) ?? Date()
         durationMs = try c.decodeIfPresent(Int.self, forKey: .durationMs) ?? 0
         raw = try c.decodeIfPresent([String: Double].self, forKey: .raw) ?? [:]
@@ -433,11 +534,22 @@ struct GameResult: Codable, Equatable {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(game, forKey: .game)
         try c.encode(score, forKey: .score)
+        try c.encodeIfPresent(baseScore, forKey: .baseScore)
+        try c.encode(bonusMultiplier, forKey: .bonusMultiplier)
         try c.encode(accuracy, forKey: .accuracy)
         try c.encodeIfPresent(medianRTms, forKey: .medianRTms)
         try c.encodeIfPresent(threshold, forKey: .threshold)
         try c.encode(trials, forKey: .trials)
         try c.encodeIfPresent(newDifficulty, forKey: .newDifficulty)
+        try c.encodeIfPresent(previousDifficulty, forKey: .previousDifficulty)
+        try c.encodeIfPresent(performanceQuality, forKey: .performanceQuality)
+        try c.encodeIfPresent(performanceConfidence, forKey: .performanceConfidence)
+        try c.encodeIfPresent(abilitySignal, forKey: .abilitySignal)
+        try c.encodeIfPresent(challengeLevel, forKey: .challengeLevel)
+        try c.encodeIfPresent(calibratedAbility, forKey: .calibratedAbility)
+        try c.encodeIfPresent(wpiDelta, forKey: .wpiDelta)
+        try c.encodeIfPresent(varianceAfter, forKey: .varianceAfter)
+        try c.encodeIfPresent(scoringVersion, forKey: .scoringVersion)
         try c.encode(startedAt, forKey: .startedAt)
         try c.encode(durationMs, forKey: .durationMs)
         try c.encode(raw, forKey: .raw)
@@ -476,7 +588,7 @@ struct GameConfig {
 
 protocol Game {
     static var id: GameID { get }
-    /// Pure mastery update from a finished run's accuracy.
+    /// Legacy challenge-level update from a finished run's accuracy.
     static func advance(_ s: DifficultyState, accuracy: Double) -> DifficultyState
     /// The playable view; calls onComplete(GameResult) when the scored run ends.
     @MainActor static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView

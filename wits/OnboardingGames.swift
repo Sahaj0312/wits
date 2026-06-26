@@ -409,7 +409,12 @@ struct FlankerScreen: View {
             r.threshold = window
             r.startedAt = startedAt
             r.durationMs = Int(Self.gameSeconds * 1000)
-            r.raw = ["bestStreak": Double(stats.bestStreak)]
+            r.raw = [
+                "bestStreak": Double(stats.bestStreak),
+                "correct": Double(stats.right),
+                "wrong": Double(stats.wrong),
+                "timeOnTaskMs": Self.gameSeconds * 1000
+            ]
             onResult(r)
         } else {
             onComplete?(stats)
@@ -642,7 +647,11 @@ struct TrackerScreen: View {
             r.trials = stats.rounds
             r.threshold = Double(stats.perfectRounds)
             r.startedAt = startedAt
-            r.raw = ["perfectRounds": Double(stats.perfectRounds), "totalTargets": Double(stats.totalTargets)]
+            r.raw = [
+                "perfectRounds": Double(stats.perfectRounds),
+                "totalTargets": Double(stats.totalTargets),
+                "correctPicks": Double(stats.correctPicks)
+            ]
             onResult(r)
         } else {
             onComplete?(stats)
@@ -1057,7 +1066,12 @@ struct SpanScreen: View {
             r.trials = stats.trials
             r.threshold = Double(stats.maxSpan)
             r.startedAt = startedAt
-            r.raw = ["maxSpan": Double(stats.maxSpan), "perfectTrials": Double(stats.perfectTrials)]
+            r.raw = [
+                "maxSpan": Double(stats.maxSpan),
+                "perfectTrials": Double(stats.perfectTrials),
+                "correctTaps": Double(stats.correctTaps),
+                "totalTaps": Double(stats.totalTaps)
+            ]
             onResult(r)
         } else {
             onComplete?(stats)

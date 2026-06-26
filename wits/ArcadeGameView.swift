@@ -182,7 +182,13 @@ struct ArcadeGameView: View {
         res.threshold = scene.spawner.speed
         res.startedAt = startedAt
         res.durationMs = Int(cfg.targetDurationSec * 1000)
-        res.raw = ["bestStreak": Double(bestCombo)]
+        res.raw = [
+            "bestStreak": Double(bestCombo),
+            "correct": Double(hits),
+            "wrong": Double(misses + near),
+            "nearMisses": Double(near),
+            "timeOnTaskMs": cfg.targetDurationSec * 1000
+        ]
         onResult(res)
     }
 }

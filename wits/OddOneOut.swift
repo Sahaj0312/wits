@@ -176,7 +176,12 @@ struct OddOneOutScreen: View {
         r.trials = total
         r.startedAt = startedAt
         r.durationMs = Int(Self.gameSeconds * 1000)
-        r.raw = ["bestStreak": Double(bestStreak)]
+        r.raw = [
+            "bestStreak": Double(bestStreak),
+            "correct": Double(right),
+            "wrong": Double(wrong),
+            "timeOnTaskMs": Self.gameSeconds * 1000
+        ]
         onResult(r)
     }
 }

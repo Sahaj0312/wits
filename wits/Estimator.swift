@@ -155,7 +155,13 @@ struct EstimatorScreen: View {
         var r = GameResult(game: .estimator, score: score, accuracy: acc)
         r.trials = total
         r.startedAt = startedAt
-        r.raw = ["bestStreak": Double(bestStreak)]
+        r.durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+        r.raw = [
+            "bestStreak": Double(bestStreak),
+            "correct": Double(right),
+            "wrong": Double(wrong),
+            "timeOnTaskMs": Double(r.durationMs)
+        ]
         onResult(r)
     }
 }
