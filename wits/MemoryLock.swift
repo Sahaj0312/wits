@@ -245,6 +245,12 @@ struct MemoryLockScreen: View {
         }
 
         let guessWord = current.lowercased()
+        guard Self.isValidGuess(guessWord, length: wordLength) else {
+            message = "not a word"
+            GameFeel.shared.play(.wrong)
+            return
+        }
+
         let marks = Self.evaluate(guess: guessWord, target: target)
         let guess = SubmittedGuess(word: guessWord.uppercased(), marks: marks)
         guesses.append(guess)
@@ -377,10 +383,18 @@ struct MemoryLockScreen: View {
         return marks
     }
 
+    private static func isValidGuess(_ word: String, length: Int) -> Bool {
+        EnglishWordValidator.isValidWord(word, length: length, acceptedWords: Set(answerPool(length: length)))
+    }
+
     private static func pickWord(length: Int, excluding used: Set<String> = []) -> String {
-        let pool = length == 6 ? sixLetterWords : fiveLetterWords
+        let pool = answerPool(length: length)
         let available = pool.filter { !used.contains($0) }
         return (available.isEmpty ? pool : available).randomElement() ?? "crane"
+    }
+
+    private static func answerPool(length: Int) -> [String] {
+        length == 6 ? sixLetterWords : fiveLetterWords
     }
 
     private static let fiveLetterWords = [
