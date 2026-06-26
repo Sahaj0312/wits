@@ -12,6 +12,12 @@ struct witsApp: App {
     @State private var app = AppModel(supa: .shared)
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        #if DEBUG
+        ScoringDiagnostics.runDebugAssertions()
+        #endif
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

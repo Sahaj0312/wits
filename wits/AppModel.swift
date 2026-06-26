@@ -166,19 +166,20 @@ final class AppModel {
 
     // MARK: Game / workout events
 
-    /// Called as each game in a workout finishes: persist the run + advance the
-    /// game's persisted mastery level.
-    func recordGameResult(_ result: GameResult, source: String = "workout", workoutID: String? = nil) {
+    /// Called as each game finishes: score the run, persist it, and advance the
+    /// game's challenge/mastery state.
+    @discardableResult
+    func recordGameResult(_ result: GameResult, source: String = "workout", workoutID: String? = nil) -> GameResult {
         let id = result.game
         let current = difficulty[id] ?? .seed(for: id)
-        let next = advanceDifficulty(for: id, current, accuracy: result.accuracy)
+        let scored = ScoringEngine.score(result, previous: current)
+        let next = scored.next
         difficulty[id] = next
-        var r = result
-        r.newDifficulty = next
+        let r = scored.result
 
         var st = gameStats[id] ?? GameStats()
         st.totalPlays += 1
-        st.bestScore = max(st.bestScore, r.score)
+        st.bestScore = max(st.bestScore, r.baseScoreValue)
         if let v = r.raw[id.statKey] {
             if let cur = st.bestStat {
                 st.bestStat = id.statLowerIsBetter ? min(cur, v) : max(cur, v)
@@ -194,9 +195,7 @@ final class AppModel {
             try? await supa.upsertDifficulty(game: id, next)
         }
 
-        // Free play moves your wits score, but does NOT advance the daily streak —
-        // that only continues by completing the daily workout.
-        if source == "free_play" { recordDayActivity([result], countsForStreak: false) }
+        return r
     }
 
     // MARK: Daily challenge (surprise extra game)
@@ -210,8 +209,9 @@ final class AppModel {
     var dailyChallengeDone: Bool { UserDefaults.standard.bool(forKey: challengeKey) }
 
     func completeDailyChallenge(_ result: GameResult) {
-        recordGameResult(result, source: "challenge")
+        let scored = recordGameResult(result, source: "challenge")
         guard !dailyChallengeDone else { return }
+        recordDayActivity([scored], countsForStreak: false)
         UserDefaults.standard.set(true, forKey: challengeKey)
         saveCache()
     }
@@ -223,23 +223,23 @@ final class AppModel {
     func recordWorkoutGame(_ result: GameResult) {
         // Stamp the run with today's prescribed-workout id so the day's recap can
         // show this exact lineup, distinct from free play / replays.
-        recordGameResult(result, source: "workout", workoutID: today.id.uuidString)
+        let scored = recordGameResult(result, source: "workout", workoutID: today.id.uuidString)
         if today.results.count < today.games.count {
-            today.results.append(result)
+            today.results.append(scored)
         }
         saveCache()
         // Roll up after each game so progress + the prescribed lineup are saved even
         // if the user backs out partway. countsForStreak only on the last game.
         let complete = today.results.count >= today.games.count
-        recordDayActivity([result], countsForStreak: complete, prescribed: today.games)
+        recordDayActivity([scored], countsForStreak: complete, prescribed: today.games)
     }
 
     /// Fold a just-played game into today's rollup: accumulate domain scores,
     /// refresh the wits score + improvement chart, and persist the prescribed lineup.
-    /// `workout_done` marks an *active* day (any scored game, incl.
-    /// free play) — the journey decides "completed" from games played vs. the
-    /// prescribed lineup, not from this flag. The streak advances only when
-    /// `countsForStreak` is true (the full daily workout was completed).
+    /// `workout_done` marks a counted progress day (workout or daily challenge).
+    /// Free play updates game mastery only. The journey decides "completed" from
+    /// games played vs. the prescribed lineup, not from this flag. The streak
+    /// advances only when `countsForStreak` is true.
     private func recordDayActivity(_ results: [GameResult], countsForStreak: Bool,
                                    prescribed: [GameID]? = nil) {
         guard !results.isEmpty else { return }
@@ -249,11 +249,25 @@ final class AppModel {
 
         let dayKey = SupabaseManager.dayString(Date())
         let existing = progressDays.first(where: { $0.day == dayKey })
-        // accumulate today's domain scores so multiple sessions build the picture
-        var domains = existing?.domain_scores ?? [:]
-        for (k, v) in domainScores(from: results) { domains[k] = v }
-        let headline = Self.headline(from: domains)
+        let merged = ScoringAggregator.mergeDailyScores(
+            existingScores: existing?.domain_scores ?? [:],
+            existingConfidence: existing?.domain_confidence ?? [:],
+            existingCounts: existing?.domain_session_counts ?? [:],
+            results: results
+        )
+        let domains = merged.scores
+        let domainConfidence = merged.confidence
+        let domainCounts = merged.counts
+        let rawHeadline = ScoringAggregator.headline(domainScores: domains, confidence: domainConfidence)
+            ?? Self.headline(from: domains)
+        let anchored = Self.migrationAnchoredHeadline(unanchored: rawHeadline,
+                                                      existing: existing,
+                                                      progressDays: progressDays,
+                                                      dayKey: dayKey)
+        let headline = anchored.headline
         headlineIndex = headline
+        let headlineConfidence = ScoringAggregator.headlineConfidence(domainConfidence)
+        let coverageCount = domainConfidence.filter { $0.value > 0 }.count
         let played = (existing?.games_played ?? 0) + results.count
         // Persist the prescribed lineup (once we know it); keep any earlier value.
         let lineup = prescribed?.map(\.rawValue) ?? existing?.workout_games
@@ -263,12 +277,24 @@ final class AppModel {
             progressDays[i].games_played = played
             progressDays[i].headline_index = headline
             progressDays[i].domain_scores = domains
+            progressDays[i].domain_confidence = domainConfidence
+            progressDays[i].domain_session_counts = domainCounts
+            progressDays[i].headline_confidence = headlineConfidence
+            progressDays[i].coverage_count = coverageCount
+            progressDays[i].migration_offset = anchored.offset
+            progressDays[i].scoring_version = ScoringVersion.current
             progressDays[i].workout_games = lineup
         } else {
             progressDays.append(DailyProgressRow(day: dayKey, workout_done: true,
                                                  games_played: played,
                                                  headline_index: headline,
                                                  domain_scores: domains,
+                                                 domain_confidence: domainConfidence,
+                                                 domain_session_counts: domainCounts,
+                                                 headline_confidence: headlineConfidence,
+                                                 coverage_count: coverageCount,
+                                                 migration_offset: anchored.offset,
+                                                 scoring_version: ScoringVersion.current,
                                                  workout_games: lineup))
         }
         saveCache()
@@ -278,8 +304,58 @@ final class AppModel {
                                                 gamesPlayed: played,
                                                 headlineIndex: headline,
                                                 domainScores: domains,
+                                                domainConfidence: domainConfidence,
+                                                domainSessionCounts: domainCounts,
+                                                headlineConfidence: headlineConfidence,
+                                                coverageCount: coverageCount,
+                                                migrationOffset: anchored.offset,
                                                 workoutGames: lineup)
         }
+    }
+
+    private static func migrationAnchoredHeadline(unanchored: Double,
+                                                  existing: DailyProgressRow?,
+                                                  progressDays: [DailyProgressRow],
+                                                  dayKey: String) -> (headline: Double, offset: Double?) {
+        let raw = ScoringMath.clamp(unanchored, 0, ScoringCalibrator.maxWPI)
+        let currentDay = parseDate(dayKey)
+
+        if existing?.scoring_version == ScoringVersion.current {
+            let offset = existing?.migration_offset ?? 0
+            return (ScoringMath.round(ScoringMath.clamp(raw + offset, 0, ScoringCalibrator.maxWPI)), nonZeroOffset(offset))
+        }
+
+        let previousRows = progressDays
+            .filter { $0.day < dayKey }
+            .sorted { ($0.dayDate ?? .distantPast) < ($1.dayDate ?? .distantPast) }
+
+        if let firstAnchor = previousRows.first(where: {
+            $0.scoring_version == ScoringVersion.current && $0.migration_offset != nil
+        }),
+           let initialOffset = firstAnchor.migration_offset,
+           let start = firstAnchor.dayDate,
+           let currentDay {
+            let cal = Calendar.current
+            let days = cal.dateComponents([.day],
+                                          from: cal.startOfDay(for: start),
+                                          to: cal.startOfDay(for: currentDay)).day ?? 0
+            let factor = max(0, 1 - Double(max(0, days)) / 14.0)
+            let offset = initialOffset * factor
+            return (ScoringMath.round(ScoringMath.clamp(raw + offset, 0, ScoringCalibrator.maxWPI)), nonZeroOffset(offset))
+        }
+
+        let previousHeadline = existing?.headline_index
+            ?? previousRows.reversed().compactMap(\.headline_index).first
+        guard let previousHeadline else {
+            return (ScoringMath.round(raw), nil)
+        }
+
+        let offset = ScoringMath.clamp(previousHeadline - raw, -1000, 1000)
+        return (ScoringMath.round(ScoringMath.clamp(raw + offset, 0, ScoringCalibrator.maxWPI)), nonZeroOffset(offset))
+    }
+
+    private static func nonZeroOffset(_ offset: Double) -> Double? {
+        abs(offset) >= 0.5 ? ScoringMath.round(offset, places: 1) : nil
     }
 
     // MARK: Reconcile (network → state)
@@ -302,10 +378,16 @@ final class AppModel {
         if let rows = try? await supa.fetchDifficulty() {
             for row in rows {
                 guard let id = GameID(rawValue: row.game) else { continue }
+                let sessions = row.sessions_played ?? 0
                 difficulty[id] = DifficultyState(level: row.level,
+                                                 mastery: row.mastery,
+                                                 confidence: row.confidence ?? min(1, Double(sessions) / 8.0),
+                                                 variance: row.variance ?? 1,
                                                  reversals: row.reversals ?? 0,
                                                  lastDirection: row.last_direction ?? 0,
-                                                 sessionsPlayed: row.sessions_played ?? 0)
+                                                 sessionsPlayed: sessions,
+                                                 lastPlayed: Self.parseServerTimestamp(row.last_played),
+                                                 scoringVersion: row.scoring_version ?? "v1_legacy")
             }
         }
 
@@ -375,9 +457,7 @@ final class AppModel {
     static let masteryMax = 10.0
     static let wpiMax = 5000.0
 
-    /// Converts the user's current mastery level into WPI. Accuracy changes the
-    /// next mastery level through `MasteryLadder`; the visible score is the level
-    /// the user has earned after that adjustment.
+    /// Legacy fallback for old rows that only have a level.
     static func wpiScore(level: Double) -> Double {
         (min(masteryMax, max(masteryMin, level)) * (wpiMax / masteryMax)).rounded()
     }
@@ -408,17 +488,23 @@ final class AppModel {
     }
 
     func domainScores(from results: [GameResult]) -> [String: Double] {
-        Self.domainScores(from: results, levelFor: { [difficulty] g in
-            difficulty[g]?.level ?? g.seedLevel
+        Self.domainScores(from: results, stateFor: { [difficulty] g in
+            difficulty[g] ?? .seed(for: g)
         })
     }
 
     static func domainScores(from results: [GameResult],
                              levelFor: (GameID) -> Double) -> [String: Double] {
+        domainScores(from: results, stateFor: { g in DifficultyState(level: levelFor(g)) })
+    }
+
+    static func domainScores(from results: [GameResult],
+                             stateFor: (GameID) -> DifficultyState) -> [String: Double] {
         var sums: [String: (Double, Int)] = [:]
         for r in results {
             let key = r.domain.rawValue
-            let sc = domainScore(level: levelFor(r.game))
+            let state = r.newDifficulty ?? stateFor(r.game)
+            let sc = r.calibratedAbility ?? ScoringCalibrator.calibratedAbility(game: r.game, mastery: state.mastery)
             let (s, n) = sums[key] ?? (0, 0)
             sums[key] = (s + sc, n + 1)
         }
@@ -427,7 +513,8 @@ final class AppModel {
 
     static func headline(from domainScores: [String: Double]) -> Double {
         guard !domainScores.isEmpty else { return 0 }
-        return (domainScores.values.reduce(0, +) / Double(domainScores.count) * 10).rounded() / 10
+        return ScoringAggregator.headline(domainScores: domainScores, confidence: [:])
+            ?? (domainScores.values.reduce(0, +) / Double(domainScores.count) * 10).rounded() / 10
     }
 
     // MARK: Local cache

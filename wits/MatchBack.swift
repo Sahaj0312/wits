@@ -201,7 +201,15 @@ struct MatchBackScreen: View {
         r.trials = total
         r.threshold = Double(n)
         r.startedAt = startedAt
-        r.raw = ["n": Double(n), "hits": Double(hits), "falseAlarms": Double(falseAlarms), "misses": Double(misses)]
+        r.durationMs = total * (intervalMs + feedbackMs)
+        r.raw = [
+            "n": Double(n),
+            "hits": Double(hits),
+            "falseAlarms": Double(falseAlarms),
+            "misses": Double(misses),
+            "correctRejections": Double(correctRej),
+            "timeOnTaskMs": Double(total * (intervalMs + feedbackMs))
+        ]
         onResult(r)
     }
 }

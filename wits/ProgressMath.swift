@@ -43,7 +43,8 @@ enum ProgressMath {
         let raw = rows.map { row -> Double in
             if let h = row.headline_index { return h }
             let ds = row.domain_scores ?? [:]
-            return ds.isEmpty ? 0 : ds.values.reduce(0, +) / Double(ds.count)
+            return ScoringAggregator.headline(domainScores: ds, confidence: row.domain_confidence ?? [:])
+                ?? (ds.isEmpty ? 0 : ds.values.reduce(0, +) / Double(ds.count))
         }
         let smooth = ewma(raw)
         return zip(rows, smooth).compactMap { row, v in
@@ -76,9 +77,14 @@ enum ProgressMath {
 
     /// The single hero number — mean of the latest smoothed domain scores.
     static func headline(_ days: [DailyProgressRow]) -> Double? {
+        if let latest = sortedDays(days).last, let h = latest.headline_index {
+            return h.rounded()
+        }
         let domains = latestDomainScores(days)
         guard !domains.isEmpty else { return nil }
-        return (domains.values.reduce(0, +) / Double(domains.count)).rounded()
+        let confidence = sortedDays(days).last?.domain_confidence ?? [:]
+        let keyed = Dictionary(uniqueKeysWithValues: domains.map { ($0.key.rawValue, $0.value) })
+        return ScoringAggregator.headline(domainScores: keyed, confidence: confidence)?.rounded()
     }
 
     // MARK: - Adaptive workout targeting

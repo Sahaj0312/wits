@@ -174,8 +174,16 @@ struct GameHost: View {
 
     private func handle(_ result: GameResult) {
         var r = result
+        let base = result.baseScore ?? result.score
+        r.baseScore = base
         let bonus = RewardEngine.bonus(seed: daySeed, index: index)
-        if let bonus { r.score *= bonus }
+        if let bonus {
+            r.bonusMultiplier = bonus
+            r.score = base * bonus
+        } else {
+            r.bonusMultiplier = 1
+            r.score = base
+        }
         results.append(r)
         onGameResult(r)
         if let bonus {
