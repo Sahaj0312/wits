@@ -40,6 +40,7 @@ struct GameCard: View {
                 accessory.padding(.horizontal, WitsMetrics.screenPadding).padding(.top, 8)
             }
             hero
+                .ignoresSafeArea(edges: .top)
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     breadcrumb
@@ -61,11 +62,11 @@ struct GameCard: View {
             footer
         }
         .background(Color.witsBg.ignoresSafeArea())
-        .overlay(alignment: .topLeading) {
+        .overlay(alignment: .topTrailing) {
             if let onBack {
                 closeButton(action: onBack)
-                    .padding(.top, 44)
-                    .padding(.leading, 12)
+                    .padding(.top, 8)
+                    .padding(.trailing, 12)
             }
         }
     }
@@ -241,10 +242,9 @@ struct GameCard: View {
     private func closeButton(action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: "xmark")
-                .font(.system(size: 15, weight: .heavy))
+                .font(.system(size: 19, weight: .heavy))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(.black.opacity(0.28), in: Circle())
                 .accessibilityLabel("close")
         }
         .buttonStyle(.plain)

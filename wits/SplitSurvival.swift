@@ -373,18 +373,17 @@ struct SplitSurvivalScreen: View {
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 16)
-        .overlay(alignment: .topLeading) {
+        .overlay(alignment: .topTrailing) {
             Button(action: onQuit) {
                 Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .heavy))
+                    .font(.system(size: 19, weight: .heavy))
                     .foregroundStyle(.white)
                     .frame(width: 44, height: 44)
-                    .background(.black.opacity(0.28), in: Circle())
                     .accessibilityLabel("close")
             }
             .buttonStyle(.plain)
-            .padding(.top, 44)
-            .padding(.leading, 12)
+            .padding(.top, 8)
+            .padding(.trailing, 12)
         }
     }
 
