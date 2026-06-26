@@ -435,7 +435,9 @@ struct DotsConnectScreen: View {
     private func finish() {
         guard !finished else { return }
         finished = true
-        let accuracy = Double(max(0, solved * 3 - mistakes - hintsUsed)) / Double(Self.boardsPerRun * 3)
+        let completion = Double(solved) / Double(Self.boardsPerRun)
+        let penalty = min(0.35, Double(mistakes) * 0.03 + Double(hintsUsed) * 0.10)
+        let accuracy = max(0, completion - penalty)
         var result = GameResult(game: .dotsConnect, score: score, accuracy: max(0, min(1, accuracy)))
         result.trials = Self.boardsPerRun
         result.startedAt = startedAt
