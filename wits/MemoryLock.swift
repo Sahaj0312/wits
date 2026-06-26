@@ -67,6 +67,7 @@ struct MemoryLockScreen: View {
             let safeTop = geo.safeAreaInsets.top
             let safeBottom = geo.safeAreaInsets.bottom
             let availableHeight = geo.size.height - safeTop - safeBottom
+            let cramped = availableHeight < 620
             let compact = availableHeight < 790
             VStack(spacing: 0) {
                 if !cfg.isSurvival {
@@ -75,8 +76,9 @@ struct MemoryLockScreen: View {
 
                 wordleGrid(width: geo.size.width - (compact ? 28 : 24),
                            availableHeight: availableHeight,
-                           compact: compact)
-                    .padding(.top, compact ? 22 : 28)
+                           compact: compact,
+                           cramped: cramped)
+                    .padding(.top, cramped ? 6 : compact ? 22 : 28)
                     .overlay(alignment: .top) {
                         if !message.isEmpty {
                             Text(message)
@@ -92,8 +94,9 @@ struct MemoryLockScreen: View {
 
                 Spacer(minLength: 0)
 
-                keyboard(compact: compact)
+                keyboard(compact: compact, cramped: cramped)
                     .padding(.horizontal, compact ? 8 : 10)
+                    .frame(maxWidth: 720)
             }
             .padding(.top, safeTop + (cfg.isSurvival ? 6 : 4))
             .padding(.bottom, safeBottom + (compact ? 8 : 10))
@@ -121,16 +124,17 @@ struct MemoryLockScreen: View {
         .padding(.leading, cfg.isSurvival ? 0 : 42)
     }
 
-    private func wordleGrid(width: CGFloat, availableHeight: CGFloat, compact: Bool) -> some View {
-        let rowSpacing: CGFloat = compact ? 5 : 7
-        let cellSpacing: CGFloat = compact ? 5 : 7
+    private func wordleGrid(width: CGFloat, availableHeight: CGFloat, compact: Bool, cramped: Bool) -> some View {
+        let rowSpacing: CGFloat = cramped ? 4 : compact ? 5 : 7
+        let cellSpacing: CGFloat = cramped ? 4 : compact ? 5 : 7
         let widthAvailable = width - CGFloat(wordLength - 1) * cellSpacing
-        let heightBudget = availableHeight * (compact ? 0.56 : 0.58)
+        let heightBudget = availableHeight * (cramped ? 0.42 : compact ? 0.56 : 0.58)
         let heightAvailable = heightBudget - CGFloat(maxGuesses - 1) * rowSpacing
-        let maxTile: CGFloat = compact ? 70 : 76
+        let minTile: CGFloat = cramped ? 22 : 36
+        let maxTile: CGFloat = cramped ? 42 : compact ? 70 : 76
         let tile = min(maxTile,
-                       max(36, floor(widthAvailable / CGFloat(wordLength))),
-                       max(36, floor(heightAvailable / CGFloat(maxGuesses))))
+                       max(minTile, floor(widthAvailable / CGFloat(wordLength))),
+                       max(minTile, floor(heightAvailable / CGFloat(maxGuesses))))
         let height = tile * CGFloat(maxGuesses) + rowSpacing * CGFloat(maxGuesses - 1)
 
         return VStack(spacing: rowSpacing) {
@@ -174,44 +178,44 @@ struct MemoryLockScreen: View {
         return letters + Array(repeating: "", count: max(0, wordLength - letters.count))
     }
 
-    private func keyboard(compact: Bool) -> some View {
+    private func keyboard(compact: Bool, cramped: Bool) -> some View {
         let rows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"]
-        return VStack(spacing: compact ? 6 : 8) {
+        return VStack(spacing: cramped ? 4 : compact ? 6 : 8) {
             ForEach(rows, id: \.self) { row in
-                HStack(spacing: compact ? 5 : 6) {
+                HStack(spacing: cramped ? 4 : compact ? 5 : 6) {
                     if row == "ZXCVBNM" {
-                        key("enter", width: compact ? 54 : 60, compact: compact)
+                        key("enter", width: cramped ? 44 : compact ? 54 : 60, compact: compact, cramped: cramped)
                     }
                     ForEach(Array(row).map(String.init), id: \.self) { letter in
-                        key(letter, compact: compact)
+                        key(letter, compact: compact, cramped: cramped)
                     }
                     if row == "ZXCVBNM" {
-                        key("delete", width: compact ? 54 : 60, compact: compact)
+                        key("delete", width: cramped ? 44 : compact ? 54 : 60, compact: compact, cramped: cramped)
                     }
                 }
             }
         }
     }
 
-    private func key(_ value: String, width: CGFloat? = nil, compact: Bool) -> some View {
+    private func key(_ value: String, width: CGFloat? = nil, compact: Bool, cramped: Bool) -> some View {
         Button { press(value) } label: {
             Group {
                 switch value {
                 case "enter":
                     Text("enter")
-                        .font(.system(size: compact ? 10 : 11, weight: .heavy, design: .rounded))
+                        .font(.system(size: cramped ? 8 : compact ? 10 : 11, weight: .heavy, design: .rounded))
                 case "delete":
                     Image(systemName: "delete.left.fill")
-                        .font(.system(size: compact ? 14 : 15, weight: .heavy))
+                        .font(.system(size: cramped ? 12 : compact ? 14 : 15, weight: .heavy))
                 default:
                     Text(value)
-                        .font(.system(size: compact ? 15 : 16, weight: .heavy, design: .rounded))
+                        .font(.system(size: cramped ? 13 : compact ? 15 : 16, weight: .heavy, design: .rounded))
                 }
             }
             .foregroundStyle(Color.white)
             .frame(width: width)
             .frame(maxWidth: width == nil ? .infinity : nil)
-            .frame(height: compact ? 58 : 64)
+            .frame(height: cramped ? 34 : compact ? 58 : 64)
             .background(value == "enter" ? Color.witsAccent : Color.witsFaint.opacity(0.58),
                         in: RoundedRectangle(cornerRadius: 5, style: .continuous))
         }
