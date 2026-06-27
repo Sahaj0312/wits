@@ -246,6 +246,19 @@ final class SupabaseManager {
         Keychain.delete(keychainKey)
     }
 
+    /// A local Keychain token is not enough after a remote data reset. Confirm
+    /// GoTrue still accepts it before skipping the sign-in sheet.
+    func hasUsableSession() async -> Bool {
+        guard isSignedIn else { return false }
+        do {
+            _ = try await call("auth/v1/user", method: "GET", authed: true)
+            return true
+        } catch {
+            signOut()
+            return false
+        }
+    }
+
     /// Returns a valid access token, refreshing if necessary.
     func validAccessToken() async -> String? {
         guard let s = session else { return nil }

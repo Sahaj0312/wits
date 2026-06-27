@@ -165,11 +165,26 @@ struct OnboardingView: View {
     @State private var stepIndex = 0
     @State private var data = OnboardingData()
     @State private var showAuth = false
+    @State private var checkingAuth = false
 
     private var step: OnboardingStep { OnboardingStep.flow[stepIndex] }
 
     private func next() {
         stepIndex = min(stepIndex + 1, OnboardingStep.flow.count - 1)
+    }
+
+    private func startAuth() {
+        guard !checkingAuth else { return }
+        checkingAuth = true
+        Task {
+            let usable = await supa.hasUsableSession()
+            checkingAuth = false
+            if usable {
+                completeAuth()
+            } else {
+                showAuth = true
+            }
+        }
     }
 
     /// Called once the user finishes Apple/Google sign-in.
@@ -221,10 +236,7 @@ struct OnboardingView: View {
     private var screen: some View {
         switch step {
         case .hook:
-            HookScreen(onNext: {
-                // Returning user with a restored session — skip sign-in.
-                if supa.isSignedIn { completeAuth() } else { showAuth = true }
-            })
+            HookScreen(onNext: startAuth)
         case .username:
             UsernameScreen(suggested: supa.suggestedName) { name in
                 data.username = name
