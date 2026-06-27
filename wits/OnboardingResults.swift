@@ -231,7 +231,7 @@ struct ResultScreen: View {
             }
             .padding(18)
             .cardSurface()
-            .padding(.top, 24)
+            .padding(.top, 20)
             .rise(0.28)
 
             VStack(spacing: 10) {
@@ -673,12 +673,15 @@ struct ProjectionScreen: View {
     var result: AttentionResult
     var onNext: () -> Void
 
-    private struct Row {
+    struct Row: Identifiable {
         let name: String
         let now: Int
         let soon: Int
+        var id: String { name }
         var delta: Int { soon - now }
     }
+
+    @State private var shown = false
 
     private var rows: [Row] {
         result.tests.map { test in
@@ -687,79 +690,255 @@ struct ProjectionScreen: View {
         }
     }
 
+    private var averageLift: Int {
+        guard !rows.isEmpty else { return 0 }
+        let total = rows.reduce(0) { $0 + $1.delta }
+        return Int((Double(total) / Double(rows.count)).rounded())
+    }
+
+    private var focusSkill: String {
+        rows.min { $0.now < $1.now }?.name ?? "focus"
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
-                .padding(.bottom, 30)
-            Text("your 30-day plan")
-                .font(.witsDisplay(32))
+                .padding(.bottom, 24)
+
+            Text("your first 30 days")
+                .font(.witsDisplay(34))
                 .foregroundStyle(Color.witsInk)
                 .rise()
-            Text("with just 5 minutes a day, these starting baselines can become stronger training signals over the next 30 days.")
-                .font(.witsBody(16))
+
+            Text("we'll start with \(focusSkill), then raise the challenge as your scores move.")
+                .font(.witsBody(16, weight: .semibold))
                 .foregroundStyle(Color.witsMuted)
                 .padding(.top, 12)
-                .padding(.bottom, 26)
                 .rise(0.08)
-            VStack(spacing: 0) {
-                HStack {
-                    Text("SKILL").frame(maxWidth: .infinity, alignment: .leading)
-                    Text("TODAY").frame(width: 60, alignment: .leading)
-                    Text("DAY 30").frame(width: 90, alignment: .leading)
-                }
-                .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                .kerning(0.8)
-                .foregroundStyle(Color.witsFaint)
-                .padding(.vertical, 11)
-                .overlay(Rectangle().fill(Color.witsLine).frame(height: 1), alignment: .bottom)
-                ForEach(Array(rows.enumerated()), id: \.element.name) { i, row in
-                    HStack {
-                        Text(row.name)
-                            .font(.system(size: 14.5, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color.witsInk)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        Text("\(row.now)%")
-                            .font(.witsBody(14, weight: .semibold))
-                            .foregroundStyle(Color.witsMuted)
-                            .frame(width: 60, alignment: .leading)
-                        HStack(spacing: 4) {
-                            Text("\(row.soon)%")
-                                .font(.system(size: 14.5, weight: .heavy, design: .rounded))
-                                .foregroundStyle(Color.witsAccent)
-                            if row.delta > 0 {
-                                Text("+\(row.delta)")
-                                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                                    .foregroundStyle(Color.witsAccent)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(Color.witsAccent.opacity(0.14), in: Capsule())
-                            }
-                        }
-                        .frame(width: 90, alignment: .leading)
-                    }
-                    .padding(.vertical, 11)
-                    .overlay(
-                        i > 0 ? Rectangle().fill(Color.witsLine).frame(height: 1) : nil,
-                        alignment: .top
-                    )
+
+            ProjectionHeroCard(
+                averageLift: averageLift,
+                focusSkill: focusSkill,
+                progress: shown ? 1 : 0
+            )
+            .padding(.top, 20)
+            .rise(0.18)
+
+            VStack(spacing: 10) {
+                ForEach(Array(rows.enumerated()), id: \.element.id) { i, row in
+                    ProjectionSkillRow(row: row, progress: shown ? 1 : 0)
+                        .rise(0.28 + Double(i) * 0.08)
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
-            .cardSurface()
-            .padding(.bottom, 14)
-            .rise(0.18)
-            Text("based on members who train 5 days a week. individual results vary.")
+            .padding(.top, 12)
+
+            Text("projection uses your fit-test baseline and training frequency. results vary.")
                 .font(.witsBody(12.5))
                 .foregroundStyle(Color.witsFaint)
-                .rise(0.3)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, 14)
+                .rise(0.58)
+
             Spacer()
             Cta(title: "start my plan", action: onNext)
-                .rise(0.38)
+                .rise(0.66)
                 .padding(.top, 16)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 12)
+        .onAppear {
+            withAnimation(.timingCurve(0.2, 0.8, 0.3, 1, duration: 0.95).delay(0.25)) {
+                shown = true
+            }
+        }
+    }
+}
+
+private struct ProjectionHeroCard: View {
+    var averageLift: Int
+    var focusSkill: String
+    var progress: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("projected lift")
+                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .kerning(0.8)
+                        .foregroundStyle(Color.witsFaint)
+                    HStack(alignment: .firstTextBaseline, spacing: 2) {
+                        Text("+\(Int((Double(averageLift) * progress).rounded()))")
+                            .font(.system(size: 44, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsAccent)
+                            .monospacedDigit()
+                        Text("pts")
+                            .font(.system(size: 15, weight: .heavy, design: .rounded))
+                            .foregroundStyle(Color.witsMuted)
+                    }
+                    Text("\(focusSkill) gets the first push.")
+                        .font(.witsBody(14, weight: .semibold))
+                        .foregroundStyle(Color.witsMuted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(width: 118, alignment: .leading)
+
+                ProjectionCurve(progress: progress)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 92)
+            }
+
+            HStack(spacing: 8) {
+                ProjectionMilestone(title: "today", subtitle: "baseline")
+                ProjectionMilestone(title: "week 2", subtitle: "adjust")
+                ProjectionMilestone(title: "day 30", subtitle: "harder")
+            }
+        }
+        .padding(16)
+        .cardSurface()
+    }
+}
+
+private struct ProjectionCurve: View {
+    var progress: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            let h = geo.size.height
+            let start = CGPoint(x: 4, y: h * 0.78)
+            let end = CGPoint(x: w - 4, y: h * 0.26)
+            let c1 = CGPoint(x: w * 0.34, y: h * 0.86)
+            let c2 = CGPoint(x: w * 0.58, y: h * 0.20)
+
+            ZStack {
+                Path { path in
+                    path.move(to: start)
+                    path.addCurve(to: end, control1: c1, control2: c2)
+                }
+                .stroke(Color.witsLine, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+
+                Path { path in
+                    path.move(to: start)
+                    path.addCurve(to: end, control1: c1, control2: c2)
+                }
+                .trim(from: 0, to: progress)
+                .stroke(Color.witsAccent, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+
+                ProjectionNode(point: start, active: true, delay: 0)
+                ProjectionNode(point: CGPoint(x: w * 0.52, y: h * 0.48), active: progress > 0.45, delay: 0.1)
+                ProjectionNode(point: end, active: progress > 0.9, delay: 0.2)
+            }
+        }
+    }
+}
+
+private struct ProjectionNode: View {
+    var point: CGPoint
+    var active: Bool
+    var delay: Double
+
+    var body: some View {
+        Circle()
+            .fill(active ? Color.witsAccent : Color.witsCard)
+            .frame(width: 16, height: 16)
+            .overlay(Circle().strokeBorder(active ? Color.witsAccent.opacity(0.28) : Color.witsLine, lineWidth: 5))
+            .position(point)
+            .scaleEffect(active ? 1 : 0.82)
+            .animation(.spring(response: 0.42, dampingFraction: 0.72).delay(delay), value: active)
+    }
+}
+
+private struct ProjectionMilestone: View {
+    var title: String
+    var subtitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title)
+                .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(subtitle)
+                .font(.witsBody(11.5, weight: .semibold))
+                .foregroundStyle(Color.witsFaint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 2)
+    }
+}
+
+private struct ProjectionSkillRow: View {
+    var row: ProjectionScreen.Row
+    var progress: Double
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(row.name)
+                    .font(.system(size: 15.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+                Text("\(row.now)%")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color.witsMuted)
+                    .monospacedDigit()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 10, weight: .heavy))
+                    .foregroundStyle(Color.witsFaint)
+                Text("\(row.soon)%")
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsAccent)
+                    .monospacedDigit()
+            }
+
+            ProjectionBar(now: Double(row.now) / 100, soon: Double(row.soon) / 100, progress: progress)
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 11)
+        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+private struct ProjectionBar: View {
+    var now: Double
+    var soon: Double
+    var progress: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let currentX = width * now
+            let targetX = width * (now + (soon - now) * progress)
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.witsLine)
+                    .frame(height: 7)
+                Capsule()
+                    .fill(Color.witsAccent.opacity(0.28))
+                    .frame(width: max(0, currentX), height: 7)
+                Capsule()
+                    .fill(Color.witsAccent)
+                    .frame(width: max(0, targetX), height: 7)
+                Circle()
+                    .fill(Color.witsCard)
+                    .frame(width: 13, height: 13)
+                    .overlay(Circle().strokeBorder(Color.witsMuted.opacity(0.55), lineWidth: 2))
+                    .position(x: currentX, y: 7)
+                Circle()
+                    .fill(Color.witsAccent)
+                    .frame(width: 15, height: 15)
+                    .shadow(color: Color.witsAccent.opacity(0.35), radius: 5)
+                    .position(x: targetX, y: 7)
+            }
+        }
+        .frame(height: 12)
     }
 }
 
