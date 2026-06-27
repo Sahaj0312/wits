@@ -12,6 +12,37 @@
 
 import SwiftUI
 
+@MainActor
+private func reportGameFeel(_ cfg: GameConfig?, _ kind: TrialOutcome.Kind, points: Int = 0, combo: Int = 0) {
+    if let cfg {
+        cfg.report(kind, points: points, combo: combo)
+        return
+    }
+
+    switch kind {
+    case .hit:
+        GameFeel.shared.play(.correct(combo: combo))
+    case .miss:
+        GameFeel.shared.play(.wrong)
+    case .nearMiss:
+        GameFeel.shared.play(.nearMiss)
+    case .timeout:
+        GameFeel.shared.play(.timeout)
+    }
+}
+
+private extension View {
+    func onboardingGameFeelLifecycle(enabled: Bool) -> some View {
+        self
+            .onAppear {
+                if enabled { GameFeel.shared.warmUp() }
+            }
+            .onDisappear {
+                if enabled { GameFeel.shared.teardown() }
+            }
+    }
+}
+
 // MARK: - Gauntlet overview
 
 struct GauntletScreen: View {
@@ -163,46 +194,49 @@ struct FlankerScreen: View {
     private var multiplier: Int { min(5, 1 + streak / 3) }
 
     var body: some View {
-        switch phase {
-        case .intro:
-            GameExplainer(
-                tag: "test 1 of 3",
-                title: "arrow storm",
-                skill: "interference control",
-                how: "five arrows flash. you answer for the middle one while its neighbours point the other way and try to drag your answer with them. the clock per arrow shrinks as you get better.",
-                why: "this is the flanker task, a lab standard since 1974. it measures how well you act on the signal while the noise screams — the muscle that keeps you on one thing when everything on screen is flashing.",
-                onStart: { phase = .tutorial }
-            ) {
-                VStack(spacing: 18) {
-                    HStack(spacing: 14) {
-                        ForEach(0..<5, id: \.self) { i in
-                            Image(systemName: i == 2 ? "arrowtriangle.right.fill" : "arrowtriangle.left.fill")
-                                .font(.system(size: 30, weight: .heavy))
-                                .foregroundStyle(i == 2 ? Color.witsAccent : .white.opacity(0.4))
+        Group {
+            switch phase {
+            case .intro:
+                GameExplainer(
+                    tag: "test 1 of 3",
+                    title: "arrow storm",
+                    skill: "interference control",
+                    how: "five arrows flash. you answer for the middle one while its neighbours point the other way and try to drag your answer with them. the clock per arrow shrinks as you get better.",
+                    why: "this is the flanker task, a lab standard since 1974. it measures how well you act on the signal while the noise screams — the muscle that keeps you on one thing when everything on screen is flashing.",
+                    onStart: { phase = .tutorial }
+                ) {
+                    VStack(spacing: 18) {
+                        HStack(spacing: 14) {
+                            ForEach(0..<5, id: \.self) { i in
+                                Image(systemName: i == 2 ? "arrowtriangle.right.fill" : "arrowtriangle.left.fill")
+                                    .font(.system(size: 30, weight: .heavy))
+                                    .foregroundStyle(i == 2 ? Color.witsAccent : .white.opacity(0.4))
+                            }
                         }
+                        Capsule()
+                            .fill(.white.opacity(0.16))
+                            .frame(width: 120, height: 5)
+                            .overlay(alignment: .leading) {
+                                Capsule().fill(Color.witsWarm).frame(width: 42)
+                            }
                     }
-                    Capsule()
-                        .fill(.white.opacity(0.16))
-                        .frame(width: 120, height: 5)
-                        .overlay(alignment: .leading) {
-                            Capsule().fill(Color.witsWarm).frame(width: 42)
-                        }
                 }
+            case .tutorial:
+                tutorialView
+            case .ready:
+                GameReady {
+                    stats = FlankerStats()
+                    streak = 0
+                    window = Self.maxWindow
+                    trial = Self.makeTrial()
+                    trialStart = Date()
+                    phase = .playing
+                }
+            case .playing:
+                playView
             }
-        case .tutorial:
-            tutorialView
-        case .ready:
-            GameReady {
-                stats = FlankerStats()
-                streak = 0
-                window = Self.maxWindow
-                trial = Self.makeTrial()
-                trialStart = Date()
-                phase = .playing
-            }
-        case .playing:
-            playView
         }
+        .onboardingGameFeelLifecycle(enabled: cfg == nil)
     }
 
     private func arrowRow(right: Bool, congruent: Bool, size: CGFloat = 32) -> some View {
@@ -250,7 +284,9 @@ struct FlankerScreen: View {
             VStack(spacing: 14) {
                 TutorialHint(text: tutorialError ? "not quite. \(t.hint)" : t.hint)
                 answerButtons { saysRight in
-                    if saysRight == t.right {
+                    let ok = saysRight == t.right
+                    reportGameFeel(cfg, ok ? .hit : .miss, points: ok ? 100 : 0, combo: ok ? tutorialIndex + 1 : 0)
+                    if ok {
                         tutorialError = false
                         if tutorialIndex < Self.tutorialTrials.count - 1 {
                             tutorialIndex += 1
@@ -351,12 +387,12 @@ struct FlankerScreen: View {
             stats.bestStreak = max(stats.bestStreak, streak)
             stats.score += 100 * multiplier
             window = max(cfg?.isSurvival == true ? 0.6 : Self.minWindow, window - (cfg?.isSurvival == true ? 0.04 : 0.025))
-            cfg?.report(.hit, points: 100, combo: streak)
+            reportGameFeel(cfg, .hit, points: 100, combo: streak)
         } else {
             stats.wrong += 1
             streak = 0
             window = min(Self.maxWindow, window + 0.12)
-            cfg?.report(.miss)
+            reportGameFeel(cfg, .miss)
         }
         feedback = ok
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
@@ -369,7 +405,7 @@ struct FlankerScreen: View {
         streak = 0
         window = min(Self.maxWindow, window + 0.12)
         feedback = false
-        cfg?.report(.timeout)
+        reportGameFeel(cfg, .timeout)
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) { feedback = nil }
         nextTrial()
     }
@@ -480,45 +516,48 @@ struct TrackerScreen: View {
     }
 
     var body: some View {
-        switch phase {
-        case .intro:
-            GameExplainer(
-                tag: "test 2 of 3",
-                title: "crowd control",
-                skill: "divided attention",
-                how: "a few dots glow, then go dark and scatter into an identical crowd. keep your eyes on all of them at once, and point them out when everything freezes. every round adds more to hold.",
-                why: "this is multiple object tracking, used in attention labs since the 80s. it measures how many moving things you can follow at once — the exact load your tabs, chats and second screen put on you together.",
-                onStart: {
-                    phase = .tutorial
+        Group {
+            switch phase {
+            case .intro:
+                GameExplainer(
+                    tag: "test 2 of 3",
+                    title: "crowd control",
+                    skill: "divided attention",
+                    how: "a few dots glow, then go dark and scatter into an identical crowd. keep your eyes on all of them at once, and point them out when everything freezes. every round adds more to hold.",
+                    why: "this is multiple object tracking, used in attention labs since the 80s. it measures how many moving things you can follow at once — the exact load your tabs, chats and second screen put on you together.",
+                    onStart: {
+                        phase = .tutorial
+                        startRound()
+                    }
+                ) {
+                    GeometryReader { geo in
+                        let spots: [(x: Double, y: Double, target: Bool)] = [
+                            (0.14, 0.30, true), (0.30, 0.68, false), (0.43, 0.22, false),
+                            (0.56, 0.58, true), (0.70, 0.26, false), (0.84, 0.62, true),
+                            (0.24, 0.46, false), (0.78, 0.42, false),
+                        ]
+                        ForEach(Array(spots.enumerated()), id: \.offset) { _, s in
+                            Circle()
+                                .fill(s.target ? Color.witsAccent : .white.opacity(0.30))
+                                .frame(width: 24, height: 24)
+                                .shadow(color: s.target ? Color.witsAccent.opacity(0.6) : .clear, radius: 7)
+                                .position(x: s.x * geo.size.width, y: s.y * geo.size.height)
+                        }
+                    }
+                    .padding(14)
+                }
+            case .tutorial, .playing:
+                board
+            case .ready:
+                GameReady {
+                    round = 0
+                    stats = TrackStats()
+                    phase = .playing
                     startRound()
                 }
-            ) {
-                GeometryReader { geo in
-                    let spots: [(x: Double, y: Double, target: Bool)] = [
-                        (0.14, 0.30, true), (0.30, 0.68, false), (0.43, 0.22, false),
-                        (0.56, 0.58, true), (0.70, 0.26, false), (0.84, 0.62, true),
-                        (0.24, 0.46, false), (0.78, 0.42, false),
-                    ]
-                    ForEach(Array(spots.enumerated()), id: \.offset) { _, s in
-                        Circle()
-                            .fill(s.target ? Color.witsAccent : .white.opacity(0.30))
-                            .frame(width: 24, height: 24)
-                            .shadow(color: s.target ? Color.witsAccent.opacity(0.6) : .clear, radius: 7)
-                            .position(x: s.x * geo.size.width, y: s.y * geo.size.height)
-                    }
-                }
-                .padding(14)
-            }
-        case .tutorial, .playing:
-            board
-        case .ready:
-            GameReady {
-                round = 0
-                stats = TrackStats()
-                phase = .playing
-                startRound()
             }
         }
+        .onboardingGameFeelLifecycle(enabled: cfg == nil)
     }
 
     private var statusLine: String {
@@ -625,14 +664,14 @@ struct TrackerScreen: View {
     private func finishPicks() {
         let correct = dots.filter { $0.picked && $0.isTarget }.count
         let isTutorial = phase == .tutorial
+        let perfect = correct == config.targets
         if !isTutorial {
             stats.correctPicks += correct
             stats.totalTargets += config.targets
             stats.rounds += 1
-            let perfect = correct == config.targets
             if perfect { stats.perfectRounds += 1 }
-            cfg?.report(perfect ? .hit : .miss, points: correct * 80, combo: stats.perfectRounds)
         }
+        reportGameFeel(cfg, perfect ? .hit : .miss, points: correct * 80, combo: isTutorial ? (perfect ? 1 : 0) : stats.perfectRounds)
         roundPhase = .reveal
         let gen = generation
         Task {
@@ -859,54 +898,57 @@ struct SpanScreen: View {
     private var cellCount: Int { Self.rows * Self.columns }
 
     var body: some View {
-        switch phase {
-        case .intro:
-            GameExplainer(
-                tag: "test 3 of 3",
-                title: "echo grid",
-                skill: "working memory",
-                how: "tiles light up one at a time, then go dark. you play the path back in reverse — last tile first. perfect rounds make the path longer, slips make it shorter.",
-                why: "this is the backward corsi span, the test neuropsychologists reach for to measure working memory. holding a sequence in your head and flipping it around is the same load deep work puts on you.",
-                onStart: {
-                    inTutorial = true
-                    startTrial(reset: true)
-                    phase = .tutorial
-                }
-            ) {
-                HStack(spacing: 22) {
-                    LazyVGrid(columns: Array(repeating: GridItem(.fixed(32), spacing: 5), count: 3), spacing: 5) {
-                        ForEach(0..<9, id: \.self) { i in
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill([1, 5, 6].contains(i) ? Color.witsAccent : .white.opacity(0.12))
-                                .frame(width: 32, height: 32)
-                                .overlay {
-                                    if let n = [1, 5, 6].firstIndex(of: i) {
-                                        Text("\(n + 1)")
-                                            .font(.system(size: 13, weight: .heavy, design: .rounded))
-                                            .foregroundStyle(.white)
+        Group {
+            switch phase {
+            case .intro:
+                GameExplainer(
+                    tag: "test 3 of 3",
+                    title: "echo grid",
+                    skill: "working memory",
+                    how: "tiles light up one at a time, then go dark. you play the path back in reverse — last tile first. perfect rounds make the path longer, slips make it shorter.",
+                    why: "this is the backward corsi span, the test neuropsychologists reach for to measure working memory. holding a sequence in your head and flipping it around is the same load deep work puts on you.",
+                    onStart: {
+                        inTutorial = true
+                        startTrial(reset: true)
+                        phase = .tutorial
+                    }
+                ) {
+                    HStack(spacing: 22) {
+                        LazyVGrid(columns: Array(repeating: GridItem(.fixed(32), spacing: 5), count: 3), spacing: 5) {
+                            ForEach(0..<9, id: \.self) { i in
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .fill([1, 5, 6].contains(i) ? Color.witsAccent : .white.opacity(0.12))
+                                    .frame(width: 32, height: 32)
+                                    .overlay {
+                                        if let n = [1, 5, 6].firstIndex(of: i) {
+                                            Text("\(n + 1)")
+                                                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                                                .foregroundStyle(.white)
+                                        }
                                     }
-                                }
+                            }
+                        }
+                        VStack(spacing: 8) {
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 17, weight: .heavy))
+                                .foregroundStyle(Color.witsAccent)
+                            Text("3 → 2 → 1")
+                                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                                .foregroundStyle(.white.opacity(0.85))
                         }
                     }
-                    VStack(spacing: 8) {
-                        Image(systemName: "arrow.uturn.backward")
-                            .font(.system(size: 17, weight: .heavy))
-                            .foregroundStyle(Color.witsAccent)
-                        Text("3 → 2 → 1")
-                            .font(.system(size: 15, weight: .heavy, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.85))
-                    }
+                }
+            case .tutorial, .playing:
+                board
+            case .ready:
+                GameReady {
+                    inTutorial = false
+                    startTrial(reset: true)
+                    phase = .playing
                 }
             }
-        case .tutorial, .playing:
-            board
-        case .ready:
-            GameReady {
-                inTutorial = false
-                startTrial(reset: true)
-                phase = .playing
-            }
         }
+        .onboardingGameFeelLifecycle(enabled: cfg == nil)
     }
 
     private var board: some View {
@@ -1076,15 +1118,15 @@ struct SpanScreen: View {
         if i == expected {
             rightTaps.insert(i)
             tapIndex += 1
+            reportGameFeel(cfg, .hit, points: 120, combo: tapIndex)
             if !inTutorial {
                 stats.correctTaps += 1
                 stats.score += 120
-                cfg?.report(.hit, points: 120, combo: tapIndex)
             }
             if tapIndex == seq.count { endTrial(perfect: true) }
         } else {
             wrongTap = i
-            if !inTutorial { cfg?.report(.miss) }
+            reportGameFeel(cfg, .miss)
             endTrial(perfect: false)
         }
     }

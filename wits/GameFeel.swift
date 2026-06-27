@@ -204,19 +204,22 @@ final class ToneSynth {
     private let pool = VoicePool()
     private var node: AVAudioSourceNode?
     private var started = false
+    private var configObserver: NSObjectProtocol?
 
     func start() {
         guard !started else { return }
-        let sr = sampleRate
-        let pool = self.pool
-        let format = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1)!
-        let node = AVAudioSourceNode { _, _, frameCount, audioBufferList -> OSStatus in
-            pool.render(into: audioBufferList, frames: Int(frameCount), sampleRate: sr)
-            return noErr
+        if node == nil {
+            let sr = sampleRate
+            let pool = self.pool
+            let format = AVAudioFormat(standardFormatWithSampleRate: sr, channels: 1)!
+            let node = AVAudioSourceNode { _, _, frameCount, audioBufferList -> OSStatus in
+                pool.render(into: audioBufferList, frames: Int(frameCount), sampleRate: sr)
+                return noErr
+            }
+            self.node = node
+            engine.attach(node)
+            engine.connect(node, to: engine.mainMixerNode, format: format)
         }
-        self.node = node
-        engine.attach(node)
-        engine.connect(node, to: engine.mainMixerNode, format: format)
         do {
             // .ambient → respects the mute switch and mixes with the user's music.
             try AVAudioSession.sharedInstance().setCategory(.ambient, options: [.mixWithOthers])
@@ -228,13 +231,15 @@ final class ToneSynth {
             started = false
         }
         // Observer fires on the main queue → safe to assume main-actor isolation.
-        NotificationCenter.default.addObserver(
-            forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            MainActor.assumeIsolated {
-                guard self.started else { return }
-                try? self.engine.start()
+        if configObserver == nil {
+            configObserver = NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                MainActor.assumeIsolated {
+                    guard self.started else { return }
+                    try? self.engine.start()
+                }
             }
         }
     }
