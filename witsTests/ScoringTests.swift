@@ -146,14 +146,43 @@ final class ScoringTests: XCTestCase {
         XCTAssertLessThan(scored.next.level, prior.level)
     }
 
-    func testEstimatorPerfectSlowRunDoesNotLoseMastery() {
+    func testTargetForgePerfectSlowRunDoesNotLoseMastery() {
         let prior = DifficultyState(level: 5, mastery: 5, confidence: 1)
         var result = GameResult(game: .estimator, score: 0, accuracy: 1, trials: 16, durationMs: 120_000)
-        result.raw = ["correct": 16, "wrong": 0, "timeOnTaskMs": 120_000]
+        result.raw = ["exact": 16, "close": 0, "near": 0, "wrong": 0, "forgeQuality": 1, "timeOnTaskMs": 120_000]
 
         let scored = ScoringEngine.score(result, previous: prior)
 
         XCTAssertGreaterThanOrEqual(scored.next.mastery, prior.mastery)
+    }
+
+    func testTargetForgePolicyFallsBackToAccuracyForLegacyEstimatorRuns() {
+        let prior = DifficultyState(level: 5, mastery: 5, confidence: 1)
+        let result = GameResult(game: .estimator, score: 0, accuracy: 1, trials: 16, durationMs: 45_000)
+
+        let scored = ScoringEngine.score(result, previous: prior)
+
+        XCTAssertEqual(scored.run.performance, 1)
+    }
+
+    func testTargetForgeIgnoresStaleEstimatorDifficulty() {
+        let stale = DifficultyState(level: 1.85, mastery: 1.85, confidence: 1, scoringVersion: ScoringVersion.current)
+
+        let normalized = GameID.estimator.difficultyState(from: stale)
+
+        XCTAssertEqual(normalized.level, GameID.estimator.seedLevel)
+        XCTAssertEqual(normalized.scoringVersion, GameID.estimator.difficultyScoringVersion)
+    }
+
+    func testTargetForgeScoredRunPersistsMechanicsVersion() {
+        let prior = DifficultyState.seed(for: .estimator)
+        var result = GameResult(game: .estimator, score: 150, accuracy: 1, trials: 1, durationMs: 45_000)
+        result.raw = ["exact": 1, "close": 0, "near": 0, "wrong": 0, "forgeQuality": 1, "timeOnTaskMs": 45_000]
+
+        let scored = ScoringEngine.score(result, previous: prior)
+
+        XCTAssertEqual(scored.next.scoringVersion, GameID.estimator.difficultyScoringVersion)
+        XCTAssertEqual(scored.result.scoringVersion, GameID.estimator.difficultyScoringVersion)
     }
 
     func testMissingLiveGamesDoNotUseAccuracyFallbackPolicy() {
@@ -161,6 +190,7 @@ final class ScoringTests: XCTestCase {
         XCTAssertFalse(ScoringPolicies.policy(for: .echoGrid) is AccuracyPolicy)
         XCTAssertFalse(ScoringPolicies.policy(for: .pathKeeper) is AccuracyPolicy)
         XCTAssertFalse(ScoringPolicies.policy(for: .estimator) is ThroughputPolicy)
+        XCTAssertTrue(ScoringPolicies.policy(for: .estimator) is TargetForgePolicy)
     }
 
     func testEqualMasteryMapsConsistentlyAcrossLaunchPriors() {

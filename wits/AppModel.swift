@@ -92,7 +92,7 @@ final class AppModel {
     }
 
     var difficultyFor: (GameID) -> DifficultyState {
-        { [difficulty] id in difficulty[id] ?? .seed(for: id) }
+        { [difficulty] id in id.difficultyState(from: difficulty[id]) }
     }
 
     /// Per-domain "needs training" weights driving today's lineup — weakest and
@@ -174,12 +174,14 @@ final class AppModel {
         if id.isStandalone {
             return recordStandaloneGameResult(result, source: source)
         }
-        let current = difficulty[id] ?? .seed(for: id)
+        let resetStats = id.shouldResetDifficulty(difficulty[id])
+        let current = id.difficultyState(from: difficulty[id])
         let scored = ScoringEngine.score(result, previous: current)
         let next = scored.next
         difficulty[id] = next
         let r = scored.result
 
+        if resetStats { gameStats[id] = nil }
         recordStats(for: r)
 
         saveCache()
@@ -406,6 +408,7 @@ final class AppModel {
                                                  lastPlayed: Self.parseServerTimestamp(row.last_played),
                                                  scoringVersion: row.scoring_version ?? "v1_legacy")
             }
+            sanitizeMechanicsMigrations()
         }
 
         if let s = try? await supa.fetchStreak() {
@@ -580,6 +583,16 @@ final class AppModel {
         // keep cached workout only if it's still today's
         if Calendar.current.isDate(state.today.day, inSameDayAs: Date()) {
             today = state.today
+        }
+        sanitizeMechanicsMigrations()
+    }
+
+    private func sanitizeMechanicsMigrations() {
+        if GameID.estimator.shouldResetDifficulty(difficulty[.estimator]) {
+            difficulty.removeValue(forKey: .estimator)
+            gameStats.removeValue(forKey: .estimator)
+        } else if difficulty[.estimator] == nil, gameStats[.estimator] != nil {
+            gameStats.removeValue(forKey: .estimator)
         }
     }
 

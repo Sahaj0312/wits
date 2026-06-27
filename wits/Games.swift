@@ -68,7 +68,7 @@ enum NumberRush: Game {
 enum Estimator: Game {
     static let id = GameID.estimator
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(EstimatorScreen(cfg: config, onResult: onComplete))
+        AnyView(TargetForgeScreen(cfg: config, onResult: onComplete))
     }
 }
 

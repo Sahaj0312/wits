@@ -102,7 +102,7 @@ extension GameID {
         case .matchBack: "match-back"
         case .ruleFinder: "rule finder"
         case .numberRush: "number rush"
-        case .estimator: "snap count"
+        case .estimator: "target forge"
         case .oddOneOut: "odd one out"
         case .tileShift: "tile shift"
         case .lastSeen: "last seen"
@@ -126,7 +126,7 @@ extension GameID {
         case .matchBack: "spot what repeats."
         case .ruleFinder: "find the rule, finish the grid."
         case .numberRush: "solve it before it drops."
-        case .estimator: "more, at a glance."
+        case .estimator: "build the number."
         case .oddOneOut: "find the one that doesn't fit."
         case .tileShift: "the rule keeps changing."
         case .lastSeen: "never tap the same one twice."
@@ -168,7 +168,7 @@ extension GameID {
         case .tileShift: "task switching"
         case .ruleFinder: "logical reasoning"
         case .numberRush: "arithmetic"
-        case .estimator: "numerical estimation"
+        case .estimator: "mental arithmetic"
         case .wordConnect: "vocabulary"
         case .memoryLock: "lexical memory"
         case .dotsConnect: "planning"
@@ -188,7 +188,7 @@ extension GameID {
         case .matchBack: "tap match whenever the current square is the same as the one a few steps back."
         case .ruleFinder: "work out the rule running across the grid and pick the figure that completes it."
         case .numberRush: "solve each falling equation and pick the answer before it hits the bottom."
-        case .estimator: "two groups flash for an instant — pick the one with more before you can count."
+        case .estimator: "use number tiles and operators to hit the target exactly, or get as close as you can before the clock bites."
         case .oddOneOut: "scan the grid and tap the single shape that doesn't match the rest."
         case .tileShift: "follow the rule on screen — sometimes match by colour, sometimes by shape. it keeps flipping."
         case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
@@ -216,7 +216,7 @@ extension GameID {
         case .dotsConnect: "planning is building a sequence of moves that satisfies several constraints at the same time."
         case .towerOfHanoi: "sequential planning is thinking several moves ahead while respecting a changing set of constraints."
         case .numberRush: "arithmetic is performing quick mental calculations accurately under time pressure."
-        case .estimator: "numerical estimation is judging quantities at a glance, without stopping to count."
+        case .estimator: "mental arithmetic is composing numbers quickly: scanning options, choosing operations, and keeping the result in mind."
         case .wordConnect: "vocabulary is fluent word retrieval: spotting letter patterns, spelling accurately, and finding possibilities quickly."
         case .memoryLock: "lexical memory is keeping spelling clues in mind while searching for the word that fits them."
         case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
@@ -234,7 +234,7 @@ extension GameID {
         case .matchBack: "rectangle.stack.fill"
         case .ruleFinder: "puzzlepiece.fill"
         case .numberRush: "plus.forwardslash.minus"
-        case .estimator: "circle.hexagongrid.fill"
+        case .estimator: "equal.circle.fill"
         case .oddOneOut: "magnifyingglass"
         case .tileShift: "arrow.triangle.2.circlepath"
         case .lastSeen: "sparkles"
@@ -258,7 +258,7 @@ extension GameID {
         case .matchBack: (0x14304D, 0x10233A)
         case .ruleFinder: (0x243155, 0x141B33)
         case .numberRush: (0x5E3A1E, 0x331F14)
-        case .estimator: (0x3F4A1E, 0x2A3314)
+        case .estimator: (0x214E63, 0x132F42)
         case .oddOneOut: (0x2E2A5E, 0x1A1840)
         case .tileShift: (0x4A1E50, 0x2D1433)
         case .lastSeen: (0x123A4D, 0x0F2A3A)
@@ -297,6 +297,7 @@ extension GameID {
         case .dotsConnect: "boardsSolved"
         case .towerOfHanoi: "efficiency"
         case .split: "maxLevel"
+        case .estimator: "exact"
         default: "bestStreak"
         }
     }
@@ -317,7 +318,35 @@ extension GameID {
         case .dotsConnect: "\(Int(v)) boards"
         case .towerOfHanoi: "\(Int(v))% optimal"
         case .split: "level \(Int(v))"
+        case .estimator: "\(Int(v)) exact"
         default: "streak \(Int(v))"
+        }
+    }
+}
+
+extension GameID {
+    var difficultyScoringVersion: String {
+        switch self {
+        case .estimator:
+            "target_forge_v1"
+        default:
+            ScoringVersion.current
+        }
+    }
+
+    func difficultyState(from stored: DifficultyState?) -> DifficultyState {
+        guard let stored else { return .seed(for: self) }
+        guard shouldResetDifficulty(stored) else { return stored }
+        return .seed(for: self)
+    }
+
+    func shouldResetDifficulty(_ stored: DifficultyState?) -> Bool {
+        guard let stored else { return false }
+        switch self {
+        case .estimator:
+            return stored.scoringVersion != difficultyScoringVersion
+        default:
+            return false
         }
     }
 }
@@ -366,7 +395,7 @@ struct DifficultyState: Codable, Equatable {
     }
 
     static func seed(for g: GameID) -> DifficultyState {
-        DifficultyState(level: g.seedLevel, mastery: g.seedLevel, variance: 1.2)
+        DifficultyState(level: g.seedLevel, mastery: g.seedLevel, variance: 1.2, scoringVersion: g.difficultyScoringVersion)
     }
 
     var masteryOrLevel: Double { mastery.isFinite ? mastery : level }

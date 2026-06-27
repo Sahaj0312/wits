@@ -79,7 +79,7 @@ extension GameScoringPolicy {
             lastDirection: dir == 0 ? oldDir : dir,
             sessionsPlayed: prior.sessionsPlayed + 1,
             lastPlayed: result.startedAt,
-            scoringVersion: ScoringVersion.current
+            scoringVersion: result.game.difficultyScoringVersion
         )
     }
 
@@ -100,7 +100,7 @@ enum ScoringPolicies {
         case .numberRush, .arrowStorm, .tileShift, .oddOneOut, .colorClash:
             ThroughputPolicy(game: game)
         case .estimator:
-            EstimatorPolicy()
+            TargetForgePolicy()
         case .crowdControl:
             CrowdControlPolicy()
         case .echoGrid, .pathKeeper:
@@ -145,7 +145,7 @@ enum ScoringEngine {
         r.calibratedAbility = aG
         r.wpiDelta = aG - priorAG
         r.varianceAfter = next.variance
-        r.scoringVersion = ScoringVersion.current
+        r.scoringVersion = r.game.difficultyScoringVersion
         r.raw.merge(run.metrics) { _, new in new }
         r.raw["baseScore"] = Double(base)
         r.raw["bonusMultiplier"] = Double(multiplier)
@@ -283,16 +283,34 @@ struct AccuracyPolicy: GameScoringPolicy {
     }
 }
 
-struct EstimatorPolicy: GameScoringPolicy {
+struct TargetForgePolicy: GameScoringPolicy {
+    var targetQuality: Double { 0.72 }
+    var abilitySignalWeight: Double { 0.10 }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
-        let trials = max(1, result.trials)
-        let accuracy = ScoringMath.clamp(result.accuracy, 0, 1)
-        let confidence = ScoringMath.clamp(Double(trials) / 16.0, 0.35, 1.0)
+        let exact = max(0, result.raw["exact"] ?? 0)
+        let close = max(0, result.raw["close"] ?? 0)
+        let near = max(0, result.raw["near"] ?? 0)
+        let wrong = max(0, result.raw["wrong"] ?? 0)
+        let rawTotal = exact + close + near + wrong
+        let total = rawTotal > 0 ? rawTotal : Double(max(1, result.trials))
+        let quality = result.raw["forgeQuality"]
+            ?? (rawTotal > 0
+                ? ScoringMath.clamp((exact + close * 0.65 + near * 0.30) / total, 0, 1)
+                : ScoringMath.clamp(result.accuracy, 0, 1))
+        let seconds = max(10, (result.raw["timeOnTaskMs"] ?? Double(result.durationMs)) / 1000.0)
+        let confidence = ScoringMath.clamp(min(total / 12.0, seconds / 45.0), 0.35, 1.0)
+        let exactRate = rawTotal > 0 ? exact / total : ScoringMath.clamp(result.accuracy, 0, 1)
+        let ability = ScoringMath.clamp(prior.masteryOrLevel + (quality - targetQuality) * 2.0 + exactRate * 0.35, 1, 10)
         return ScoredRun(
-            performance: accuracy,
+            performance: ScoringMath.clamp(quality, 0, 1),
             confidence: confidence,
-            abilitySignal: prior.masteryOrLevel,
-            metrics: ["estimatorAccuracy": accuracy]
+            abilitySignal: ability,
+            metrics: [
+                "targetForgeQuality": quality,
+                "exactRate": exactRate,
+                "avgError": result.raw["avgError"] ?? 0
+            ]
         )
     }
 }
