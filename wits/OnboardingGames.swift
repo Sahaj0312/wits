@@ -451,6 +451,8 @@ struct TrackerScreen: View {
     private static let markSeconds = 1.5
     private static let moveSeconds = 6.5
     private static let margin = 0.08
+    private static let dotDiameter: CGFloat = 30
+    private static let collisionIterations = 3
 
     private enum RoundPhase {
         case mark, move, pick, reveal
@@ -471,6 +473,7 @@ struct TrackerScreen: View {
     @State private var stats = TrackStats()
     @State private var pulse = false
     @State private var generation = 0
+    @State private var boardSize: CGSize = .zero
 
     private var config: (targets: Int, dots: Int, speed: Double) {
         phase == .tutorial ? Self.tutorialRound : Self.rounds[min(round, Self.rounds.count - 1)]
@@ -561,6 +564,12 @@ struct TrackerScreen: View {
                     }
                 }
                 .contentShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+                .onAppear {
+                    boardSize = size
+                }
+                .onChange(of: size) { _, newSize in
+                    boardSize = newSize
+                }
                 .onTapGesture { location in
                     tapBoard(location, in: size)
                 }
@@ -584,7 +593,7 @@ struct TrackerScreen: View {
             : Color.witsInk.opacity(0.32)
         return Circle()
             .fill(fill)
-            .frame(width: 30, height: 30)
+            .frame(width: Self.dotDiameter, height: Self.dotDiameter)
             .scaleEffect(showTarget && pulse ? 1.18 : 1)
             .overlay(
                 Circle()
@@ -728,28 +737,79 @@ struct TrackerScreen: View {
             }
             d.pos.x += d.vel.dx * dt
             d.pos.y += d.vel.dy * dt
-            if d.pos.x < Self.margin { d.pos.x = Self.margin; d.vel.dx = abs(d.vel.dx) }
-            if d.pos.x > 1 - Self.margin { d.pos.x = 1 - Self.margin; d.vel.dx = -abs(d.vel.dx) }
-            if d.pos.y < Self.margin { d.pos.y = Self.margin; d.vel.dy = abs(d.vel.dy) }
-            if d.pos.y > 1 - Self.margin { d.pos.y = 1 - Self.margin; d.vel.dy = -abs(d.vel.dy) }
+            keepDotInBounds(&d)
             dots[i] = d
         }
-        // soft repulsion so dots stay distinguishable
-        for i in dots.indices {
-            for j in dots.indices where j > i {
-                let dx = dots[j].pos.x - dots[i].pos.x
-                let dy = dots[j].pos.y - dots[i].pos.y
-                let d = hypot(dx, dy)
-                if d < 0.075, d > 0 {
-                    let push = (0.075 - d) / 2
-                    let ux = dx / d, uy = dy / d
-                    dots[i].pos.x = min(1 - Self.margin, max(Self.margin, dots[i].pos.x - ux * push))
-                    dots[i].pos.y = min(1 - Self.margin, max(Self.margin, dots[i].pos.y - uy * push))
-                    dots[j].pos.x = min(1 - Self.margin, max(Self.margin, dots[j].pos.x + ux * push))
-                    dots[j].pos.y = min(1 - Self.margin, max(Self.margin, dots[j].pos.y + uy * push))
+        resolveDotCollisions()
+    }
+
+    private func resolveDotCollisions() {
+        guard dots.count > 1, boardSize.width > 0, boardSize.height > 0 else { return }
+        for _ in 0..<Self.collisionIterations {
+            for i in dots.indices {
+                for j in dots.indices where j > i {
+                    resolveCollision(i, j, in: boardSize)
                 }
             }
+            for i in dots.indices {
+                keepDotInBounds(&dots[i])
+            }
         }
+    }
+
+    private func resolveCollision(_ i: Int, _ j: Int, in size: CGSize) {
+        var dx = (dots[j].pos.x - dots[i].pos.x) * size.width
+        var dy = (dots[j].pos.y - dots[i].pos.y) * size.height
+        var distance = hypot(dx, dy)
+        if distance == 0 {
+            let angle = Double((dots[i].id * 37 + dots[j].id * 19) % 360) * .pi / 180
+            dx = CGFloat(Darwin.cos(angle)) * 0.001
+            dy = CGFloat(Darwin.sin(angle)) * 0.001
+            distance = hypot(dx, dy)
+        }
+        guard distance < Self.dotDiameter else { return }
+
+        let nx = dx / distance
+        let ny = dy / distance
+        let push = (Self.dotDiameter - distance) / 2
+
+        dots[i].pos.x -= nx * push / size.width
+        dots[i].pos.y -= ny * push / size.height
+        dots[j].pos.x += nx * push / size.width
+        dots[j].pos.y += ny * push / size.height
+
+        let ivx = dots[i].vel.dx * size.width
+        let ivy = dots[i].vel.dy * size.height
+        let jvx = dots[j].vel.dx * size.width
+        let jvy = dots[j].vel.dy * size.height
+        let rvx = jvx - ivx
+        let rvy = jvy - ivy
+        let closingSpeed = rvx * nx + rvy * ny
+        if closingSpeed < 0 {
+            dots[i].vel.dx = (ivx + closingSpeed * nx) / size.width
+            dots[i].vel.dy = (ivy + closingSpeed * ny) / size.height
+            dots[j].vel.dx = (jvx - closingSpeed * nx) / size.width
+            dots[j].vel.dy = (jvy - closingSpeed * ny) / size.height
+            normalizeSpeed(&dots[i], in: size)
+            normalizeSpeed(&dots[j], in: size)
+        }
+    }
+
+    private func keepDotInBounds(_ dot: inout Dot) {
+        if dot.pos.x < Self.margin { dot.pos.x = Self.margin; dot.vel.dx = abs(dot.vel.dx) }
+        if dot.pos.x > 1 - Self.margin { dot.pos.x = 1 - Self.margin; dot.vel.dx = -abs(dot.vel.dx) }
+        if dot.pos.y < Self.margin { dot.pos.y = Self.margin; dot.vel.dy = abs(dot.vel.dy) }
+        if dot.pos.y > 1 - Self.margin { dot.pos.y = 1 - Self.margin; dot.vel.dy = -abs(dot.vel.dy) }
+    }
+
+    private func normalizeSpeed(_ dot: inout Dot, in size: CGSize) {
+        let vx = dot.vel.dx * size.width
+        let vy = dot.vel.dy * size.height
+        let speed = hypot(vx, vy)
+        guard speed > 0 else { return }
+        let targetSpeed = CGFloat(config.speed) * min(size.width, size.height)
+        dot.vel.dx = vx / speed * targetSpeed / size.width
+        dot.vel.dy = vy / speed * targetSpeed / size.height
     }
 }
 
