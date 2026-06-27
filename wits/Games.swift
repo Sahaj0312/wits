@@ -19,7 +19,7 @@ enum ArrowStorm: Game {
 enum CrowdControl: Game {
     static let id = GameID.crowdControl
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(ArcadeSpriteHost(cfg: config, game: MotArcade(), onResult: onComplete))
+        AnyView(TrackerScreen(cfg: config, onResult: onComplete))
     }
 }
 
