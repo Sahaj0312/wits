@@ -30,7 +30,7 @@ enum OnboardingStep: Hashable {
     case tracker, explainTracker
     case span, explainSpan
     // 6 — results & engagement
-    case calc, result, breakdown
+    case calc, breakdown, result
     case streak, reminder
     // 7 — program builder
     case planIntro, difficulty, coach, exercise, sleep, trainingDays, planBuild
@@ -47,7 +47,7 @@ enum OnboardingStep: Hashable {
         .flanker, .explainFlanker,
         .tracker, .explainTracker,
         .span, .explainSpan,
-        .calc, .result, .breakdown,
+        .calc, .breakdown, .result,
         .streak, .reminder,
         .planIntro, .difficulty, .coach, .exercise, .sleep, .trainingDays, .planBuild,
         .projection, .paywall,

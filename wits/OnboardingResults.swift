@@ -2,7 +2,7 @@
 //  OnboardingResults.swift
 //  wits
 //
-//  Part three of the flow: calculating, result, breakdown, streak,
+//  Part three of the flow: calculating, breakdown, result, streak,
 //  reminder, coaching style, plan build, 30-day projection, paywall.
 //
 
@@ -137,75 +137,125 @@ struct ResultScreen: View {
 
     @State private var progress = 0.0
 
-    private var shownAge: Int { Int((Double(result.age) * progress).rounded()) }
-    private var gaugeFraction: Double { min(1, Double(result.age - 16) / 78) * progress }
+    private var baselineScore: Int {
+        guard !result.tests.isEmpty else { return 50 }
+        let total = result.tests.reduce(0) { $0 + $1.pct }
+        return min(99, max(4, Int((Double(total) / Double(result.tests.count)).rounded())))
+    }
+    private var shownScore: Int { Int((Double(baselineScore) * progress).rounded()) }
+    private var gaugeFraction: Double { Double(baselineScore) / 100 * progress }
+    private var weakest: TestScore {
+        result.tests.min { $0.pct < $1.pct } ?? result.best
+    }
+    private var statusTitle: String {
+        if result.gap > 8 {
+            "we found the pressure points"
+        } else if baselineScore >= 78 {
+            "you've got a strong starting point"
+        } else {
+            "we found your starting point"
+        }
+    }
+    private var statusCopy: String {
+        if result.gap > 8 {
+            "your test showed where attention held steady and where it slipped under pressure. wits will start there."
+        } else if baselineScore >= 78 {
+            "your test showed a solid baseline. wits will raise the challenge as your scores move."
+        } else {
+            "this is not a grade. it's the starting map wits uses to tune your first week."
+        }
+    }
+    private var scoreColor: Color {
+        baselineScore < 55 ? .witsWarm : .witsAccent
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Text("YOUR RESULT")
-                .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                .kerning(1.2)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("FIT TEST COMPLETE")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .kerning(1.1)
                 .foregroundStyle(Color.witsFaint)
-                .padding(.bottom, 8)
-            ZStack {
-                Circle()
-                    .stroke(Color.witsLine, lineWidth: 14)
-                Circle()
-                    .trim(from: 0, to: gaugeFraction)
-                    .stroke(Color.witsWarm, style: StrokeStyle(lineWidth: 14, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-                VStack(spacing: 4) {
-                    Text("\(shownAge)")
-                        .font(.system(size: 60, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsWarm)
-                        .monospacedDigit()
-                    Text("fit baseline")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                }
-            }
-            .frame(width: 172, height: 172)
-            .padding(.bottom, 20)
+                .rise()
+            Text(statusTitle)
+                .font(.witsDisplay(34))
+                .foregroundStyle(Color.witsInk)
+                .padding(.top, 10)
+                .fixedSize(horizontal: false, vertical: true)
+                .rise(0.08)
+            Text(statusCopy)
+                .font(.witsBody(16))
+                .foregroundStyle(Color.witsMuted)
+                .padding(.top, 10)
+                .fixedSize(horizontal: false, vertical: true)
+                .rise(0.16)
+
             VStack(spacing: 12) {
-                HStack {
-                    Text("starting estimate")
-                        .font(.witsBody(14))
-                        .foregroundStyle(Color.witsMuted)
-                    Spacer()
-                    Text("\(min(97, max(3, 100 - result.percentile))) / 100")
-                        .font(.system(size: 14.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
-                }
-                HStack {
-                    Text("baseline status")
-                        .font(.witsBody(14))
-                        .foregroundStyle(Color.witsMuted)
-                    Spacer()
-                    Text(result.gap > 0 ? "room to grow" : "right on track")
-                        .font(.system(size: 14.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsInk)
-                }
-                Rectangle()
-                    .fill(Color.witsLine)
-                    .frame(height: 1)
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 9, weight: .heavy))
-                        .foregroundStyle(Color.witsAccent)
-                        .frame(width: 20, height: 20)
-                        .background(Color.witsAccent.opacity(0.16), in: Circle())
-                    Text("your strongest area today: \(result.best.skill). \(result.best.name) is your best fit-test signal so far.")
-                        .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                HStack(spacing: 18) {
+                    ZStack {
+                        Circle()
+                            .stroke(Color.witsLine, lineWidth: 12)
+                        Circle()
+                            .trim(from: 0, to: gaugeFraction)
+                            .stroke(scoreColor, style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                            .rotationEffect(.degrees(-90))
+                        VStack(spacing: 2) {
+                            HStack(alignment: .firstTextBaseline, spacing: 1) {
+                                Text("\(shownScore)")
+                                    .font(.system(size: 48, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(scoreColor)
+                                    .monospacedDigit()
+                                Text("/100")
+                                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(Color.witsFaint)
+                            }
+                            Text("starting score")
+                                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Color.witsMuted)
+                        }
+                    }
+                    .frame(width: 142, height: 142)
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        ResultPill(text: "adaptive baseline", color: scoreColor)
+                        Text("we'll use it to set your first drills.")
+                            .font(.witsBody(17, weight: .heavy))
+                            .foregroundStyle(Color.witsInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text("your first sessions will adjust from here.")
+                            .font(.witsBody(13.5))
+                            .foregroundStyle(Color.witsMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding(18)
             .cardSurface()
-            .rise(0.5)
+            .padding(.top, 24)
+            .rise(0.28)
+
+            VStack(spacing: 10) {
+                ResultSignalRow(
+                    icon: "bolt.fill",
+                    title: "strongest signal",
+                    value: "\(result.best.skill) · \(result.best.pct)%",
+                    detail: "\(result.best.name) came through as your clearest strength today.",
+                    tint: .witsAccent
+                )
+                ResultSignalRow(
+                    icon: "target",
+                    title: "training target",
+                    value: "\(weakest.skill) · \(weakest.pct)%",
+                    detail: "we'll put extra early work into the area that showed the most friction.",
+                    tint: .witsWarm
+                )
+            }
+            .padding(.top, 12)
+            .rise(0.42)
+
             Spacer()
-            Cta(title: "see the breakdown", action: onNext)
-                .rise(0.9)
+            Cta(title: "continue", action: onNext)
+                .rise(0.62)
                 .padding(.top, 16)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
@@ -220,6 +270,59 @@ struct ResultScreen: View {
                 try? await Task.sleep(for: .milliseconds(16))
             }
         }
+    }
+}
+
+private struct ResultPill: View {
+    var text: String
+    var color: Color
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .heavy, design: .rounded))
+            .foregroundStyle(color)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(color.opacity(0.14), in: Capsule())
+    }
+}
+
+private struct ResultSignalRow: View {
+    var icon: String
+    var title: String
+    var value: String
+    var detail: String
+    var tint: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(0.14), in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsFaint)
+                        .textCase(.uppercase)
+                    Spacer(minLength: 8)
+                    Text(value)
+                        .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(Color.witsInk)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+                }
+                Text(detail)
+                    .font(.witsBody(13.5))
+                    .foregroundStyle(Color.witsMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -330,7 +433,7 @@ struct BreakdownScreen: View {
                 }
             }
             Spacer()
-            Cta(title: "start training", action: onNext)
+            Cta(title: "see my baseline", action: onNext)
                 .rise(0.56)
                 .padding(.top, 16)
         }
