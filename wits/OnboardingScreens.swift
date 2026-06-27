@@ -251,27 +251,31 @@ struct LikertScreen: View {
 struct StatScreen: View {
     var onNext: () -> Void
 
-    @State private var value = 0
-    private let target = 10
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Wordmark()
             Spacer()
             VStack(alignment: .leading, spacing: 16) {
-                Text("\(value)")
-                    .font(.system(size: 92, weight: .heavy, design: .rounded))
+                Text("brain fog")
+                    .font(.system(size: 72, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsAccent)
-                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
                     .rise()
-                Text("minutes a day is all it takes to start training your brain.")
-                    .font(.system(size: 19, weight: .bold, design: .rounded))
+                Text("is not random.")
+                    .font(.system(size: 32, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsInk)
-                    .rise(0.12)
-                Text("small sessions, done consistently, add up over time.")
-                    .font(.witsBody(15))
+                    .rise(0.08)
+                Text("it's what happens when attention gets pulled apart all day.")
+                    .font(.witsBody(18, weight: .heavy))
+                    .foregroundStyle(Color.witsInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .rise(0.16)
+                Text("before we build your plan, we'll check how your mind performs under pressure.")
+                    .font(.witsBody(15.5))
                     .foregroundStyle(Color.witsMuted)
-                    .rise(0.22)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .rise(0.24)
             }
             Spacer()
             Cta(title: "keep going", action: onNext)
@@ -280,16 +284,6 @@ struct StatScreen: View {
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 12)
-        .task {
-            let start = Date()
-            let duration = 1.1
-            while !Task.isCancelled {
-                let t = min(1, Date().timeIntervalSince(start) / duration)
-                value = Int((1 - pow(1 - t, 3)) * Double(target))
-                if t >= 1 { break }
-                try? await Task.sleep(for: .milliseconds(16))
-            }
-        }
     }
 }
 
