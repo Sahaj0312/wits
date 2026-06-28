@@ -87,6 +87,10 @@ struct ProfileRow: Decodable {
     var display_name: String?
     var birthdate: String?
     var goals: [String]?
+    var difficulty: String?
+    var encouragement: String?
+    var exercise_freq: String?
+    var sleep_hours: String?
     var training_days: Int?
     var reminder_hour: Int?
     var reminder_minute: Int?

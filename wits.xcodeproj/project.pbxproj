@@ -35,14 +35,14 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		9F9D49787B6440E482A8CB12 /* Frameworks */ = {
+		9E6ED0782FDB535500400770 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		9E6ED0782FDB535500400770 /* Frameworks */ = {
+		9F9D49787B6440E482A8CB12 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -73,6 +73,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		9E6ED07A2FDB535500400770 /* wits */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 9E6ED0862FDB535700400770 /* Build configuration list for PBXNativeTarget "wits" */;
+			buildPhases = (
+				9E6ED0772FDB535500400770 /* Sources */,
+				9E6ED0782FDB535500400770 /* Frameworks */,
+				9E6ED0792FDB535500400770 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				9E6ED07D2FDB535500400770 /* wits */,
+			);
+			name = wits;
+			packageProductDependencies = (
+			);
+			productName = wits;
+			productReference = 9E6ED07B2FDB535500400770 /* wits.app */;
+			productType = "com.apple.product-type.application";
+		};
 		CE056DAE156E41F28434530E /* witsTests */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F4BA6AE597204A16847AFC68 /* Build configuration list for PBXNativeTarget "witsTests" */;
@@ -95,28 +117,6 @@
 			productName = witsTests;
 			productReference = 300FE5DBFB1849278A4B1F08 /* witsTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
-		};
-		9E6ED07A2FDB535500400770 /* wits */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 9E6ED0862FDB535700400770 /* Build configuration list for PBXNativeTarget "wits" */;
-			buildPhases = (
-				9E6ED0772FDB535500400770 /* Sources */,
-				9E6ED0782FDB535500400770 /* Frameworks */,
-				9E6ED0792FDB535500400770 /* Resources */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			fileSystemSynchronizedGroups = (
-				9E6ED07D2FDB535500400770 /* wits */,
-			);
-			name = wits;
-			packageProductDependencies = (
-			);
-			productName = wits;
-			productReference = 9E6ED07B2FDB535500400770 /* wits.app */;
-			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
@@ -442,15 +442,6 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		F4BA6AE597204A16847AFC68 /* Build configuration list for PBXNativeTarget "witsTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				34FF0674C69040D4AA873DC7 /* Debug */,
-				4B66A0F49C204CA996377680 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		9E6ED0762FDB535500400770 /* Build configuration list for PBXProject "wits" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -465,6 +456,15 @@
 			buildConfigurations = (
 				9E6ED0872FDB535700400770 /* Debug */,
 				9E6ED0882FDB535700400770 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F4BA6AE597204A16847AFC68 /* Build configuration list for PBXNativeTarget "witsTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				34FF0674C69040D4AA873DC7 /* Debug */,
+				4B66A0F49C204CA996377680 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -200,3 +200,107 @@ final class ScoringTests: XCTestCase {
         XCTAssertEqual(arrow, word)
     }
 }
+
+final class NotificationPlannerTests: XCTestCase {
+    private func calendar() -> Calendar {
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 0)!
+        return cal
+    }
+
+    private func date(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 8, _ minute: Int = 0) -> Date {
+        calendar().date(from: DateComponents(timeZone: TimeZone(secondsFromGMT: 0),
+                                             year: year, month: month, day: day,
+                                             hour: hour, minute: minute))!
+    }
+
+    private func profile(trainingDays: Int = 5,
+                         hour: Int = 9,
+                         minute: Int = 0,
+                         difficulty: String? = nil,
+                         encouragement: String? = nil,
+                         sleep: String? = nil,
+                         trialStartedAt: Date? = nil) -> ProfileSnapshot {
+        ProfileSnapshot(
+            goals: ["sharpen my focus"],
+            difficultyPreference: difficulty,
+            encouragementStyle: encouragement,
+            sleepHours: sleep,
+            trainingDays: trainingDays,
+            reminderHour: hour,
+            reminderMinute: minute,
+            notificationsEnabled: true,
+            trialStartedAt: trialStartedAt
+        )
+    }
+
+    func testTrainingDaysLimitDailyWorkoutReminders() {
+        let cal = calendar()
+        let now = date(2026, 6, 29, 8) // Monday
+        let events = WitsNotificationPlanner.events(
+            profile: profile(trainingDays: 3),
+            context: WitsNotificationPlanContext(now: now),
+            calendar: cal
+        )
+
+        XCTAssertEqual(events.filter { $0.kind == .dailyWorkout }.count, 3)
+    }
+
+    func testCompletedWorkoutSkipsSameDayWorkoutAndRescue() {
+        let cal = calendar()
+        let now = date(2026, 6, 29, 8)
+        let events = WitsNotificationPlanner.events(
+            profile: profile(trainingDays: 7),
+            context: WitsNotificationPlanContext(now: now, todayWorkoutDone: true),
+            calendar: cal
+        )
+        let today = cal.startOfDay(for: now)
+
+        XCTAssertFalse(events.contains {
+            [.dailyWorkout, .streakRescue].contains($0.kind) && cal.isDate($0.fireDate, inSameDayAs: today)
+        })
+    }
+
+    func testToneAndDifficultyPersonalizeCopy() {
+        let cal = calendar()
+        let now = date(2026, 6, 29, 8)
+        let standard = WitsNotificationPlanner.events(
+            profile: profile(difficulty: "standard", encouragement: "high fives"),
+            context: WitsNotificationPlanContext(now: now),
+            calendar: cal
+        ).first { $0.kind == .dailyWorkout }?.body
+        let advanced = WitsNotificationPlanner.events(
+            profile: profile(difficulty: "advanced", encouragement: "tough love"),
+            context: WitsNotificationPlanContext(now: now),
+            calendar: cal
+        ).first { $0.kind == .dailyWorkout }?.body
+
+        XCTAssertNotEqual(standard, advanced)
+    }
+
+    func testLowSleepAvoidsLateRescueNotification() {
+        let cal = calendar()
+        let now = date(2026, 6, 29, 8)
+        let events = WitsNotificationPlanner.events(
+            profile: profile(trainingDays: 7, hour: 21, sleep: "5-6 hours"),
+            context: WitsNotificationPlanContext(now: now),
+            calendar: cal
+        )
+
+        XCTAssertFalse(events.contains { $0.kind == .streakRescue })
+    }
+
+    func testTrialLifecycleSchedulesDeadlineNudges() {
+        let cal = calendar()
+        let now = date(2026, 6, 29, 8)
+        let events = WitsNotificationPlanner.events(
+            profile: profile(trainingDays: 7, trialStartedAt: date(2026, 6, 27, 12)),
+            context: WitsNotificationPlanContext(now: now),
+            calendar: cal
+        )
+        let kinds = Set(events.map(\.kind))
+
+        XCTAssertTrue(kinds.contains(.trialEndingSoon))
+        XCTAssertTrue(kinds.contains(.trialEndsToday))
+    }
+}

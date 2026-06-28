@@ -162,6 +162,7 @@ struct OnboardingView: View {
     var onFinished: () -> Void
 
     @Environment(SupabaseManager.self) private var supa
+    @Environment(AppModel.self) private var app
     @State private var stepIndex = 0
     @State private var data = OnboardingData()
     @State private var showAuth = false
@@ -240,6 +241,7 @@ struct OnboardingView: View {
         case .username:
             UsernameScreen(suggested: supa.suggestedName) { name in
                 data.username = name
+                app.profile.displayName = name
                 supa.suggestedName = nil
                 Task { try? await supa.upsertProfile(["display_name": name]) }
                 next()
@@ -247,6 +249,7 @@ struct OnboardingView: View {
         case .birthdate:
             BirthdateScreen { date in
                 data.birthdate = date
+                app.profile.birthdate = date
                 supa.recordCheckpoint(.birthdate, merging: ["birthdate": Self.dateString(date)])
                 next()
             }
@@ -255,6 +258,7 @@ struct OnboardingView: View {
         case .goals:
             GoalsScreen { picked in
                 data.goals = picked
+                app.profile.goals = picked
                 supa.recordCheckpoint(.goals, merging: ["goals": picked])
                 next()
             }
@@ -352,34 +356,46 @@ struct OnboardingView: View {
         case .streak:
             StreakScreen(onNext: next)
         case .reminder:
-            ReminderScreen(onNext: next)
+            ReminderScreen(
+                onEnable: { hour, minute in
+                    app.setReminder(hour: hour, minute: minute, enabled: true)
+                    next()
+                },
+                onSkip: next
+            )
         case .planIntro:
             PlanIntroScreen(onNext: next)
         case .difficulty:
             DifficultyScreen { value in
                 data.difficulty = value
+                app.profile.difficultyPreference = value
                 next()
             }
         case .coach:
             CoachScreen { value in
                 data.encouragement = value
+                app.profile.encouragementStyle = value
                 next()
             }
         case .exercise:
             ExerciseScreen { value in
                 data.exerciseFreq = value
+                app.profile.exerciseFrequency = value
                 next()
             }
         case .sleep:
             SleepScreen { value in
                 data.sleepHours = value
+                app.profile.sleepHours = value
                 next()
             }
         case .trainingDays:
             TrainingDaysScreen { value in
                 data.trainingDays = value
+                app.profile.trainingDays = value
                 // End of the program-builder section — one write for the whole section.
                 supa.recordCheckpoint(.planBuilt, merging: programFields)
+                app.refreshReminderSchedule()
                 next()
             }
         case .planBuild:
@@ -516,6 +532,8 @@ struct OnboardingView: View {
     }
 
     private func complete() {
+        app.profile.trialStartedAt = Date()
+        app.refreshReminderSchedule()
         supa.recordCheckpoint(.completed)
         onFinished()
     }

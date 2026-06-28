@@ -25,6 +25,10 @@ struct ProfileSnapshot: Codable, Equatable {
     var displayName: String? = nil
     var birthdate: Date? = nil
     var goals: [String] = []
+    var difficultyPreference: String? = nil
+    var encouragementStyle: String? = nil
+    var exerciseFrequency: String? = nil
+    var sleepHours: String? = nil
     var trainingDays: Int = 5
     var reminderHour: Int? = nil
     var reminderMinute: Int = 0
@@ -89,6 +93,7 @@ final class AppModel {
         rebuildTodayIfNeeded()
         recomputeEntitlement()
         saveCache()
+        refreshReminderSchedule()
     }
 
     var difficultyFor: (GameID) -> DifficultyState {
@@ -140,7 +145,7 @@ final class AppModel {
         profile.notificationsEnabled = enabled
         saveCache()
         if enabled {
-            WitsNotifications.scheduleDaily(hour: hour, minute: minute)
+            refreshReminderSchedule()
         } else {
             WitsNotifications.cancelAll()
         }
@@ -156,8 +161,21 @@ final class AppModel {
     /// Re-arm the OS schedule from persisted prefs on launch (system clears
     /// pending requests in some cases; cheap to re-add).
     func refreshReminderSchedule() {
-        guard profile.notificationsEnabled, let h = profile.reminderHour else { return }
-        WitsNotifications.scheduleDaily(hour: h, minute: profile.reminderMinute)
+        saveCache()
+        guard profile.notificationsEnabled, profile.reminderHour != nil else {
+            WitsNotifications.cancelAll()
+            return
+        }
+        WitsNotifications.schedulePlan(profile: profile, context: notificationContext())
+    }
+
+    private func notificationContext(now: Date = Date()) -> WitsNotificationPlanContext {
+        WitsNotificationPlanContext(
+            now: now,
+            todayWorkoutDone: isWorkoutDoneToday,
+            streak: streak,
+            hasAnyProgress: !progressDays.isEmpty
+        )
     }
 
     var isWorkoutDoneToday: Bool {
@@ -256,6 +274,11 @@ final class AppModel {
         // if the user backs out partway. countsForStreak only on the last game.
         let complete = today.results.count >= today.games.count
         recordDayActivity([scored], countsForStreak: complete, prescribed: today.games)
+        if complete {
+            WitsNotifications.cancelTodayWorkoutNotifications()
+        } else {
+            refreshReminderSchedule()
+        }
     }
 
     /// Fold a just-played game into today's rollup: accumulate domain scores,
@@ -386,6 +409,10 @@ final class AppModel {
             profile.displayName = p.display_name ?? profile.displayName
             profile.birthdate = Self.parseDate(p.birthdate)
             profile.goals = p.goals ?? profile.goals
+            profile.difficultyPreference = p.difficulty ?? profile.difficultyPreference
+            profile.encouragementStyle = p.encouragement ?? profile.encouragementStyle
+            profile.exerciseFrequency = p.exercise_freq ?? profile.exerciseFrequency
+            profile.sleepHours = p.sleep_hours ?? profile.sleepHours
             profile.trainingDays = p.training_days ?? profile.trainingDays
             profile.reminderHour = p.reminder_hour ?? profile.reminderHour
             profile.reminderMinute = p.reminder_minute ?? profile.reminderMinute
@@ -453,6 +480,7 @@ final class AppModel {
         recomputeEntitlement()
         rebuildTodayIfNeeded()
         saveCache()
+        refreshReminderSchedule()
     }
 
     private func recomputeEntitlement() {

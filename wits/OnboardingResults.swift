@@ -504,15 +504,17 @@ struct StreakScreen: View {
 // MARK: - Reminder
 
 struct ReminderScreen: View {
-    var onNext: () -> Void
+    var onEnable: (Int, Int) -> Void
+    var onSkip: () -> Void
 
-    private static let times: [(label: String, time: String, sub: String)] = [
-        ("morning", "8:00", "start your day sharp"),
-        ("lunch", "12:30", "a midday brain break"),
-        ("night", "21:00", "wind down with a quick session"),
+    private static let times: [(label: String, hour: Int, minute: Int, sub: String)] = [
+        ("morning", 8, 0, "start your day sharp"),
+        ("lunch", 12, 30, "a midday brain break"),
+        ("night", 21, 0, "wind down with a quick session"),
     ]
 
     @State private var picked = 0
+    @State private var working = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -534,7 +536,7 @@ struct ReminderScreen: View {
                         picked = i
                     } label: {
                         HStack(spacing: 14) {
-                            Text(option.time)
+                            Text(timeLabel(hour: option.hour, minute: option.minute))
                                 .font(.system(size: 18, weight: .heavy, design: .rounded))
                                 .foregroundStyle(Color.witsInk)
                                 .monospacedDigit()
@@ -569,14 +571,31 @@ struct ReminderScreen: View {
             }
             Spacer()
             VStack(spacing: 12) {
-                Cta(title: "set the reminder", action: onNext)
+                Cta(title: working ? "..." : "set the reminder") {
+                    guard !working else { return }
+                    working = true
+                    Task {
+                        let granted = await WitsNotifications.requestAuthorization()
+                        let choice = Self.times[picked]
+                        working = false
+                        if granted {
+                            onEnable(choice.hour, choice.minute)
+                        } else {
+                            onSkip()
+                        }
+                    }
+                }
                     .rise(0.42)
-                QuietButton(title: "skip for now", action: onNext)
+                QuietButton(title: "skip for now", action: onSkip)
             }
             .padding(.top, 16)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 12)
+    }
+
+    private func timeLabel(hour: Int, minute: Int) -> String {
+        String(format: "%d:%02d", hour, minute)
     }
 }
 

@@ -53,7 +53,7 @@ struct NotificationPrimer: View {
                 Task {
                     let granted = await WitsNotifications.requestAuthorization()
                     let (h, m) = components(time)
-                    if granted { app.setReminder(hour: h, minute: m, enabled: true) }
+                    app.setReminder(hour: h, minute: m, enabled: granted)
                     working = false
                     dismiss()
                 }
@@ -81,7 +81,7 @@ struct ReminderSettingsSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("daily reminder")
+            Text("notification plan")
                 .font(.witsDisplay(26))
                 .foregroundStyle(Color.witsInk)
                 .padding(.top, 8)
@@ -108,13 +108,16 @@ struct ReminderSettingsSheet: View {
             Cta(title: "save") {
                 Task {
                     let (h, m) = components(time)
+                    var canEnable = enabled
                     if enabled {
                         let status = await WitsNotifications.authStatus()
                         if status == .notDetermined {
-                            _ = await WitsNotifications.requestAuthorization()
+                            canEnable = await WitsNotifications.requestAuthorization()
+                        } else if status == .denied {
+                            canEnable = false
                         }
                     }
-                    app.setReminder(hour: h, minute: m, enabled: enabled)
+                    app.setReminder(hour: h, minute: m, enabled: canEnable)
                     dismiss()
                 }
             }
