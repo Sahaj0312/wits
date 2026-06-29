@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 private func components(_ date: Date) -> (Int, Int) {
     let c = Calendar.current.dateComponents([.hour, .minute], from: date)
@@ -104,17 +105,37 @@ struct ReminderSettingsSheet: View {
                     .cardSurface()
             }
 
+            if app.notificationsNeedSettings {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("notifications are off in iOS Settings.")
+                        .font(.witsBody(15, weight: .semibold))
+                        .foregroundStyle(Color.witsInk)
+                    Button("open settings") {
+                        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+                        UIApplication.shared.open(url)
+                    }
+                    .font(.witsBody(14, weight: .bold))
+                    .foregroundStyle(Color.witsAccent)
+                }
+                .padding(16)
+                .cardSurface()
+            }
+
             Spacer()
             Cta(title: "save") {
                 Task {
                     let (h, m) = components(time)
                     var canEnable = enabled
                     if enabled {
-                        let status = await WitsNotifications.authStatus()
-                        if status == .notDetermined {
+                        switch await WitsNotifications.permissionState() {
+                        case .ready:
+                            canEnable = true
+                        case .notDetermined:
                             canEnable = await WitsNotifications.requestAuthorization()
-                        } else if status == .denied {
-                            canEnable = false
+                        case .disabled:
+                            app.notificationsNeedSettings = true
+                            WitsNotifications.cancelAll()
+                            return
                         }
                     }
                     app.setReminder(hour: h, minute: m, enabled: canEnable)
@@ -125,5 +146,8 @@ struct ReminderSettingsSheet: View {
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 16)
         .background(Color.witsBg.ignoresSafeArea())
+        .task {
+            await app.syncNotificationAuthorizationAndSchedule()
+        }
     }
 }

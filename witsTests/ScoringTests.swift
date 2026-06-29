@@ -261,6 +261,42 @@ final class NotificationPlannerTests: XCTestCase {
         })
     }
 
+    func testCompletedWorkoutReplanDropsReactivationNudges() {
+        let cal = calendar()
+        let now = date(2026, 6, 29, 8)
+        let events = WitsNotificationPlanner.events(
+            profile: profile(trainingDays: 7),
+            context: WitsNotificationPlanContext(
+                now: now,
+                todayWorkoutDone: true,
+                streak: StreakState(current: 1, longest: 1, lastActiveDay: now),
+                hasAnyProgress: true
+            ),
+            calendar: cal
+        )
+
+        XCTAssertFalse(events.contains { $0.kind == .reactivation })
+    }
+
+    func testReactivationSuppressesSameDayDailyWorkoutNudge() {
+        let cal = calendar()
+        let now = date(2026, 6, 29, 8)
+        let events = WitsNotificationPlanner.events(
+            profile: profile(trainingDays: 7),
+            context: WitsNotificationPlanContext(
+                now: now,
+                streak: StreakState(current: 0, longest: 4, lastActiveDay: date(2026, 6, 25)),
+                hasAnyProgress: true
+            ),
+            calendar: cal
+        )
+        let dailyDays = Set(events.filter { $0.kind == .dailyWorkout }.map { cal.startOfDay(for: $0.fireDate) })
+        let reactivationDays = Set(events.filter { $0.kind == .reactivation }.map { cal.startOfDay(for: $0.fireDate) })
+
+        XCTAssertTrue(dailyDays.isDisjoint(with: reactivationDays))
+        XCTAssertFalse(reactivationDays.isEmpty)
+    }
+
     func testToneAndDifficultyPersonalizeCopy() {
         let cal = calendar()
         let now = date(2026, 6, 29, 8)
@@ -288,6 +324,18 @@ final class NotificationPlannerTests: XCTestCase {
         )
 
         XCTAssertFalse(events.contains { $0.kind == .streakRescue })
+    }
+
+    func testLowSleepMatcherDoesNotTreatSixteenHoursAsLowSleep() {
+        let cal = calendar()
+        let now = date(2026, 6, 29, 8)
+        let events = WitsNotificationPlanner.events(
+            profile: profile(trainingDays: 7, hour: 16, sleep: "16 hours"),
+            context: WitsNotificationPlanContext(now: now),
+            calendar: cal
+        )
+
+        XCTAssertTrue(events.contains { $0.kind == .streakRescue })
     }
 
     func testTrialLifecycleSchedulesDeadlineNudges() {

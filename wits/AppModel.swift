@@ -50,6 +50,7 @@ final class AppModel {
     var gameStats: [GameID: GameStats] = [:]
     var today: DailyWorkout
     var headlineIndex: Double? = nil
+    var notificationsNeedSettings = false
     /// Per-day rollups for the progress chart (ascending by day).
     var progressDays: [DailyProgressRow] = []
     /// Actual workout games played per day (key yyyy-MM-dd, local), with the level
@@ -78,9 +79,11 @@ final class AppModel {
         guard load == .idle else { return }
         rebuildTodayIfNeeded()
         recomputeEntitlement()
-        refreshReminderSchedule()
         load = .ready
-        Task { await reconcile() }
+        Task {
+            await syncNotificationAuthorizationAndSchedule()
+            await reconcile()
+        }
     }
 
     /// Foreground / midnight: break the streak if a day was missed, refresh the day.
@@ -93,7 +96,7 @@ final class AppModel {
         rebuildTodayIfNeeded()
         recomputeEntitlement()
         saveCache()
-        refreshReminderSchedule()
+        Task { await syncNotificationAuthorizationAndSchedule() }
     }
 
     var difficultyFor: (GameID) -> DifficultyState {
@@ -143,6 +146,7 @@ final class AppModel {
         profile.reminderHour = enabled ? hour : nil
         profile.reminderMinute = minute
         profile.notificationsEnabled = enabled
+        notificationsNeedSettings = false
         saveCache()
         if enabled {
             refreshReminderSchedule()
@@ -161,12 +165,31 @@ final class AppModel {
     /// Re-arm the OS schedule from persisted prefs on launch (system clears
     /// pending requests in some cases; cheap to re-add).
     func refreshReminderSchedule() {
-        saveCache()
         guard profile.notificationsEnabled, profile.reminderHour != nil else {
             WitsNotifications.cancelAll()
             return
         }
         WitsNotifications.schedulePlan(profile: profile, context: notificationContext())
+    }
+
+    func syncNotificationAuthorizationAndSchedule() async {
+        guard profile.notificationsEnabled, profile.reminderHour != nil else {
+            notificationsNeedSettings = false
+            WitsNotifications.cancelAll()
+            return
+        }
+
+        switch await WitsNotifications.permissionState() {
+        case .ready:
+            notificationsNeedSettings = false
+            refreshReminderSchedule()
+        case .notDetermined:
+            notificationsNeedSettings = false
+            WitsNotifications.cancelAll()
+        case .disabled:
+            notificationsNeedSettings = true
+            WitsNotifications.cancelAll()
+        }
     }
 
     private func notificationContext(now: Date = Date()) -> WitsNotificationPlanContext {
@@ -274,11 +297,7 @@ final class AppModel {
         // if the user backs out partway. countsForStreak only on the last game.
         let complete = today.results.count >= today.games.count
         recordDayActivity([scored], countsForStreak: complete, prescribed: today.games)
-        if complete {
-            WitsNotifications.cancelTodayWorkoutNotifications()
-        } else {
-            refreshReminderSchedule()
-        }
+        refreshReminderSchedule()
     }
 
     /// Fold a just-played game into today's rollup: accumulate domain scores,
@@ -480,7 +499,7 @@ final class AppModel {
         recomputeEntitlement()
         rebuildTodayIfNeeded()
         saveCache()
-        refreshReminderSchedule()
+        await syncNotificationAuthorizationAndSchedule()
     }
 
     private func recomputeEntitlement() {

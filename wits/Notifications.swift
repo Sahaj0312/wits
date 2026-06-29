@@ -18,6 +18,12 @@ enum WitsNotificationKind: String, CaseIterable {
     case reactivation = "reactivation"
 }
 
+enum WitsNotificationPermissionState {
+    case ready
+    case notDetermined
+    case disabled
+}
+
 struct WitsNotificationPlanContext: Equatable {
     var now = Date()
     var todayWorkoutDone = false
@@ -79,22 +85,13 @@ enum WitsNotificationPlanner {
                                                      horizonEnd: horizonEnd,
                                                      calendar: calendar))
 
-        return Dictionary(grouping: events, by: \.id)
+        return Dictionary(grouping: suppressDailyReactivationOverlap(events, calendar: calendar), by: \.id)
             .compactMap { $0.value.sorted { $0.fireDate < $1.fireDate }.first }
             .sorted { $0.fireDate < $1.fireDate }
     }
 
     static func id(for kind: WitsNotificationKind, fireDate: Date, calendar: Calendar = .current) -> String {
         "wits.local.\(kind.rawValue).\(dayKey(fireDate, calendar: calendar))"
-    }
-
-    static func idsForToday(calendar: Calendar = .current, now: Date = Date()) -> [String] {
-        let today = calendar.startOfDay(for: now)
-        return [
-            id(for: .dailyWorkout, fireDate: today, calendar: calendar),
-            id(for: .streakRescue, fireDate: today, calendar: calendar),
-            id(for: .reactivation, fireDate: today, calendar: calendar),
-        ]
     }
 
     private static func trialEvents(profile: ProfileSnapshot,
@@ -152,6 +149,17 @@ enum WitsNotificationPlanner {
             events.append(event(.reactivation, fire: fire, profile: profile, calendar: calendar))
         }
         return events
+    }
+
+    private static func suppressDailyReactivationOverlap(_ events: [WitsNotificationEvent],
+                                                         calendar: Calendar) -> [WitsNotificationEvent] {
+        let reactivationDays = Set(events
+            .filter { $0.kind == .reactivation }
+            .map { dayKey($0.fireDate, calendar: calendar) })
+        guard !reactivationDays.isEmpty else { return events }
+        return events.filter { event in
+            event.kind != .dailyWorkout || !reactivationDays.contains(dayKey(event.fireDate, calendar: calendar))
+        }
     }
 
     private static func event(_ kind: WitsNotificationKind,
@@ -266,7 +274,7 @@ enum WitsNotificationPlanner {
 
     private static func isLowSleep(_ sleep: String?) -> Bool {
         guard let s = sleep?.lowercased() else { return false }
-        return s.contains("4 hours") || s.contains("5") || s.contains("6")
+        return s.contains("4 hours") || s.contains("5–6") || s.contains("5-6")
     }
 
     private static func date(on day: Date, minutes: Int, calendar: Calendar) -> Date? {
@@ -305,6 +313,19 @@ enum WitsNotifications {
         await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
     }
 
+    static func permissionState() async -> WitsNotificationPermissionState {
+        switch await authStatus() {
+        case .authorized, .provisional, .ephemeral:
+            return .ready
+        case .notDetermined:
+            return .notDetermined
+        case .denied:
+            return .disabled
+        @unknown default:
+            return .disabled
+        }
+    }
+
     @discardableResult
     static func requestAuthorization() async -> Bool {
         (try? await UNUserNotificationCenter.current()
@@ -326,11 +347,6 @@ enum WitsNotifications {
                 center.add(request)
             }
         }
-    }
-
-    static func cancelTodayWorkoutNotifications() {
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(withIdentifiers: WitsNotificationPlanner.idsForToday())
     }
 
     static func cancelAll() {
