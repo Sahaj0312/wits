@@ -28,6 +28,7 @@ struct GameHost: View {
     @State private var stage: Stage = .interstitial
     @State private var results: [GameResult] = []
     @State private var bonusValue: Int?
+    @State private var pauseController = GamePauseController()
 
     init(workout: DailyWorkout,
          difficultyFor: @escaping (GameID) -> DifficultyState,
@@ -60,24 +61,41 @@ struct GameHost: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, stage == .playing && currentGame?.ownsSafeAreaSurface != true ? max(geo.safeAreaInsets.top, 8) : 0)
                     .padding(.bottom, stage == .playing && currentGame?.ownsSafeAreaSurface != true ? max(geo.safeAreaInsets.bottom, 8) : 0)
+                    .allowsHitTesting(!pauseController.isPaused)
                     .clipped()
             }
             .overlay(alignment: .topLeading) {
-                if stage == .playing, currentGame?.usesEmbeddedQuitControl != true {
-                    Button(action: onQuit) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 15, weight: .heavy))
-                            .foregroundStyle(Color.witsFaint)
-                            .padding(12)
+                if stage == .playing, currentGame?.usesEmbeddedQuitControl != true, !pauseController.isPaused {
+                    GamePauseButton {
+                        pauseController.pause()
                     }
-                    .padding(.leading, 8)
-                    .padding(.top, max(geo.safeAreaInsets.top, 8))
+                    .padding(.leading, 10)
+                    .padding(.top, max(geo.safeAreaInsets.top - 6, 8))
+                }
+            }
+            .overlay {
+                if stage == .playing, pauseController.isPaused {
+                    GamePausedOverlay(game: currentGame,
+                                      quitTitle: "quit workout",
+                                      onResume: { pauseController.resume() },
+                                      onQuit: {
+                                          pauseController.reset()
+                                          onQuit()
+                                      })
                 }
             }
         }
         .animation(.easeOut(duration: 0.25), value: stageKey)
         .onAppear { GameFeel.shared.warmUp() }
-        .onDisappear { GameFeel.shared.teardown() }
+        .onChange(of: stage) { _, newStage in
+            if newStage != .playing {
+                pauseController.reset()
+            }
+        }
+        .onDisappear {
+            pauseController.reset()
+            GameFeel.shared.teardown()
+        }
     }
 
     private var stageKey: String {
@@ -98,7 +116,7 @@ struct GameHost: View {
                     progressDots
                         .padding(.top, 8)
                     makeGameView(game,
-                                 config: GameConfig.standard(game, difficulty: difficultyFor(game))) { result in
+                                 config: GameConfig.standard(game, difficulty: difficultyFor(game), pauseController: pauseController)) { result in
                         handle(result)
                     }
                 }
@@ -163,7 +181,10 @@ struct GameHost: View {
                 stats: app.gameStats[game],
                 difficulty: app.difficultyFor(game),
                 primaryTitle: index == 0 ? "start" : "play",
-                onPlay: { withAnimation { stage = .playing } },
+                onPlay: {
+                    pauseController.reset()
+                    withAnimation { stage = .playing }
+                },
                 onBack: onQuit,
                 accessory: AnyView(progressDots)
             )

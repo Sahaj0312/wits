@@ -186,8 +186,8 @@ struct TileShiftScreen: View {
         let start = Date()
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(30))
-            timeLeft = max(0, Self.gameSeconds - Date().timeIntervalSince(start))
-            let elapsed = Date().timeIntervalSince(trialStart)
+            timeLeft = max(0, Self.gameSeconds - cfg.activeElapsed(since: start))
+            let elapsed = cfg.activeElapsed(since: trialStart)
             windowFrac = max(0, 1 - elapsed / window)
             if elapsed > window { timeout() }
             if !cfg.isSurvival && timeLeft <= 0 {

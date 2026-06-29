@@ -794,7 +794,7 @@ struct WordConnectScreen: View {
         var result = GameResult(game: .wordConnect, score: score, accuracy: accuracy)
         result.trials = attempts
         result.startedAt = startedAt
-        result.durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+        result.durationMs = Int(cfg.activeElapsed(since: startedAt) * 1000)
         result.raw = [
             "bestStreak": Double(bestStreak),
             "wordsFound": Double(requiredWordsFoundTotal + bonusWordsFoundTotal),

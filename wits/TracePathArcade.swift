@@ -66,7 +66,7 @@ final class TracePathArcade: ArcadeGame {
 
     func resolve(_ action: ArcadeAction, scene: ArcadeScene) -> Resolution? {
         guard phase == .awaitTrace, case let .tap(p) = action else { return nil }
-        guard let e = scene.nearest(to: p, maxDist: 0.085, where: { $0.kind == 1 }),
+        guard let e = scene.nearest(to: p, maxDist: 0.11, where: { $0.kind == 1 }),
               !entered.contains(e.id) else { return nil }
 
         entered.append(e.id)
@@ -157,7 +157,7 @@ final class TracePathArcade: ArcadeGame {
         // makes equal fractions look stretched vertically. Use the same *pixel* gap
         // for rows as columns (a true square grid), centered.
         let aspect = scene.bounds.height > 0 ? scene.bounds.width / scene.bounds.height : 390.0 / 700.0
-        let stepX = 0.2                    // unit-x gap between columns (unchanged)
+        let stepX = 0.24                   // larger grid, still leaving edge margin
         let stepY = stepX * aspect         // matching pixel gap between rows
         let startX = 0.5 - stepX * Double(cols - 1) / 2
         let startY = 0.5 - stepY * Double(rows - 1) / 2
@@ -166,7 +166,7 @@ final class TracePathArcade: ArcadeGame {
                 let x = startX + Double(c) * stepX
                 let y = startY + Double(r) * stepY
                 scene.add(ArcadeEntity(id: scene.newID(), pos: CGPoint(x: x, y: y), vel: .zero,
-                                       radius: 0.075, kind: 1, b: r * cols + c))
+                                       radius: 0.09, kind: 1, b: r * cols + c))
             }
         }
     }

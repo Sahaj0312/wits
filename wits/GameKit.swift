@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import Observation
 
 // MARK: - Identity
 
@@ -46,7 +47,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     /// their own top/bottom spacing.
     var ownsSafeAreaSurface: Bool {
         switch self {
-        case .wordConnect, .memoryLock, .dotsConnect, .towerOfHanoi: true
+        case .echoGrid, .pathKeeper, .wordConnect, .memoryLock, .dotsConnect, .towerOfHanoi: true
         default: false
         }
     }
@@ -597,6 +598,60 @@ struct GameResult: Codable, Equatable {
 
 enum GameMode: String, Codable { case workout, freePlay }
 
+private struct GamePauseSpan {
+    let start: Date
+    let end: Date
+}
+
+@Observable
+final class GamePauseController {
+    var isPaused = false
+    @ObservationIgnored private var pauseStartedAt: Date?
+    @ObservationIgnored private var spans: [GamePauseSpan] = []
+
+    func pause(now: Date = Date()) {
+        guard !isPaused else { return }
+        isPaused = true
+        pauseStartedAt = now
+    }
+
+    func resume(now: Date = Date()) {
+        guard isPaused else { return }
+        if let pauseStartedAt {
+            spans.append(GamePauseSpan(start: pauseStartedAt, end: now))
+        }
+        pauseStartedAt = nil
+        isPaused = false
+    }
+
+    func reset() {
+        isPaused = false
+        pauseStartedAt = nil
+        spans.removeAll()
+    }
+
+    func elapsed(since start: Date, until now: Date = Date()) -> TimeInterval {
+        max(0, now.timeIntervalSince(start) - pausedDuration(since: start, until: now))
+    }
+
+    private func pausedDuration(since start: Date, until now: Date) -> TimeInterval {
+        var total: TimeInterval = 0
+        for span in spans {
+            total += overlap(from: span.start, to: span.end, withStart: start, withEnd: now)
+        }
+        if let pauseStartedAt {
+            total += overlap(from: pauseStartedAt, to: now, withStart: start, withEnd: now)
+        }
+        return total
+    }
+
+    private func overlap(from spanStart: Date, to spanEnd: Date, withStart start: Date, withEnd end: Date) -> TimeInterval {
+        let lower = max(spanStart.timeIntervalSinceReferenceDate, start.timeIntervalSinceReferenceDate)
+        let upper = min(spanEnd.timeIntervalSinceReferenceDate, end.timeIntervalSinceReferenceDate)
+        return max(0, upper - lower)
+    }
+}
+
 /// A single decision's outcome, emitted by a game in survival so the host can
 /// own lives/combo/score. `points` is the game's base points for that decision.
 struct TrialOutcome: Equatable {
@@ -611,12 +666,48 @@ struct GameConfig {
     var targetDurationSec: Double = 45
     var mode: GameMode = .workout
     var rewardSeed: UInt64 = 0
+    var pauseController: GamePauseController?
     /// Back-compat: existing call sites read `isFreePlay`.
     var isFreePlay: Bool { mode == .freePlay }
     var isSurvival: Bool { false }
+    var isPaused: Bool { pauseController?.isPaused == true }
 
-    static func standard(_ g: GameID, difficulty: DifficultyState, freePlay: Bool = false) -> GameConfig {
-        GameConfig(difficulty: difficulty, mode: freePlay ? .freePlay : .workout)
+    static func standard(_ g: GameID,
+                         difficulty: DifficultyState,
+                         freePlay: Bool = false,
+                         pauseController: GamePauseController? = nil) -> GameConfig {
+        GameConfig(difficulty: difficulty, mode: freePlay ? .freePlay : .workout, pauseController: pauseController)
+    }
+
+    func pause() {
+        pauseController?.pause()
+    }
+
+    func resume() {
+        pauseController?.resume()
+    }
+
+    func activeElapsed(since start: Date, now: Date = Date()) -> TimeInterval {
+        pauseController?.elapsed(since: start, until: now) ?? now.timeIntervalSince(start)
+    }
+
+    func sleepActive(milliseconds: Int) async {
+        guard let pauseController else {
+            try? await Task.sleep(for: .milliseconds(milliseconds))
+            return
+        }
+
+        var remaining = TimeInterval(milliseconds) / 1_000
+        var last = Date()
+        while remaining > 0, !Task.isCancelled {
+            let step = min(remaining, 0.04)
+            try? await Task.sleep(for: .milliseconds(max(8, Int(step * 1_000))))
+            let now = Date()
+            if !pauseController.isPaused {
+                remaining -= now.timeIntervalSince(last)
+            }
+            last = now
+        }
     }
 }
 

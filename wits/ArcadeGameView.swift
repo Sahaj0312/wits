@@ -99,7 +99,7 @@ struct ArcadeGameView: View {
 
     @ViewBuilder
     private func field(size: CGSize) -> some View {
-        TimelineView(.animation(paused: finished || showHowTo)) { tl in
+        TimelineView(.animation(paused: finished || showHowTo || cfg.isPaused)) { tl in
             Canvas { ctx, sz in
                 let m = min(sz.width, sz.height)
                 for e in scene.entities where !e.dead {
@@ -126,7 +126,7 @@ struct ArcadeGameView: View {
     }
 
     private func tick(_ rawDt: Double) {
-        guard !finished, !showHowTo else { return }
+        guard !finished, !showHowTo, !cfg.isPaused else { return }
         let dt = min(max(rawDt, 0), 0.1)         // clamp first-frame / background spikes
         guard dt > 0 else { return }
 
@@ -152,7 +152,7 @@ struct ArcadeGameView: View {
     }
 
     private func handle(_ action: ArcadeAction) {
-        guard !finished, !showHowTo, let r = game.resolve(action, scene: scene) else { return }
+        guard !finished, !showHowTo, !cfg.isPaused, let r = game.resolve(action, scene: scene) else { return }
         emit(r)
     }
 

@@ -536,7 +536,7 @@ struct RuleFinderScreen: View {
 
     private func pick(_ opt: Figure) {
         guard picked == nil else { return }
-        let elapsedMs = Date().timeIntervalSince(puzzleStartedAt) * 1_000
+        let elapsedMs = cfg.activeElapsed(since: puzzleStartedAt) * 1_000
         responseTimesMs.append(elapsedMs)
         picked = opt
 
@@ -554,7 +554,7 @@ struct RuleFinderScreen: View {
         generation += 1
         let gen = generation
         Task {
-            try? await Task.sleep(for: .milliseconds(cfg.isSurvival ? 500 : 800))
+            await cfg.sleepActive(milliseconds: cfg.isSurvival ? 500 : 800)
             guard gen == generation else { return }
             if !cfg.isSurvival && puzzle >= Self.total {
                 finish()
@@ -582,7 +582,7 @@ struct RuleFinderScreen: View {
         r.threshold = Double(maxTier)
         r.medianRTms = median
         r.startedAt = runStartedAt
-        r.durationMs = Int(Date().timeIntervalSince(runStartedAt) * 1_000)
+        r.durationMs = Int(cfg.activeElapsed(since: runStartedAt) * 1_000)
         r.raw = [
             "complexity": Double(maxTier),
             "avgTier": Double(tierTotal) / Double(max(1, Self.total)),

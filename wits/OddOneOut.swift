@@ -155,8 +155,8 @@ struct OddOneOutScreen: View {
         let start = Date()
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(40))
-            timeLeft = max(0, Self.gameSeconds - Date().timeIntervalSince(start))
-            let elapsed = Date().timeIntervalSince(roundStart)
+            timeLeft = max(0, Self.gameSeconds - cfg.activeElapsed(since: start))
+            let elapsed = cfg.activeElapsed(since: roundStart)
             windowFrac = max(0, 1 - elapsed / window)
             if elapsed > window { roundTimeout() }
             if !cfg.isSurvival && timeLeft <= 0 {

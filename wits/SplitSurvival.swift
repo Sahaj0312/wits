@@ -311,6 +311,7 @@ struct SplitSurvivalScreen: View {
     @State private var endReason = ""
     @State private var newBest = false
     @State private var tick = 0              // forces the playing view to observe model changes
+    @State private var pauseController = GamePauseController()
 
     private enum Phase { case intro, playing, over }
 
@@ -334,21 +335,29 @@ struct SplitSurvivalScreen: View {
             }
         }
         .overlay(alignment: .topLeading) {
-            if phase == .playing {
-                Button(action: onQuit) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(Color.witsFaint)
-                        .frame(width: 40, height: 40)
-                        .background(Color.witsCard.opacity(0.92), in: Circle())
-                        .shadow(color: .witsShadow, radius: 7, y: 4)
+            if phase == .playing, !pauseController.isPaused {
+                GamePauseButton {
+                    pauseController.pause()
                 }
                 .padding(.top, 44)
                 .padding(.leading, 10)
             }
         }
+        .overlay {
+            if phase == .playing, pauseController.isPaused {
+                GamePausedOverlay(game: .split,
+                                  onResume: { pauseController.resume() },
+                                  onQuit: {
+                                      pauseController.reset()
+                                      onQuit()
+                                  })
+            }
+        }
         .onAppear { GameFeel.shared.warmUp() }
-        .onDisappear { GameFeel.shared.teardown() }
+        .onDisappear {
+            pauseController.reset()
+            GameFeel.shared.teardown()
+        }
     }
 
     // MARK: Intro
@@ -420,12 +429,13 @@ struct SplitSurvivalScreen: View {
                 ZStack {
                     ArcadeArena()
 
-                    TimelineView(.animation) { tl in
+                    TimelineView(.animation(paused: pauseController.isPaused)) { tl in
                         Canvas { ctx, size in
                             _ = tick                     // read so the closure re-evaluates each tick
                             model.draw(into: &ctx, size: size)
                         }
                         .onChange(of: tl.date) { _, _ in
+                            guard !pauseController.isPaused else { return }
                             model.tick(Date())
                             tick &+= 1
                             if !model.alive { endRun() }
@@ -437,7 +447,10 @@ struct SplitSurvivalScreen: View {
                         .contentShape(Rectangle())
                         .gesture(
                             DragGesture(minimumDistance: 0)
-                                .onEnded { v in model.handleTap(v.location, size: geo.size) }
+                                .onEnded { v in
+                                    guard !pauseController.isPaused else { return }
+                                    model.handleTap(v.location, size: geo.size)
+                                }
                         )
 
                     if !model.started {
@@ -505,12 +518,14 @@ struct SplitSurvivalScreen: View {
     // MARK: Run lifecycle
 
     private func startRun() {
+        pauseController.reset()
         model.reset()
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }
 
     private func endRun() {
         guard phase == .playing else { return }
+        pauseController.reset()
         endLevel = model.level
         endReason = model.deathReason
         newBest = endLevel > best

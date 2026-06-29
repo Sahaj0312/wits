@@ -362,7 +362,7 @@ struct MemoryLockScreen: View {
         var result = GameResult(game: .memoryLock, score: score, accuracy: accuracy)
         result.trials = total
         result.startedAt = startedAt
-        result.durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+        result.durationMs = Int(cfg.activeElapsed(since: startedAt) * 1000)
         result.raw = [
             "wordsSolved": Double(wordsSolved),
             "bestStreak": Double(bestStreak),

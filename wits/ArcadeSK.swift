@@ -196,7 +196,7 @@ final class ArcadeSKScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         defer { lastT = currentTime }
-        guard running, !finished, style != nil else { return }
+        guard running, !finished, style != nil, !cfg.isPaused else { return }
         let dt = min(max(currentTime - lastT, 0), 0.1)
         guard dt > 0 else { return }
 
@@ -320,7 +320,7 @@ final class ArcadeSKScene: SKScene {
     private func unit(_ p: CGPoint) -> CGPoint { CGPoint(x: p.x / size.width, y: 1 - p.y / size.height) }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard running, let t = touches.first else { return }
+        guard running, !cfg.isPaused, let t = touches.first else { return }
         let u = unit(t.location(in: self))
         startUnit = u
         if game.inputMode == .drag, let e = model.nearest(to: u, maxDist: 0.11) {
@@ -329,7 +329,7 @@ final class ArcadeSKScene: SKScene {
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard running, let t = touches.first else { return }
+        guard running, !cfg.isPaused, let t = touches.first else { return }
         let u = unit(t.location(in: self))
         switch game.inputMode {
         case .drag:
@@ -343,7 +343,7 @@ final class ArcadeSKScene: SKScene {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard running, let t = touches.first else { return }
+        guard running, !cfg.isPaused, let t = touches.first else { return }
         let u = unit(t.location(in: self))
         let start = startUnit ?? u
         let moved = hypot((u.x - start.x) * size.width, (u.y - start.y) * size.height)

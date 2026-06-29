@@ -166,10 +166,10 @@ struct MatchBackScreen: View {
                     responded = false
                     feedback = nil
                     withAnimation { current = seq[i] }
-                    try? await Task.sleep(for: .milliseconds(intervalMs))
+                    await cfg.sleepActive(milliseconds: intervalMs)
                     guard gen == generation else { return }
                     evaluate(i)
-                    try? await Task.sleep(for: .milliseconds(feedbackMs))
+                    await cfg.sleepActive(milliseconds: feedbackMs)
                 }
             } while cfg.isSurvival && !Task.isCancelled
             if !cfg.isSurvival { finish() }

@@ -121,7 +121,7 @@ struct LastSeenScreen: View {
         let start = Date()
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(40))
-            timeLeft = max(0, Self.gameSeconds - Date().timeIntervalSince(start))
+            timeLeft = max(0, Self.gameSeconds - cfg.activeElapsed(since: start))
             if !cfg.isSurvival && timeLeft <= 0 {
                 guard !finished else { return }
                 finished = true

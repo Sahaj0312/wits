@@ -140,7 +140,11 @@ struct DotsConnectScreen: View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
                 Button {
-                    finish()
+                    if cfg.pauseController != nil {
+                        cfg.pause()
+                    } else {
+                        finish()
+                    }
                 } label: {
                     Image(systemName: "pause.fill")
                         .font(.system(size: 17, weight: .heavy))
@@ -149,6 +153,7 @@ struct DotsConnectScreen: View {
                         .background(.white.opacity(0.20), in: Circle())
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("pause game")
 
                 VStack(spacing: 1) {
                     Text("level \(level)")
@@ -441,7 +446,7 @@ struct DotsConnectScreen: View {
         var result = GameResult(game: .dotsConnect, score: score, accuracy: max(0, min(1, accuracy)))
         result.trials = Self.boardsPerRun
         result.startedAt = startedAt
-        result.durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+        result.durationMs = Int(cfg.activeElapsed(since: startedAt) * 1000)
         result.raw = [
             "boardsSolved": Double(solved),
             "bestStreak": Double(bestStreak),

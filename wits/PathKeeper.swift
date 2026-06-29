@@ -128,14 +128,14 @@ struct PathKeeperScreen: View {
         litIndex = nil; tapIndex = 0; rightTaps = []; wrongTap = nil; failed = false
         phase = .show
         Task {
-            try? await Task.sleep(for: .milliseconds(500))
+            await cfg.sleepActive(milliseconds: 500)
             for i in seq.indices {
                 guard gen == generation else { return }
                 litIndex = i
-                try? await Task.sleep(for: .milliseconds(520))
+                await cfg.sleepActive(milliseconds: 520)
                 guard gen == generation else { return }
                 litIndex = nil
-                try? await Task.sleep(for: .milliseconds(150))
+                await cfg.sleepActive(milliseconds: 150)
             }
             guard gen == generation else { return }
             phase = .recall
@@ -165,7 +165,7 @@ struct PathKeeperScreen: View {
         phase = .reveal
         let gen = generation
         Task {
-            try? await Task.sleep(for: .milliseconds(ok ? 800 : 1500))
+            await cfg.sleepActive(milliseconds: ok ? 800 : 1500)
             guard gen == generation else { return }
             len = ok ? min(9, len + 1) : max(2, len - 1)
             if !cfg.isSurvival && trial >= Self.totalTrials { finish() } else { trial += 1; startTrial() }
@@ -177,7 +177,7 @@ struct PathKeeperScreen: View {
         var r = GameResult(game: .pathKeeper, score: score, accuracy: acc)
         r.trials = Self.totalTrials
         r.startedAt = startedAt
-        r.durationMs = Int(Date().timeIntervalSince(startedAt) * 1000)
+        r.durationMs = Int(cfg.activeElapsed(since: startedAt) * 1000)
         r.raw = [
             "maxLen": Double(maxLen),
             "perfect": Double(perfect),

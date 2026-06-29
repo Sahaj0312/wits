@@ -193,13 +193,13 @@ struct SpotSpeedScreen: View {
         lastCorrect = nil
         step = .fixation
         Task {
-            try? await Task.sleep(for: .milliseconds(450))
+            await cfg.sleepActive(milliseconds: 450)
             guard gen == generation else { return }
             step = .stimulus
-            try? await Task.sleep(for: .milliseconds(Int(presentationMs)))
+            await cfg.sleepActive(milliseconds: Int(presentationMs))
             guard gen == generation else { return }
             step = .mask
-            try? await Task.sleep(for: .milliseconds(250))
+            await cfg.sleepActive(milliseconds: 250)
             guard gen == generation else { return }
             step = .askCenter
         }
@@ -229,7 +229,7 @@ struct SpotSpeedScreen: View {
         step = .feedback
         let gen = generation
         Task {
-            try? await Task.sleep(for: .milliseconds(cfg.isSurvival ? 450 : 900))
+            await cfg.sleepActive(milliseconds: cfg.isSurvival ? 450 : 900)
             guard gen == generation else { return }
             if !cfg.isSurvival && trial >= Self.totalTrials {
                 finish()

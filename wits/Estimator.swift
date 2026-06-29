@@ -486,9 +486,9 @@ struct TargetForgeScreen: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(30))
             guard !finished else { return }
-            timeLeft = max(0, Self.gameSeconds - Date().timeIntervalSince(start))
+            timeLeft = max(0, Self.gameSeconds - cfg.activeElapsed(since: start))
             if !resolving {
-                let elapsed = Date().timeIntervalSince(roundStart)
+                let elapsed = cfg.activeElapsed(since: roundStart)
                 windowFrac = max(0, 1 - elapsed / roundWindow)
                 if elapsed > roundWindow { timeout() }
             }

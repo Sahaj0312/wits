@@ -168,6 +168,7 @@ private struct GameLauncher: View {
     @State private var lastResult: GameResult?
     @State private var lastNewBest = false
     @State private var attempt = 0   // bump to force a fresh game instance on replay
+    @State private var pauseController = GamePauseController()
 
     private enum Phase { case card, train, result }
 
@@ -181,7 +182,10 @@ private struct GameLauncher: View {
                 primaryTitle: game.isStandalone ? "play" : "train",
                 showsLevelProgress: game.usesAdaptiveLevelDisplay,
                 modeLabel: game.isStandalone ? "survival" : "train",
-                onPlay: { phase = .train },
+                onPlay: {
+                    pauseController.reset()
+                    phase = .train
+                },
                 onBack: { dismiss() }
             )
         case .train:
@@ -205,41 +209,60 @@ private struct GameLauncher: View {
                         } else {
                             Color.witsBg.ignoresSafeArea()
                         }
-                        makeGameView(game, config: .standard(game, difficulty: app.difficultyFor(game), freePlay: true)) { r in
+                        makeGameView(game, config: .standard(game,
+                                                             difficulty: app.difficultyFor(game),
+                                                             freePlay: true,
+                                                             pauseController: pauseController)) { r in
                             let previousBest = app.gameStats[game]?.bestScore ?? 0
                             app.recordGameResult(r, source: "free_play")
                             lastResult = r
                             lastNewBest = r.score > previousBest
+                            pauseController.reset()
                             withAnimation(.easeOut(duration: 0.2)) { phase = .result }
                         }
                         .id(attempt)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding(.top, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.top, 8))
                         .padding(.bottom, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.bottom, 8))
+                        .allowsHitTesting(!pauseController.isPaused)
                         .clipped()
                     }
                     .overlay(alignment: .topLeading) {
-                        if !game.usesEmbeddedQuitControl {
-                            Button { dismiss() } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 15, weight: .heavy))
-                                    .foregroundStyle(Color.witsFaint)
-                                    .padding(12)
+                        if !game.usesEmbeddedQuitControl, !pauseController.isPaused {
+                            GamePauseButton {
+                                pauseController.pause()
                             }
-                            .padding(.leading, 8)
-                            .padding(.top, max(geo.safeAreaInsets.top, 8))
+                            .padding(.leading, 10)
+                            .padding(.top, max(geo.safeAreaInsets.top - 6, 8))
+                        }
+                    }
+                    .overlay {
+                        if pauseController.isPaused {
+                            GamePausedOverlay(game: game,
+                                              onResume: { pauseController.resume() },
+                                              onQuit: {
+                                                  pauseController.reset()
+                                                  dismiss()
+                                              })
                         }
                     }
                 }
                 .onAppear { GameFeel.shared.warmUp() }
-                .onDisappear { GameFeel.shared.teardown() }
+                .onDisappear {
+                    pauseController.reset()
+                    GameFeel.shared.teardown()
+                }
             }
         case .result:
             GameResultView(
                 game: game,
                 result: lastResult,
                 isNewBest: lastNewBest,
-                onReplay: { attempt += 1; withAnimation(.easeOut(duration: 0.2)) { phase = .train } },
+                onReplay: {
+                    pauseController.reset()
+                    attempt += 1
+                    withAnimation(.easeOut(duration: 0.2)) { phase = .train }
+                },
                 onDone: { dismiss() }
             )
         }

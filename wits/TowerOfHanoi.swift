@@ -337,7 +337,7 @@ struct TowerOfHanoiScreen: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(250))
             guard !finished else { return }
-            elapsed = Date().timeIntervalSince(timerStartedAt)
+            elapsed = cfg.activeElapsed(since: timerStartedAt)
         }
     }
 
