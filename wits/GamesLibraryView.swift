@@ -227,13 +227,11 @@ private struct GameLauncher: View {
                         .allowsHitTesting(!pauseController.isPaused)
                         .clipped()
                     }
-                    .overlay(alignment: .topLeading) {
+                    .overlay {
                         if !game.usesEmbeddedQuitControl, !pauseController.isPaused {
-                            GamePauseButton {
+                            GamePauseButtonLayer {
                                 pauseController.pause()
                             }
-                            .padding(.leading, 10)
-                            .padding(.top, max(geo.safeAreaInsets.top - 6, 8))
                         }
                     }
                     .overlay {

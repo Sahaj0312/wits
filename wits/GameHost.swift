@@ -64,13 +64,11 @@ struct GameHost: View {
                     .allowsHitTesting(!pauseController.isPaused)
                     .clipped()
             }
-            .overlay(alignment: .topLeading) {
+            .overlay {
                 if stage == .playing, currentGame?.usesEmbeddedQuitControl != true, !pauseController.isPaused {
-                    GamePauseButton {
+                    GamePauseButtonLayer {
                         pauseController.pause()
                     }
-                    .padding(.leading, 10)
-                    .padding(.top, max(geo.safeAreaInsets.top - 6, 8))
                 }
             }
             .overlay {

@@ -15,13 +15,23 @@ struct GamePauseButton: View {
             Image(systemName: "pause.fill")
                 .font(.system(size: 17, weight: .heavy))
                 .foregroundStyle(Color.witsInk)
-                .frame(width: 46, height: 46)
-                .background(Color.witsCard.opacity(0.94), in: Circle())
-                .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1))
-                .shadow(color: .witsShadow, radius: 8, y: 4)
+                .frame(width: 44, height: 44)
         }
         .buttonStyle(.plain)
+        .contentShape(Circle())
         .accessibilityLabel("pause game")
+    }
+}
+
+struct GamePauseButtonLayer: View {
+    var action: () -> Void
+
+    var body: some View {
+        GeometryReader { _ in
+            GamePauseButton(action: action)
+                .position(x: 24,
+                          y: 56)
+        }
     }
 }
 

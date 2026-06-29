@@ -334,13 +334,11 @@ struct SplitSurvivalScreen: View {
             case .over:    gameOver
             }
         }
-        .overlay(alignment: .topLeading) {
+        .overlay {
             if phase == .playing, !pauseController.isPaused {
-                GamePauseButton {
+                GamePauseButtonLayer {
                     pauseController.pause()
                 }
-                .padding(.top, 44)
-                .padding(.leading, 10)
             }
         }
         .overlay {
