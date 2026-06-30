@@ -377,7 +377,7 @@ struct ThroughputPolicy: GameScoringPolicy {
     private func rcsReference(level: Double) -> Double {
         switch game {
         case .numberRush:
-            return 0.12 + level * 0.035
+            return NumberRushTuning.targetCorrectPerSecond(for: level)
         case .estimator:
             return 0.14 + level * 0.025
         default:

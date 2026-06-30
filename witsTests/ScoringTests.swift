@@ -59,6 +59,14 @@ final class ScoringTests: XCTestCase {
                              policy.score(slow, prior: prior).performance)
     }
 
+    func testNumberRushTuningAddsOperationsWithoutInflatingThroughputTarget() {
+        XCTAssertEqual(NumberRushTuning.operationCount(for: 1), 1)
+        XCTAssertEqual(NumberRushTuning.operationCount(for: 4), 3)
+        XCTAssertEqual(NumberRushTuning.operationCount(for: 10), 6)
+        XCTAssertLessThan(NumberRushTuning.targetCorrectPerSecond(for: 10),
+                          NumberRushTuning.targetCorrectPerSecond(for: 2))
+    }
+
     func testSpotSpeedEighteenTrialsReachFullPolicyConfidence() {
         let prior = DifficultyState(level: 3, mastery: 3)
         let result = GameResult(game: .spotSpeed,
