@@ -59,6 +59,29 @@ final class ScoringTests: XCTestCase {
                              policy.score(slow, prior: prior).performance)
     }
 
+    func testSpotSpeedEighteenTrialsReachFullPolicyConfidence() {
+        let prior = DifficultyState(level: 3, mastery: 3)
+        let result = GameResult(game: .spotSpeed,
+                                score: 0,
+                                accuracy: 0.80,
+                                threshold: 300,
+                                trials: SpotSpeedTuning.totalTrials)
+
+        let run = SpotSpeedPolicy().score(result, prior: prior)
+
+        XCTAssertEqual(run.confidence, 1)
+        XCTAssertEqual(run.metrics["thresholdMs"], 300)
+    }
+
+    func testSpotSpeedLevelCurveSeparatesEarlyLevels() {
+        let level2Ms = SpotSpeedTuning.initialPresentationMs(for: 2)
+        let level4Ms = SpotSpeedTuning.initialPresentationMs(for: 4)
+
+        XCTAssertGreaterThanOrEqual(level2Ms - level4Ms, 80)
+        XCTAssertGreaterThan(SpotSpeedTuning.slotCount(for: 4), SpotSpeedTuning.slotCount(for: 2))
+        XCTAssertGreaterThan(SpotSpeedTuning.stimulationLevel(for: 4), SpotSpeedTuning.stimulationLevel(for: 2))
+    }
+
     func testSameDomainSessionsAggregateInsteadOfOverwrite() {
         var a = GameResult(game: .arrowStorm, score: 0, accuracy: 1)
         a.calibratedAbility = 3000

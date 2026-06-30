@@ -390,11 +390,11 @@ struct SpotSpeedPolicy: GameScoringPolicy {
     var abilitySignalWeight: Double { 0.45 }
 
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
-        let startMs = max(120, 600 - prior.level * 40)
+        let startMs = SpotSpeedTuning.initialPresentationMs(for: prior.level)
         let finalMs = result.threshold ?? result.raw["thresholdMs"] ?? startMs
         let accuracy = ScoringMath.clamp(result.accuracy, 0, 1)
-        let confidence = ScoringMath.clamp(Double(max(1, result.trials)) / 18.0, 0.45, 0.90)
-        let ability = ScoringMath.clamp(1 + log2(700.0 / max(80.0, finalMs)) * 2.2, 1, 10)
+        let confidence = ScoringMath.clamp(Double(max(1, result.trials)) / Double(SpotSpeedTuning.totalTrials), 0.45, 1.0)
+        let ability = ScoringMath.clamp(1 + log2(700.0 / max(SpotSpeedTuning.minPresentationMs, finalMs)) * 2.2, 1, 10)
         let thresholdScore = ScoringMath.logistic(ScoringMath.logit(targetQuality) + (ability - prior.masteryOrLevel) * 0.75)
         let performance = ScoringMath.clamp(0.55 * accuracy + 0.45 * thresholdScore, 0, 1)
         return ScoredRun(

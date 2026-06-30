@@ -79,8 +79,8 @@ confidence    = min(1, trials / k_trials)
 ```
 
 **SpotSpeed** maps threshold straight to ability — halving flash duration ≈ +1 level:
-`θ ≈ θ_ref − log2(ms / ms_ref)`. Because it only has 14 trials today, cap confidence
-below 1 (`k_trials ≈ 18`) until more trials are added.
+`θ ≈ θ_ref − log2(ms / ms_ref)`. It runs 18 trials, and its play curve now uses
+an explicit 1...10 starting-duration table so early levels separate visibly.
 
 ### Archetype B — Timed-throughput games
 *NumberRush, Estimator, ColorClash, ArrowStorm, TileShift, OddOneOut.* Fixed duration,
