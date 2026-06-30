@@ -170,7 +170,7 @@ private struct GameLauncher: View {
     @State private var attempt = 0   // bump to force a fresh game instance on replay
     @State private var pauseController = GamePauseController()
 
-    private enum Phase { case card, train, result }
+    private enum Phase { case card, tutorial, train, result }
 
     var body: some View {
         switch phase {
@@ -184,9 +184,22 @@ private struct GameLauncher: View {
                 modeLabel: game.isStandalone ? "survival" : "train",
                 onPlay: {
                     pauseController.reset()
-                    phase = .train
+                    phase = nextPlayPhase()
                 },
                 onBack: { dismiss() }
+            )
+        case .tutorial:
+            FirstPlayTutorial(
+                game: game,
+                onStart: {
+                    GameTutorialStore.markSeen(game)
+                    pauseController.reset()
+                    withAnimation(.easeOut(duration: 0.2)) { phase = .train }
+                },
+                onBack: {
+                    pauseController.reset()
+                    withAnimation(.easeOut(duration: 0.2)) { phase = .card }
+                }
             )
         case .train:
             if game == .split {
@@ -264,6 +277,10 @@ private struct GameLauncher: View {
                 onDone: { dismiss() }
             )
         }
+    }
+
+    private func nextPlayPhase() -> Phase {
+        GameTutorialStore.shouldShow(for: game, hasPlayed: app.hasPlayed(game)) ? .tutorial : .train
     }
 
     private func splitResult(level: Int, depth: Double, trials: Int) -> GameResult {

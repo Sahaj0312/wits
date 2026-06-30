@@ -138,6 +138,15 @@ final class AppModel {
         return playedByDay[SupabaseManager.dayString(day)] ?? []
     }
 
+    func hasPlayed(_ game: GameID) -> Bool {
+        if (gameStats[game]?.totalPlays ?? 0) > 0 { return true }
+        if (difficulty[game]?.sessionsPlayed ?? 0) > 0 { return true }
+        if today.results.contains(where: { $0.game == game }) { return true }
+        return playedByDay.values.contains { runs in
+            runs.contains { $0.game == game }
+        }
+    }
+
     // MARK: Reminders
 
     /// Turn the daily reminder on/off and persist the choice. Caller must have

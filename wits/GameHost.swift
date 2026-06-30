@@ -21,7 +21,7 @@ struct GameHost: View {
     /// Dismiss without finishing (user backs out).
     let onQuit: () -> Void
 
-    private enum Stage: Equatable { case playing, bonus, interstitial, summary }
+    private enum Stage: Equatable { case tutorial, playing, bonus, interstitial, summary }
 
     @Environment(AppModel.self) private var app
     @State private var index = 0
@@ -98,6 +98,8 @@ struct GameHost: View {
 
     private var stageKey: String {
         switch stage {
+        case .tutorial:
+            "tutorial-\(index)"
         case .playing: "play-\(index)"
         case .bonus: "bonus-\(index)"
         case .interstitial: "inter-\(index)"
@@ -108,6 +110,24 @@ struct GameHost: View {
     @ViewBuilder
     private var content: some View {
         switch stage {
+        case .tutorial:
+            if let game = currentGame {
+                FirstPlayTutorial(
+                    game: game,
+                    accessory: AnyView(progressDots),
+                    onStart: {
+                        GameTutorialStore.markSeen(game)
+                        pauseController.reset()
+                        withAnimation { stage = .playing }
+                    },
+                    onBack: {
+                        pauseController.reset()
+                        withAnimation { stage = .interstitial }
+                    }
+                )
+            } else {
+                Color.clear.onAppear { stage = .summary }
+            }
         case .playing:
             if let game = currentGame {
                 VStack(spacing: 0) {
@@ -181,7 +201,7 @@ struct GameHost: View {
                 primaryTitle: index == 0 ? "start" : "play",
                 onPlay: {
                     pauseController.reset()
-                    withAnimation { stage = .playing }
+                    withAnimation { beginCurrentGame() }
                 },
                 onBack: onQuit,
                 accessory: AnyView(progressDots)
@@ -189,6 +209,14 @@ struct GameHost: View {
         } else {
             Color.clear.onAppear { stage = .summary }
         }
+    }
+
+    private func beginCurrentGame() {
+        guard let game = currentGame else {
+            stage = .summary
+            return
+        }
+        stage = GameTutorialStore.shouldShow(for: game, hasPlayed: app.hasPlayed(game)) ? .tutorial : .playing
     }
 
     private func handle(_ result: GameResult) {

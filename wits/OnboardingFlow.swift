@@ -194,6 +194,7 @@ struct OnboardingView: View {
         Task {
             // returning user (already onboarded on the server) → go straight in
             if await supa.isOnboardingComplete() {
+                GameTutorialStore.markSeen(GameTutorialStore.onboardingGames)
                 onFinished()
             } else {
                 supa.recordCheckpoint(.accountCreated)
@@ -532,6 +533,7 @@ struct OnboardingView: View {
     }
 
     private func complete() {
+        GameTutorialStore.markSeen(GameTutorialStore.onboardingGames)
         app.profile.trialStartedAt = Date()
         app.refreshReminderSchedule()
         supa.recordCheckpoint(.completed)

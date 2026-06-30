@@ -143,3 +143,263 @@ struct TutorialHint: View {
             .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
+
+enum GameTutorialStore {
+    static let onboardingGames: [GameID] = [.arrowStorm, .crowdControl, .echoGrid]
+
+    private static let keyPrefix = "wits.gameTutorialSeen."
+
+    static func shouldShow(for game: GameID, hasPlayed: Bool) -> Bool {
+        game.isPlayable && !hasPlayed && !hasSeen(game)
+    }
+
+    static func hasSeen(_ game: GameID) -> Bool {
+        UserDefaults.standard.bool(forKey: key(for: game))
+    }
+
+    static func markSeen(_ game: GameID) {
+        UserDefaults.standard.set(true, forKey: key(for: game))
+    }
+
+    static func markSeen(_ games: [GameID]) {
+        for game in games { markSeen(game) }
+    }
+
+    private static func key(for game: GameID) -> String {
+        keyPrefix + game.rawValue
+    }
+}
+
+struct FirstPlayTutorial: View {
+    let game: GameID
+    var accessory: AnyView? = nil
+    var onStart: () -> Void
+    var onBack: (() -> Void)? = nil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let accessory {
+                accessory
+                    .padding(.bottom, 10)
+            }
+            GameTopTag(text: "first play tutorial")
+                .padding(.bottom, 18)
+            HeroPanel {
+                GameTutorialHero(game: game)
+            }
+            ScrollView(showsIndicators: false) {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("how to play \(game.displayName)")
+                        .font(.witsDisplay(30))
+                        .foregroundStyle(Color.witsInk)
+                        .rise(0.08)
+                    Text(game.cardHow)
+                        .font(.witsBody(15.5))
+                        .foregroundStyle(Color.witsMuted)
+                        .rise(0.14)
+                    VStack(spacing: 10) {
+                        ForEach(game.tutorialSteps.indices, id: \.self) { index in
+                            TutorialStepRow(number: index + 1, text: game.tutorialSteps[index])
+                        }
+                    }
+                    .padding(.top, 2)
+                    .rise(0.2)
+                    TutorialHint(text: game.tutorialHint)
+                        .rise(0.26)
+                }
+                .padding(.top, 22)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Cta(title: "start game", action: onStart)
+                .rise(0.32)
+                .padding(.top, 12)
+            if let onBack {
+                QuietButton(title: "back", action: onBack)
+                    .padding(.top, 6)
+            }
+        }
+        .padding(.horizontal, WitsMetrics.screenPadding)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.witsBg.ignoresSafeArea())
+    }
+}
+
+private struct GameTutorialHero: View {
+    let game: GameID
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(systemName: game.symbol)
+                .font(.system(size: 58, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(width: 94, height: 94)
+                .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(.white.opacity(0.16), lineWidth: 1.5)
+                )
+            HStack(spacing: 8) {
+                tutorialChip(game.domain.label)
+                tutorialChip(game.subskill)
+            }
+        }
+    }
+
+    private func tutorialChip(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white.opacity(0.78))
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(.white.opacity(0.10), in: Capsule())
+    }
+}
+
+private struct TutorialStepRow: View {
+    let number: Int
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text("\(number)")
+                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                .foregroundStyle(Color.witsAccent)
+                .frame(width: 28, height: 28)
+                .background(Color.witsAccent.opacity(0.14), in: Circle())
+            Text(text)
+                .font(.witsBody(15, weight: .semibold))
+                .foregroundStyle(Color.witsInk)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(14)
+        .background(Color.witsCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.witsLine, lineWidth: 1)
+        )
+    }
+}
+
+extension GameID {
+    var tutorialHint: String {
+        "the next screen is scored. \(tagline)"
+    }
+
+    var tutorialSteps: [String] {
+        switch self {
+        case .arrowStorm:
+            [
+                "watch the row of arrows.",
+                "answer only the middle arrow's direction.",
+                "go quickly, but wrong taps break your streak."
+            ]
+        case .crowdControl:
+            [
+                "memorize the glowing dots.",
+                "track them while every dot moves.",
+                "when they freeze, tap the original targets."
+            ]
+        case .echoGrid:
+            [
+                "watch the tiles light up in order.",
+                "when the board goes dark, tap them backwards.",
+                "perfect rounds make the path longer."
+            ]
+        case .spotSpeed:
+            [
+                "watch the centre and the edge at the same time.",
+                "pick whether the centre showed a car or bus.",
+                "then tap the ring position where the dot flashed."
+            ]
+        case .colorClash:
+            [
+                "look at the ink colour, not the word.",
+                "tap the matching colour button.",
+                "answer before the timer bar drains."
+            ]
+        case .matchBack:
+            [
+                "a new card enters the lane each beat.",
+                "compare it with the card a few steps back.",
+                "answer yes or no for the prompted feature."
+            ]
+        case .ruleFinder:
+            [
+                "study the figures already in the grid.",
+                "find the rule running across the row or column.",
+                "choose the missing figure that completes the pattern."
+            ]
+        case .numberRush:
+            [
+                "solve the falling equation.",
+                "tap the correct answer before it reaches the bottom.",
+                "keep a streak to raise the multiplier."
+            ]
+        case .estimator:
+            [
+                "use the number tiles and operators to build the target.",
+                "exact answers score best, but close answers still count.",
+                "submit before time runs out."
+            ]
+        case .oddOneOut:
+            [
+                "scan the whole grid.",
+                "tap the one shape that does not match the rest.",
+                "later boards get denser and faster."
+            ]
+        case .tileShift:
+            [
+                "read the current rule.",
+                "tap the tile that matches by that rule.",
+                "adapt quickly when the rule changes."
+            ]
+        case .lastSeen:
+            [
+                "tap an object you have not chosen yet.",
+                "keep the earlier picks in mind.",
+                "never tap the same object twice."
+            ]
+        case .pathKeeper:
+            [
+                "watch the token hop across the board.",
+                "repeat the path in the same order.",
+                "one wrong tap reveals the answer and starts a new path."
+            ]
+        case .wordConnect:
+            [
+                "connect letters to spell hidden words.",
+                "fill the grid by finding every target word.",
+                "clear two boards to unlock the next level."
+            ]
+        case .memoryLock:
+            [
+                "guess the hidden word in six tries.",
+                "use the green, yellow, and gray clues.",
+                "remember them quickly before the clues fade."
+            ]
+        case .dotsConnect:
+            [
+                "draw paths between matching dots.",
+                "cover every square on the board.",
+                "paths cannot cross each other."
+            ]
+        case .towerOfHanoi:
+            [
+                "move one top disk at a time.",
+                "never place a bigger disk on a smaller disk.",
+                "move the stack to the target tower in as few moves as you can."
+            ]
+        case .split:
+            [
+                "tap the left side to keep the flyer up.",
+                "tap the right-side targets before they pass.",
+                "avoid the look-alike; one mistake ends the run."
+            ]
+        }
+    }
+}
