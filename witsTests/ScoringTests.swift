@@ -48,15 +48,32 @@ final class ScoringTests: XCTestCase {
     }
 
     func testRCSRewardsHigherCorrectPerSecond() {
-        let policy = ThroughputPolicy(game: .numberRush)
+        let policy = NumberRushPolicy()
         let prior = DifficultyState(level: 3, mastery: 3)
         var fast = GameResult(game: .numberRush, score: 0, accuracy: 1, trials: 10, durationMs: 45_000)
-        fast.raw = ["correct": 10, "timeOnTaskMs": 45_000]
+        fast.raw = ["correct": 10, "wrong": 0, "timeOnTaskMs": 45_000]
         var slow = GameResult(game: .numberRush, score: 0, accuracy: 1, trials: 10, durationMs: 45_000)
-        slow.raw = ["correct": 5, "timeOnTaskMs": 45_000]
+        slow.raw = ["correct": 5, "wrong": 0, "timeOnTaskMs": 45_000]
 
         XCTAssertGreaterThan(policy.score(fast, prior: prior).performance,
                              policy.score(slow, prior: prior).performance)
+    }
+
+    func testNumberRushWrongAnswersReducePerformanceAndMasteryMovement() {
+        let policy = NumberRushPolicy()
+        let prior = DifficultyState(level: 4, mastery: 4, confidence: 1)
+        var clean = GameResult(game: .numberRush, score: 0, accuracy: 1, trials: 8, durationMs: 45_000)
+        clean.raw = ["correct": 8, "wrong": 0, "timeOnTaskMs": 45_000]
+        var messy = GameResult(game: .numberRush, score: 0, accuracy: 8.0 / 18.0, trials: 18, durationMs: 45_000)
+        messy.raw = ["correct": 8, "wrong": 10, "timeOnTaskMs": 45_000]
+
+        let cleanRun = policy.score(clean, prior: prior)
+        let messyRun = policy.score(messy, prior: prior)
+        let cleanNext = policy.nextState(from: clean, prior: prior, run: cleanRun)
+        let messyNext = policy.nextState(from: messy, prior: prior, run: messyRun)
+
+        XCTAssertGreaterThan(cleanRun.performance, messyRun.performance)
+        XCTAssertGreaterThan(cleanNext.mastery, messyNext.mastery)
     }
 
     func testNumberRushTuningAddsOperationsWithoutInflatingThroughputTarget() {
@@ -220,6 +237,7 @@ final class ScoringTests: XCTestCase {
         XCTAssertFalse(ScoringPolicies.policy(for: .crowdControl) is AccuracyPolicy)
         XCTAssertFalse(ScoringPolicies.policy(for: .echoGrid) is AccuracyPolicy)
         XCTAssertFalse(ScoringPolicies.policy(for: .pathKeeper) is AccuracyPolicy)
+        XCTAssertTrue(ScoringPolicies.policy(for: .numberRush) is NumberRushPolicy)
         XCTAssertFalse(ScoringPolicies.policy(for: .estimator) is ThroughputPolicy)
         XCTAssertTrue(ScoringPolicies.policy(for: .estimator) is TargetForgePolicy)
     }

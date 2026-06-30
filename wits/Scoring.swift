@@ -97,7 +97,9 @@ enum ScoringPolicies {
             SpotSpeedPolicy()
         case .matchBack:
             MatchBackPolicy()
-        case .numberRush, .arrowStorm, .tileShift, .oddOneOut, .colorClash:
+        case .numberRush:
+            NumberRushPolicy()
+        case .arrowStorm, .tileShift, .oddOneOut, .colorClash:
             ThroughputPolicy(game: game)
         case .estimator:
             TargetForgePolicy()
@@ -383,6 +385,38 @@ struct ThroughputPolicy: GameScoringPolicy {
         default:
             return 0.18 + level * 0.04
         }
+    }
+}
+
+struct NumberRushPolicy: GameScoringPolicy {
+    var targetQuality: Double { 0.80 }
+
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let trials = max(1, result.trials)
+        let correct = max(0, result.raw["correct"] ?? (result.accuracy * Double(trials)))
+        let wrong = max(0, result.raw["wrong"] ?? (Double(trials) - correct))
+        let total = max(1, correct + wrong)
+        let seconds = max(10, (result.raw["timeOnTaskMs"] ?? Double(result.durationMs)) / 1000.0)
+        let rcs = correct / seconds
+        let ref = NumberRushTuning.targetCorrectPerSecond(for: prior.level)
+        let logRatio = log(max(0.01, rcs) / max(0.01, ref))
+        let throughput = ScoringMath.logistic(ScoringMath.logit(targetQuality) + logRatio)
+        let accuracy = ScoringMath.clamp(correct / total, 0, 1)
+        let accuracyPenalty = 0.65 + 0.35 * accuracy
+        let performance = ScoringMath.clamp(throughput * accuracyPenalty, 0, 1)
+        let confidence = ScoringMath.clamp(min(total / 18.0, seconds / 45.0), 0.35, 1.0)
+        return ScoredRun(
+            performance: performance,
+            confidence: confidence,
+            abilitySignal: prior.level,
+            metrics: [
+                "rcs": rcs,
+                "rcsRef": ref,
+                "numberRushThroughput": throughput,
+                "numberRushAccuracy": accuracy,
+                "timeOnTaskMs": seconds * 1000
+            ]
+        )
     }
 }
 
