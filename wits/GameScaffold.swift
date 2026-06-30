@@ -336,9 +336,9 @@ extension GameID {
             ]
         case .numberRush:
             [
-                "solve the falling equation.",
-                "tap the correct answer before it reaches the bottom.",
-                "keep a streak to raise the multiplier."
+                "solve the equation on the card.",
+                "type the answer with the keypad.",
+                "submit with the checkmark before the timer bar drains."
             ]
         case .estimator:
             [
