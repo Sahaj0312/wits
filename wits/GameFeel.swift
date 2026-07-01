@@ -34,13 +34,26 @@ enum FeelEvent {
 final class GameFeel {
     static let shared = GameFeel()
 
-    var soundEnabled = true
-    var hapticsEnabled = true
+    private static let soundEnabledKey = "wits.soundEffectsEnabled"
+    private static let hapticsEnabledKey = "wits.hapticsEnabled"
+
+    var soundEnabled = GameFeel.storedBool(GameFeel.soundEnabledKey, defaultValue: true) {
+        didSet { UserDefaults.standard.set(soundEnabled, forKey: Self.soundEnabledKey) }
+    }
+    var hapticsEnabled = GameFeel.storedBool(GameFeel.hapticsEnabledKey, defaultValue: true) {
+        didSet { UserDefaults.standard.set(hapticsEnabled, forKey: Self.hapticsEnabledKey) }
+    }
 
     private let haptics = HapticBox()
     private let synth = ToneSynth()
 
     private init() {}
+
+    private static func storedBool(_ key: String, defaultValue: Bool) -> Bool {
+        UserDefaults.standard.object(forKey: key) == nil
+            ? defaultValue
+            : UserDefaults.standard.bool(forKey: key)
+    }
 
     /// Prepare haptics + start the audio engine. Call when a game host appears.
     func warmUp() {
