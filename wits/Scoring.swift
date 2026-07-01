@@ -195,31 +195,8 @@ enum ScoringAggregator {
     static let neutralWPI = 2500.0
     static let shrinkage = 0.10
 
-    static func mergeDailyScores(existingScores: [String: Double],
-                                 existingConfidence: [String: Double],
-                                 existingCounts: [String: Int],
-                                 results: [GameResult]) -> (scores: [String: Double], confidence: [String: Double], counts: [String: Int]) {
-        var scores = existingScores
-        var confidence = existingConfidence
-        var counts = existingCounts
-
-        for result in results {
-            let key = result.domain.rawValue
-            let score = result.calibratedAbility
-                ?? result.newDifficulty.map { ScoringCalibrator.calibratedAbility(game: result.game, mastery: $0.mastery) }
-                ?? ScoringCalibrator.calibratedAbility(game: result.game, mastery: result.game.seedLevel)
-            let weight = max(0.10, min(1.0, result.performanceConfidence ?? 0.5))
-            let oldWeight = max(0, confidence[key] ?? 0)
-            let oldScore = scores[key] ?? neutralWPI
-            let newWeight = oldWeight + weight
-            scores[key] = ScoringMath.round((oldScore * oldWeight + score * weight) / max(0.001, newWeight))
-            confidence[key] = newWeight
-            counts[key, default: 0] += 1
-        }
-
-        return (scores, confidence, counts)
-    }
-
+    /// The production daily rollup: fold every played game's persistent state
+    /// into confidence-weighted per-domain scores.
     static func aggregateGameStates(_ states: [GameID: DifficultyState]) -> (scores: [String: Double], confidence: [String: Double], counts: [String: Int]) {
         var sums: [String: Double] = [:]
         var weights: [String: Double] = [:]
@@ -584,6 +561,12 @@ struct OneLinePolicy: GameScoringPolicy {
 struct TowerPolicy: GameScoringPolicy {
     var abilitySignalWeight: Double { 0.20 }
 
+    /// Workout Tower is a fixed 36-level campaign the game persists itself;
+    /// map campaign progress (1...36) onto the shared 1...10 level scale.
+    static func level(forCampaignLevel campaign: Double) -> Double {
+        DifficultyState.clamp(1 + (campaign - 1) * 9.0 / 35.0)
+    }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let moves = max(1, result.raw["moves"] ?? Double(result.trials))
         let optimal = max(1, result.raw["optimalMoves"] ?? moves)
@@ -593,12 +576,22 @@ struct TowerPolicy: GameScoringPolicy {
         let moveEfficiency = min(1, optimal / moves)
         let timeEfficiency = min(1, targetSeconds / seconds)
         let quality = ScoringMath.clamp(0.75 * moveEfficiency + 0.25 * timeEfficiency - min(0.35, invalid * 0.10), 0, 1)
+        let campaign = result.raw["hanoiLevel"]
         return ScoredRun(
             performance: quality,
             confidence: 1.0,
-            abilitySignal: ScoringMath.clamp((result.raw["hanoiLevel"] ?? prior.level) / 3.6, 1, 10),
+            abilitySignal: campaign.map(Self.level(forCampaignLevel:)) ?? prior.level,
             metrics: ["moveEfficiency": moveEfficiency, "timeEfficiency": timeEfficiency]
         )
+    }
+
+    func nextLevel(from result: GameResult, prior: DifficultyState, run: ScoredRun) -> Double {
+        // Keep the adaptive level in lockstep with the campaign so the card's
+        // "level" reflects the challenge actually served next run.
+        guard let end = result.raw["hanoiLevelEnd"] ?? result.raw["hanoiLevel"] else {
+            return DifficultyState.clamp(prior.level + adaptiveDelta(for: run))
+        }
+        return Self.level(forCampaignLevel: end)
     }
 }
 
@@ -644,7 +637,9 @@ struct MemoryLockPolicy: GameScoringPolicy {
         return ScoredRun(
             performance: quality,
             confidence: ScoringMath.clamp(total / 4.0, 0.45, 1),
-            abilitySignal: result.raw["wordLength"] ?? prior.level,
+            // The challenge level the run was actually served at. Legacy rows
+            // (before the game was adaptive) have no key → neutral prior.level.
+            abilitySignal: result.raw["memoryLockLevel"] ?? prior.level,
             metrics: ["completion": completion, "solveEfficiency": efficiency]
         )
     }
@@ -784,15 +779,13 @@ enum ScoringDiagnostics {
     }
 
     private static func testDailyAggregation() {
-        var a = GameResult(game: .arrowStorm, score: 0, accuracy: 1)
-        a.calibratedAbility = 3000
-        a.performanceConfidence = 1
-        var b = GameResult(game: .spotSpeed, score: 0, accuracy: 1)
-        b.calibratedAbility = 1000
-        b.performanceConfidence = 1
-        let merged = ScoringAggregator.mergeDailyScores(existingScores: [:], existingConfidence: [:], existingCounts: [:], results: [a, b])
-        assert(merged.scores[CognitiveDomain.focus.rawValue] == 2000, "Same-domain sessions should aggregate, not overwrite")
-        assert(merged.counts[CognitiveDomain.focus.rawValue] == 2, "Domain session count should include both sessions")
+        let states: [GameID: DifficultyState] = [
+            .arrowStorm: DifficultyState(level: 6, mastery: 6, confidence: 1, sessionsPlayed: 1),
+            .spotSpeed: DifficultyState(level: 2, mastery: 2, confidence: 1, sessionsPlayed: 1)
+        ]
+        let rollup = ScoringAggregator.aggregateGameStates(states)
+        assert(rollup.scores[CognitiveDomain.focus.rawValue] == 2000, "Same-domain games should aggregate, not overwrite")
+        assert(rollup.counts[CognitiveDomain.focus.rawValue] == 2, "Domain count should include both games")
     }
 
     private static func testBonusIsolation() {

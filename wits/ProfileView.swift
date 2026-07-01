@@ -146,6 +146,7 @@ struct ProfileView: View {
                 settingsSection("account") {
                     Button {
                         supa.signOut()
+                        app.resetForSignOut()
                         hasCompletedOnboarding = false
                     } label: {
                         settingsValueRow(icon: "rectangle.portrait.and.arrow.right",

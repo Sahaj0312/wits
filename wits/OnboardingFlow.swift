@@ -470,6 +470,14 @@ struct OnboardingView: View {
         let headline = ScoringAggregator.headline(domainScores: domains, confidence: rollup.confidence)
             ?? (domains.values.reduce(0, +) / Double(max(1, domains.count)) * 10).rounded() / 10
         let day = Self.dateString(Date())
+        // Mirror the baseline into local state so the first session plays at the
+        // calibrated levels even if the later reconcile fetch fails.
+        app.applyOnboardingBaseline(states: Dictionary(uniqueKeysWithValues: scoredFitTests.map { ($0.result.game, $0.next) }),
+                                    day: day,
+                                    headline: headline,
+                                    domainScores: domains,
+                                    domainConfidence: rollup.confidence,
+                                    domainCounts: rollup.counts)
         Task {
             try? await supa.saveGameScores(rows)
             for fit in scoredFitTests {

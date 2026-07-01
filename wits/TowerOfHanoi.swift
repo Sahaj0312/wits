@@ -302,6 +302,9 @@ struct TowerOfHanoiScreen: View {
             "seconds": seconds.rounded(),
             "diskCount": Double(diskCount),
             "hanoiLevel": Double(campaignLevel),
+            // Campaign level to play next (finish() only runs on a solve in
+            // campaign mode) — TowerPolicy pins the adaptive level to this.
+            "hanoiLevelEnd": Double(cfg.isSurvival ? campaignLevel : min(Self.campaignLevelCount, campaignLevel + 1)),
             "hanoiLevelCount": Double(Self.campaignLevelCount),
             "sourceTower": Double(sourceTower),
             "targetTower": Double(targetTower),

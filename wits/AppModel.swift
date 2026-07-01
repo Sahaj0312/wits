@@ -283,10 +283,15 @@ final class AppModel {
     var dailyChallengeDone: Bool { UserDefaults.standard.bool(forKey: challengeKey) }
 
     func completeDailyChallenge(_ result: GameResult) {
-        let scored = recordGameResult(result, source: "challenge")
-        guard !dailyChallengeDone else { return }
-        recordDayActivity([scored], countsForStreak: false)
+        // Replays after the challenge is done are just free play: mastery moves
+        // like any run, but there's no second challenge credit or day rollup.
+        guard !dailyChallengeDone else {
+            recordGameResult(result, source: "free_play")
+            return
+        }
         UserDefaults.standard.set(true, forKey: challengeKey)
+        let scored = recordGameResult(result, source: "challenge")
+        recordDayActivity([scored], countsForStreak: false)
         saveCache()
     }
 
@@ -327,7 +332,11 @@ final class AppModel {
         let rollup = ScoringAggregator.aggregateGameStates(difficulty)
         let domains = rollup.scores
         let domainConfidence = rollup.confidence
-        let domainCounts = rollup.counts
+        // Per-day play counts, NOT a snapshot of every domain ever trained —
+        // ProgressMath.domainPriorities reads these to tell which domains were
+        // actually exercised on a given day (its staleness signal).
+        var domainCounts = existing?.domain_session_counts ?? [:]
+        for r in results { domainCounts[r.domain.rawValue, default: 0] += 1 }
         let rawHeadline = ScoringAggregator.headline(domainScores: domains, confidence: domainConfidence)
             ?? Self.headline(from: domains)
         let anchored = Self.migrationAnchoredHeadline(unanchored: rawHeadline,
@@ -381,6 +390,35 @@ final class AppModel {
                                                 migrationOffset: anchored.offset,
                                                 workoutGames: lineup)
         }
+    }
+
+    /// Seed local state from the onboarding fit test so the app plays at the
+    /// calibrated levels immediately instead of raw seeds — the server gets the
+    /// same values, but we must not depend on a reconcile round-trip landing.
+    func applyOnboardingBaseline(states: [GameID: DifficultyState],
+                                 day: String,
+                                 headline: Double?,
+                                 domainScores: [String: Double],
+                                 domainConfidence: [String: Double],
+                                 domainCounts: [String: Int]) {
+        for (game, state) in states {
+            difficulty[game] = state
+        }
+        if let headline { headlineIndex = headline }
+        if !progressDays.contains(where: { $0.day == day }) {
+            progressDays.append(DailyProgressRow(day: day, workout_done: true,
+                                                 games_played: states.count,
+                                                 headline_index: headline,
+                                                 domain_scores: domainScores,
+                                                 domain_confidence: domainConfidence,
+                                                 domain_session_counts: domainCounts,
+                                                 headline_confidence: ScoringAggregator.headlineConfidence(domainConfidence),
+                                                 coverage_count: domainConfidence.filter { $0.value > 0 }.count,
+                                                 migration_offset: nil,
+                                                 scoring_version: ScoringVersion.current,
+                                                 workout_games: nil))
+        }
+        saveCache()
     }
 
     private static func migrationAnchoredHeadline(unanchored: Double,
@@ -453,15 +491,23 @@ final class AppModel {
             for row in rows {
                 guard let id = GameID(rawValue: row.game) else { continue }
                 let sessions = row.sessions_played ?? 0
-                difficulty[id] = DifficultyState(level: row.level,
-                                                 mastery: row.mastery,
-                                                 confidence: row.confidence ?? min(1, Double(sessions) / 8.0),
-                                                 variance: row.variance ?? 1,
-                                                 reversals: row.reversals ?? 0,
-                                                 lastDirection: row.last_direction ?? 0,
-                                                 sessionsPlayed: sessions,
-                                                 lastPlayed: Self.parseServerTimestamp(row.last_played),
-                                                 scoringVersion: row.scoring_version ?? "v1_legacy")
+                let server = DifficultyState(level: row.level,
+                                             mastery: row.mastery,
+                                             confidence: row.confidence ?? min(1, Double(sessions) / 8.0),
+                                             variance: row.variance ?? 1,
+                                             reversals: row.reversals ?? 0,
+                                             lastDirection: row.last_direction ?? 0,
+                                             sessionsPlayed: sessions,
+                                             lastPlayed: Self.parseServerTimestamp(row.last_played),
+                                             scoringVersion: row.scoring_version ?? "v1_legacy")
+                // The server can lag local play (offline runs, failed upserts).
+                // sessionsPlayed only ever grows, so a server row with fewer
+                // sessions is stale: keep local and heal the server instead.
+                if let local = difficulty[id], local.sessionsPlayed > server.sessionsPlayed {
+                    Task { try? await supa.upsertDifficulty(game: id, local) }
+                    continue
+                }
+                difficulty[id] = server
             }
             sanitizeMechanicsMigrations()
         }
@@ -620,6 +666,24 @@ final class AppModel {
         if let data = try? JSONEncoder().encode(state) {
             UserDefaults.standard.set(data, forKey: cacheKey)
         }
+    }
+
+    /// Wipe all locally cached user state on sign-out. A different account
+    /// signing in on this device must start from its own server state — never
+    /// inherit the previous user's levels, mastery, streak, or progress.
+    func resetForSignOut() {
+        profile = ProfileSnapshot()
+        streak = .empty
+        difficulty = [:]
+        gameStats = [:]
+        headlineIndex = nil
+        progressDays = []
+        playedByDay = [:]
+        today = WorkoutBuilder.build(for: Date())
+        notificationsNeedSettings = false
+        load = .idle
+        UserDefaults.standard.removeObject(forKey: cacheKey)
+        WitsNotifications.cancelAll()
     }
 
     private func loadCache() {

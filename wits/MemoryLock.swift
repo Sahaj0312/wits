@@ -53,11 +53,23 @@ struct MemoryLockScreen: View {
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
         self.onResult = onResult
-        self.level = cfg.difficulty.level
-        self.wordLength = 5
+        let level = cfg.difficulty.level
+        self.level = level
+        self.wordLength = Self.wordLength(for: level)
         self.maxGuesses = 6
-        self.clueSeconds = 1.0
-        _target = State(initialValue: Self.pickWord(length: 5))
+        self.clueSeconds = Self.clueSeconds(for: level)
+        _target = State(initialValue: Self.pickWord(length: Self.wordLength(for: level)))
+    }
+
+    /// Adaptive challenge: longer words from the middle of the ladder up.
+    static func wordLength(for level: Double) -> Int {
+        level >= 6 ? 6 : 5
+    }
+
+    /// Adaptive challenge: clues stay up ~1.4s at level 1 and fade in ~0.55s
+    /// by level 10, so higher levels lean harder on lexical memory.
+    static func clueSeconds(for level: Double) -> Double {
+        max(0.55, 1.45 - 0.09 * DifficultyState.clamp(level))
     }
 
     private var progressText: String {
@@ -367,7 +379,8 @@ struct MemoryLockScreen: View {
             "wordsSolved": Double(wordsSolved),
             "bestStreak": Double(bestStreak),
             "guesses": Double(totalGuesses),
-            "wordLength": Double(wordLength)
+            "wordLength": Double(wordLength),
+            "memoryLockLevel": level
         ]
         result.text = [
             "solved": solvedWords,

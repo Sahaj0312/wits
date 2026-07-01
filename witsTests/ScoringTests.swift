@@ -108,22 +108,17 @@ final class ScoringTests: XCTestCase {
     }
 
     func testSameDomainSessionsAggregateInsteadOfOverwrite() {
-        var a = GameResult(game: .arrowStorm, score: 0, accuracy: 1)
-        a.calibratedAbility = 3000
-        a.performanceConfidence = 1
-        var b = GameResult(game: .spotSpeed, score: 0, accuracy: 1)
-        b.calibratedAbility = 1000
-        b.performanceConfidence = 1
+        // arrowStorm and spotSpeed are both focus games; the production rollup
+        // (aggregateGameStates) must average them, not keep only one.
+        let states: [GameID: DifficultyState] = [
+            .arrowStorm: DifficultyState(level: 6, mastery: 6, confidence: 1, sessionsPlayed: 1),
+            .spotSpeed: DifficultyState(level: 2, mastery: 2, confidence: 1, sessionsPlayed: 1)
+        ]
 
-        let merged = ScoringAggregator.mergeDailyScores(
-            existingScores: [:],
-            existingConfidence: [:],
-            existingCounts: [:],
-            results: [a, b]
-        )
+        let rollup = ScoringAggregator.aggregateGameStates(states)
 
-        XCTAssertEqual(merged.scores[CognitiveDomain.focus.rawValue], 2000)
-        XCTAssertEqual(merged.counts[CognitiveDomain.focus.rawValue], 2)
+        XCTAssertEqual(rollup.scores[CognitiveDomain.focus.rawValue], 2000)
+        XCTAssertEqual(rollup.counts[CognitiveDomain.focus.rawValue], 2)
     }
 
     func testBonusMultiplierDoesNotChangeBaseScore() {
@@ -297,6 +292,64 @@ final class ScoringTests: XCTestCase {
         let word = ScoringCalibrator.calibratedAbility(game: .wordConnect, mastery: 7)
 
         XCTAssertEqual(arrow, word)
+    }
+
+    func testTowerCampaignProgressDrivesAdaptiveLevel() {
+        let prior = DifficultyState.seed(for: .towerOfHanoi)
+        var result = GameResult(game: .towerOfHanoi, score: 500, accuracy: 1, trials: 7, durationMs: 20_000)
+        result.raw = ["moves": 7, "optimalMoves": 7, "seconds": 18, "invalidMoves": 0,
+                      "hanoiLevel": 36, "hanoiLevelEnd": 36]
+
+        let scored = ScoringEngine.score(result, previous: prior)
+
+        XCTAssertEqual(scored.next.level, 10)
+        XCTAssertEqual(TowerPolicy.level(forCampaignLevel: 1), 1)
+    }
+
+    func testMemoryLockAbilityFollowsChallengeLevel() {
+        let prior = DifficultyState(level: 7, mastery: 7, confidence: 1)
+        var result = GameResult(game: .memoryLock, score: 900, accuracy: 1, trials: 3, durationMs: 60_000)
+        result.raw = ["wordsSolved": 3, "guesses": 9, "wordLength": 6, "memoryLockLevel": 7]
+
+        let run = MemoryLockPolicy().score(result, prior: prior)
+
+        XCTAssertEqual(run.abilitySignal, 7)
+    }
+
+    @MainActor
+    func testMemoryLockChallengeScalesWithLevel() {
+        XCTAssertEqual(MemoryLockScreen.wordLength(for: 1), 5)
+        XCTAssertEqual(MemoryLockScreen.wordLength(for: 8), 6)
+        XCTAssertGreaterThan(MemoryLockScreen.clueSeconds(for: 1),
+                             MemoryLockScreen.clueSeconds(for: 10))
+    }
+
+    func testDomainPrioritiesStalenessTracksActualPlayNotSnapshots() {
+        // Every rollup snapshots all trained domains into domain_scores, so
+        // staleness must come from per-day domain_session_counts instead.
+        func row(_ day: String, played: [String: Int]) -> DailyProgressRow {
+            DailyProgressRow(day: day, workout_done: true, games_played: 1,
+                             headline_index: 2500,
+                             domain_scores: ["focus": 3000, "memory": 3000],
+                             domain_confidence: ["focus": 1, "memory": 1],
+                             domain_session_counts: played,
+                             headline_confidence: 1, coverage_count: 2,
+                             migration_offset: nil,
+                             scoring_version: ScoringVersion.current,
+                             workout_games: nil)
+        }
+        let days = [row("2026-06-20", played: ["focus": 1]),
+                    row("2026-06-29", played: ["focus": 1])]
+        let cal = Calendar.current
+        let today = cal.date(from: DateComponents(year: 2026, month: 6, day: 30))!
+
+        let priorities = ProgressMath.domainPriorities(days, asOf: today, calendar: cal)
+
+        // Identical weakness (same scores) — memory was never actually played,
+        // so it must carry full staleness vs. focus's one idle day.
+        let focus = priorities[.focus] ?? 0
+        let memory = priorities[.memory] ?? 0
+        XCTAssertEqual(memory - focus, ProgressMath.stalenessCap - ProgressMath.stalenessPerDay, accuracy: 0.5)
     }
 }
 

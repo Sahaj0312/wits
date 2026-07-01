@@ -126,8 +126,17 @@ enum ProgressMath {
         for domain in CognitiveDomain.allCases {
             let weakness = scores[domain].map { maxScore - min(maxScore, max(0, $0)) } ?? unknownWeakness
 
+            // A day trained this domain only if a session was actually played in
+            // it that day (domain_session_counts). domain_scores can't tell us:
+            // it snapshots every domain ever trained on every rollup. Rows from
+            // before per-day counts existed fall back to that snapshot.
             let lastTrained = scored
-                .filter { $0.domain_scores?[domain.rawValue] != nil }
+                .filter { row in
+                    if let counts = row.domain_session_counts {
+                        return (counts[domain.rawValue] ?? 0) > 0
+                    }
+                    return row.domain_scores?[domain.rawValue] != nil
+                }
                 .compactMap { $0.dayDate }
                 .max()
             let staleness: Double

@@ -198,7 +198,7 @@ extension GameID {
         case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
         case .pathKeeper: "watch a token hop across the board, then repeat its path in the same order."
         case .wordConnect: "connect letters in the wheel to uncover every hidden word in the grid. clear two boards to unlock the next level."
-        case .memoryLock: "guess the hidden word in 6 tries. after each guess, green means right letter and right spot, yellow means right letter but wrong spot, and gray means that letter is not in the word. clues fade after 1 second."
+        case .memoryLock: "guess the hidden word in 6 tries. after each guess, green means right letter and right spot, yellow means right letter but wrong spot, and gray means that letter is not in the word. clues fade after a moment — faster, with longer words, as your level climbs."
         case .dotsConnect: "draw paths between matching dots, cover every square, and avoid crossing another path."
         case .oneLine: "trace the graph in one continuous route. each segment can be used once, so every choice changes what remains open."
         case .towerOfHanoi: "clear a 36-level tower campaign. each level gives you a source tower and a target tower; move the stack across in as few moves as possible."

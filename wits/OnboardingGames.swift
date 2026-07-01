@@ -695,10 +695,14 @@ struct TrackerScreen: View {
             r.trials = stats.rounds
             r.threshold = Double(stats.perfectRounds)
             r.startedAt = startedAt
+            r.durationMs = Int((cfg?.activeElapsed(since: startedAt) ?? Date().timeIntervalSince(startedAt)) * 1000)
             r.raw = [
                 "perfectRounds": Double(stats.perfectRounds),
                 "totalTargets": Double(stats.totalTargets),
-                "correctPicks": Double(stats.correctPicks)
+                "correctPicks": Double(stats.correctPicks),
+                // CrowdControlPolicy's contract: per-target hits and misses.
+                "correct": Double(stats.correctPicks),
+                "wrong": Double(max(0, stats.totalTargets - stats.correctPicks))
             ]
             onResult(r)
         } else {
