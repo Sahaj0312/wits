@@ -57,6 +57,10 @@ final class AppModel {
     /// played — reconstructed from game_sessions so a past day's recap shows the
     /// real lineup and difficulty, not a rotation guess.
     var playedByDay: [String: [PlayedGame]] = [:]
+    /// Latest global-leaderboard snapshot per game (top players + my rank),
+    /// prefetched right after each run persists so post-game UI renders instantly.
+    var leaderboards: [GameID: LeaderboardSnapshot] = [:]
+    @ObservationIgnored private var leaderboardMeta: [GameID: (at: Date, best: Int)] = [:]
 
     let supa: SupabaseManager
     private let cacheKey = "wits.appstate.v1"
@@ -238,6 +242,9 @@ final class AppModel {
         Task {
             try? await supa.saveSession(r, source: source, workoutID: workoutID)
             try? await supa.upsertDifficulty(game: id, next)
+            // The session insert just updated the server leaderboard (trigger);
+            // prefetch now so the post-game screen has the rank ready.
+            await loadLeaderboard(for: id, force: true)
         }
 
         return r
@@ -253,8 +260,28 @@ final class AppModel {
         saveCache()
         Task {
             try? await supa.saveSession(r, source: source)
+            await loadLeaderboard(for: r.game, force: true)
         }
         return r
+    }
+
+    // MARK: Leaderboards
+
+    /// Fetch (or reuse) the global leaderboard for a game. Safe to call from
+    /// onAppear: one RPC, cached ~3 minutes, refreshed when the user's best
+    /// score changes or `force` is set (post-run, after the session persists).
+    func loadLeaderboard(for game: GameID, force: Bool = false) async {
+        let best = gameStats[game]?.bestScore ?? 0
+        if !force,
+           let meta = leaderboardMeta[game],
+           meta.best == best,
+           Date().timeIntervalSince(meta.at) < 180,
+           leaderboards[game] != nil {
+            return
+        }
+        guard supa.isSignedIn, let snap = try? await supa.fetchLeaderboard(game: game) else { return }
+        leaderboards[game] = snap
+        leaderboardMeta[game] = (at: Date(), best: best)
     }
 
     private func recordStats(for result: GameResult) {
@@ -317,9 +344,12 @@ final class AppModel {
     /// Fold a just-played game into today's rollup: accumulate domain scores,
     /// refresh the wits score + improvement chart, and persist the prescribed lineup.
     /// `workout_done` marks a counted progress day (workout or daily challenge).
-    /// Free play updates game mastery only. The journey decides "completed" from
-    /// games played vs. the prescribed lineup, not from this flag. The streak
-    /// advances only when `countsForStreak` is true.
+    /// Free play never calls this, but note it still reaches WPI indirectly:
+    /// it advances per-game mastery, and this rollup snapshots ALL game states
+    /// (`aggregateGameStates`), so free-play gains land in the next counted day.
+    /// The journey decides "completed" from games played vs. the prescribed
+    /// lineup, not from this flag. The streak advances only when
+    /// `countsForStreak` is true.
     private func recordDayActivity(_ results: [GameResult], countsForStreak: Bool,
                                    prescribed: [GameID]? = nil) {
         guard !results.isEmpty else { return }
@@ -679,6 +709,8 @@ final class AppModel {
         headlineIndex = nil
         progressDays = []
         playedByDay = [:]
+        leaderboards = [:]
+        leaderboardMeta = [:]
         today = WorkoutBuilder.build(for: Date())
         notificationsNeedSettings = false
         load = .idle

@@ -79,16 +79,16 @@ enum ProgressMath {
         return result
     }
 
-    /// The single hero number — mean of the latest smoothed domain scores.
+    /// The single hero number. Defined as the mean of `latestDomainScores` so it
+    /// always equals the average of the per-domain bars rendered beside it —
+    /// the stored `headline_index` is a raw single-day value and would drift
+    /// from the smoothed bars it appears to aggregate.
     static func headline(_ days: [DailyProgressRow]) -> Double? {
-        if let latest = sortedDays(days).last, let h = latest.headline_index {
-            return h.rounded()
-        }
         let domains = latestDomainScores(days)
-        guard !domains.isEmpty else { return nil }
-        let confidence = sortedDays(days).last?.domain_confidence ?? [:]
-        let keyed = Dictionary(uniqueKeysWithValues: domains.map { ($0.key.rawValue, $0.value) })
-        return ScoringAggregator.headline(domainScores: keyed, confidence: confidence)?.rounded()
+        guard !domains.isEmpty else {
+            return sortedDays(days).last?.headline_index?.rounded()
+        }
+        return (domains.values.reduce(0, +) / Double(domains.count)).rounded()
     }
 
     // MARK: - Adaptive workout targeting

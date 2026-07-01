@@ -406,7 +406,7 @@ struct DayDetailSheet: View {
             }
             Spacer(minLength: 0)
             if let level {
-                Text(String(format: "lvl %.1f", level))
+                Text("lvl \(Int(min(10, max(1, level.rounded(.down)))))")
                     .font(.system(size: 11.5, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsAccent)
                     .monospacedDigit()

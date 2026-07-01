@@ -229,8 +229,9 @@ private struct GameLauncher: View {
                                                              freePlay: true,
                                                              pauseController: pauseController)) { r in
                             let previousBest = app.gameStats[game]?.bestScore ?? 0
-                            app.recordGameResult(r, source: "free_play")
-                            lastResult = r
+                            // Keep the scored result: it carries the difficulty
+                            // transition + WPI delta the result screen shows.
+                            lastResult = app.recordGameResult(r, source: "free_play")
                             lastNewBest = r.score > previousBest
                             pauseController.reset()
                             withAnimation(.easeOut(duration: 0.2)) { phase = .result }
@@ -271,6 +272,7 @@ private struct GameLauncher: View {
                 game: game,
                 result: lastResult,
                 isNewBest: lastNewBest,
+                leaderboard: app.leaderboards[game],
                 onReplay: {
                     pauseController.reset()
                     attempt += 1
@@ -278,6 +280,7 @@ private struct GameLauncher: View {
                 },
                 onDone: { dismiss() }
             )
+            .task { await app.loadLeaderboard(for: game) }
         }
     }
 
@@ -307,6 +310,7 @@ private struct GameResultView: View {
     let game: GameID
     let result: GameResult?
     var isNewBest: Bool
+    var leaderboard: LeaderboardSnapshot?
     var onReplay: () -> Void
     var onDone: () -> Void
 
@@ -390,10 +394,25 @@ private struct GameResultView: View {
         }
         return "85% accuracy needed to unlock level \(wordLevelStart + 1)"
     }
+    /// Generic adaptive-level movement for games without their own level UI.
+    private var levelChangeText: String? {
+        guard game != .wordConnect, game != .towerOfHanoi, game.usesAdaptiveLevelDisplay,
+              let next = result?.newDifficulty?.level else { return nil }
+        let after = Int(DifficultyState.clamp(next).rounded(.down))
+        let before = Int(DifficultyState.clamp(result?.previousDifficulty?.level ?? next).rounded(.down))
+        if after > before { return "level \(after) unlocked" }
+        if after < before { return "level \(after) — easing off" }
+        return "level \(after)"
+    }
+    private var wpiDeltaText: String? {
+        guard let d = result?.wpiDelta, abs(d) >= 1 else { return nil }
+        return "\(d > 0 ? "+" : "")\(Int(d)) WPI"
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
+            ScrollView(showsIndicators: false) {
+            VStack(spacing: 0) {
             VStack(spacing: 8) {
                 Image(systemName: game.symbol)
                     .font(.system(size: 34, weight: .heavy))
@@ -459,14 +478,42 @@ private struct GameResultView: View {
                     }
                     .padding(.top, 8)
                 }
+                if levelChangeText != nil || wpiDeltaText != nil {
+                    HStack(spacing: 8) {
+                        if let levelChangeText {
+                            Text(levelChangeText)
+                                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Color.witsAccent)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.witsAccent.opacity(0.12), in: Capsule())
+                        }
+                        if let wpiDeltaText {
+                            Text(wpiDeltaText)
+                                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Color.witsMuted)
+                                .monospacedDigit()
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.witsTint, in: Capsule())
+                        }
+                    }
+                    .padding(.top, 8)
+                }
             }
             .padding(28)
             .frame(maxWidth: .infinity)
             .cardSurface()
             .rise()
-            Spacer()
+            LeaderboardPanel(game: game, snapshot: leaderboard)
+                .padding(.top, 10)
+                .rise(0.06)
+            }
+            .padding(.vertical, 10)
+            }
             Cta(title: replayTitle, action: onReplay)
                 .rise(0.1)
+                .padding(.top, 8)
             QuietButton(title: "back to games", action: onDone)
                 .padding(.top, 6)
         }

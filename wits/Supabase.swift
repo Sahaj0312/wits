@@ -148,6 +148,23 @@ struct SessionRow: Decodable {
     var workout_id: String?
 }
 
+/// One row of the global per-game leaderboard, as returned by the
+/// `game_leaderboard` RPC.
+struct LeaderboardEntry: Decodable, Equatable {
+    var name: String
+    var score: Int
+    var me: Bool
+}
+
+/// Snapshot from a single `game_leaderboard` RPC round trip: the top players
+/// plus the caller's own rank among every player of that game.
+struct LeaderboardSnapshot: Decodable, Equatable {
+    var total: Int
+    var rank: Int?
+    var score: Int?
+    var top: [LeaderboardEntry]
+}
+
 // MARK: - Manager
 
 @Observable
@@ -522,6 +539,29 @@ final class SupabaseManager {
             URLQueryItem(name: "limit", value: "1"),
         ])
         return try JSONDecoder().decode([StreakRow].self, from: data).first
+    }
+
+    // MARK: - Percentiles & leaderboards (RPC)
+
+    /// Age-banded fit-test percentiles from the server population norms.
+    /// `accuracies` is keyed by GameID rawValue (0...1 values); returns the
+    /// share of the age-matched population the caller beat, per game.
+    func fetchFitPercentiles(age: Int, accuracies: [String: Double]) async throws -> [String: Int] {
+        let data = try await call("rest/v1/rpc/fit_percentiles",
+                                  method: "POST",
+                                  body: ["p_age": age, "p_scores": accuracies],
+                                  authed: true)
+        return try JSONDecoder().decode([String: Int].self, from: data)
+    }
+
+    /// Global leaderboard for one game in a single round trip: top players +
+    /// the caller's rank. Backed by an index on (game, best_score desc).
+    func fetchLeaderboard(game: GameID, top: Int = 5) async throws -> LeaderboardSnapshot {
+        let data = try await call("rest/v1/rpc/game_leaderboard",
+                                  method: "POST",
+                                  body: ["p_game": game.rawValue, "p_top": top],
+                                  authed: true)
+        return try JSONDecoder().decode(LeaderboardSnapshot.self, from: data)
     }
 
     static func dayString(_ date: Date) -> String {

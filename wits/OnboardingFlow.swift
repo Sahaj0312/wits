@@ -99,6 +99,10 @@ struct OnboardingData {
     var flanker: FlankerStats?
     var tracker: TrackStats?
     var span: SpanStats?
+    /// Age-banded population percentiles from the server (GameID rawValue →
+    /// 1...99). Empty until the fetch after the last fit test lands; screens
+    /// fall back to accuracy-derived figures meanwhile.
+    var fitPercentiles: [String: Int] = [:]
 
     /// Total self-assessment score (0–18 across six statements).
     var likert: Int { likertAnswers.values.reduce(0, +) }
@@ -120,7 +124,6 @@ struct TestScore {
 struct AttentionResult {
     let age: Int
     let gap: Int
-    let percentile: Int
     let tests: [TestScore]
     let best: TestScore
 }
@@ -141,19 +144,20 @@ func computeResult(_ d: OnboardingData) -> AttentionResult {
     age = min(94, max((Double(d.ageMid) * 0.8).rounded(), age)).rounded()
 
     let gap = Int(age) - d.ageMid
-    let percentile = min(97, max(6, Int((40 + Double(gap) * 1.6).rounded())))
 
+    // Prefer the real, age-banded population percentile from fit_norms; fall
+    // back to the accuracy-derived figure while the fetch is in flight.
     let clamp = { (p: Int) in min(99, max(4, p)) }
     let tests = [
         TestScore(name: "arrow storm", skill: "focus",
-                  pct: clamp(Int((flankerAcc * 100).rounded()))),
+                  pct: d.fitPercentiles["arrowStorm"] ?? clamp(Int((flankerAcc * 100).rounded()))),
         TestScore(name: "crowd control", skill: "multitasking",
-                  pct: clamp(Int((trackAcc * 100).rounded()))),
+                  pct: d.fitPercentiles["crowdControl"] ?? clamp(Int((trackAcc * 100).rounded()))),
         TestScore(name: "echo grid", skill: "memory",
-                  pct: clamp(Int((spanAcc * 100).rounded()))),
+                  pct: d.fitPercentiles["echoGrid"] ?? clamp(Int((spanAcc * 100).rounded()))),
     ]
     let best = tests.max { $0.pct < $1.pct } ?? tests[0]
-    return AttentionResult(age: Int(age), gap: gap, percentile: percentile, tests: tests, best: best)
+    return AttentionResult(age: Int(age), gap: gap, tests: tests, best: best)
 }
 
 // MARK: - Root flow view
@@ -336,7 +340,7 @@ struct OnboardingView: View {
         case .span:
             SpanScreen(onComplete: { stats in
                 data.span = stats
-                pushScores()
+                fetchPercentilesThenPush()
                 supa.recordCheckpoint(.fitTest)
                 next()
             })
@@ -440,6 +444,33 @@ struct OnboardingView: View {
             return (idx: idx, statement: text, score: score)
         }
         Task { try? await supa.saveAssessment(rows) }
+    }
+
+    /// After the last fit test: get the age-banded population percentiles from
+    /// the server (they drive the results bell curves), then persist the
+    /// baseline. The two explainer screens in between hide the round trip;
+    /// if the fetch fails, screens keep their accuracy-derived fallback.
+    private func fetchPercentilesThenPush() {
+        var accuracies: [String: Double] = [:]
+        if let f = data.flanker {
+            accuracies[GameID.arrowStorm.rawValue] = accuracy(f.right, f.right + f.wrong)
+        }
+        if let t = data.tracker {
+            accuracies[GameID.crowdControl.rawValue] = accuracy(t.correctPicks, t.totalTargets)
+        }
+        if let s = data.span {
+            accuracies[GameID.echoGrid.rawValue] = accuracy(s.correctTaps, s.totalTaps)
+        }
+        guard supa.isSignedIn, !accuracies.isEmpty else {
+            pushScores()
+            return
+        }
+        Task {
+            if let pcts = try? await supa.fetchFitPercentiles(age: data.ageMid, accuracies: accuracies) {
+                data.fitPercentiles = pcts
+            }
+            pushScores()
+        }
     }
 
     private func pushScores() {

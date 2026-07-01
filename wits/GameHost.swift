@@ -256,6 +256,7 @@ struct GameHost: View {
 // MARK: - Summary
 
 private struct WorkoutSummary: View {
+    @Environment(AppModel.self) private var app
     let results: [GameResult]
     let onDone: () -> Void
 
@@ -313,15 +314,38 @@ private struct WorkoutSummary: View {
                             Text(r.game.displayName)
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
                                 .foregroundStyle(Color.witsInk)
-                            Text(r.game.domain.label)
-                                .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                                .foregroundStyle(Color.witsMuted)
+                            if let lb = app.leaderboards[r.game], let rank = lb.rank {
+                                Text("global #\(rank) of \(lb.total)")
+                                    .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                                    .foregroundStyle(Color.witsAccent)
+                                    .monospacedDigit()
+                            } else {
+                                Text(r.game.domain.label)
+                                    .font(.system(size: 12.5, weight: .medium, design: .rounded))
+                                    .foregroundStyle(Color.witsMuted)
+                            }
                         }
                         Spacer()
-                        Text("\(Int((r.accuracy * 100).rounded()))%")
-                            .font(.system(size: 15, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.witsMuted)
-                            .monospacedDigit()
+                        if r.bonusMultiplier > 1 {
+                            Text("×\(r.bonusMultiplier)")
+                                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Color.witsWarm)
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(Color.witsWarm.opacity(0.14), in: Capsule())
+                        }
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text("\(Int((r.accuracy * 100).rounded()))%")
+                                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                                .foregroundStyle(Color.witsMuted)
+                                .monospacedDigit()
+                            if let levelLine = levelLine(r) {
+                                Text(levelLine.text)
+                                    .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(levelLine.moved ? Color.witsAccent : Color.witsFaint)
+                                    .monospacedDigit()
+                            }
+                        }
                     }
                     .padding(14)
                     .cardSurface()
@@ -336,6 +360,14 @@ private struct WorkoutSummary: View {
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 16)
+    }
+
+    /// "lvl 3 → 4" when the whole-number level moved this run, else "lvl 4".
+    private func levelLine(_ r: GameResult) -> (text: String, moved: Bool)? {
+        guard r.game.usesAdaptiveLevelDisplay, let next = r.newDifficulty?.level else { return nil }
+        let after = Int(DifficultyState.clamp(next).rounded(.down))
+        let before = Int(DifficultyState.clamp(r.previousDifficulty?.level ?? next).rounded(.down))
+        return before != after ? ("lvl \(before) → \(after)", true) : ("lvl \(after)", false)
     }
 
     private func statCard(value: String, label: String) -> some View {

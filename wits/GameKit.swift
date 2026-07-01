@@ -299,7 +299,7 @@ extension GameID {
         case .matchBack: "n"
         case .ruleFinder: "complexity"
         case .lastSeen: "remembered"
-        case .pathKeeper: "maxLen"
+        case .pathKeeper: "maxSpan"    // TracePathArcade emits maxSpan for both path games
         case .wordConnect: "wordsFound"
         case .memoryLock: "wordsSolved"
         case .dotsConnect: "boardsSolved"

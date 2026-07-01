@@ -654,7 +654,6 @@ struct OneLineScreen: View {
             "validTraversals": Double(validTraversals),
             "totalEdges": Double(totalEdges),
             "levelStart": Double(runLevel),
-            "levelEnd": Double(hardestPuzzleDifficulty),
             "avgPuzzleDifficulty": avgPuzzleDifficulty,
             "puzzleDifficulty": Double(hardestPuzzleDifficulty),
             "oneLineMoveQuality": moveQuality,
