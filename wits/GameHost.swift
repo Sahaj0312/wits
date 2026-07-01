@@ -21,13 +21,12 @@ struct GameHost: View {
     /// Dismiss without finishing (user backs out).
     let onQuit: () -> Void
 
-    private enum Stage: Equatable { case tutorial, playing, bonus, interstitial, summary }
+    private enum Stage: Equatable { case tutorial, playing, interstitial, summary }
 
     @Environment(AppModel.self) private var app
     @State private var index = 0
     @State private var stage: Stage = .interstitial
     @State private var results: [GameResult] = []
-    @State private var bonusValue: Int?
     @State private var pauseController = GamePauseController()
 
     init(workout: DailyWorkout,
@@ -48,8 +47,6 @@ struct GameHost: View {
     private var currentGame: GameID? {
         index < workout.games.count ? workout.games[index] : nil
     }
-
-    private var daySeed: UInt64 { RewardEngine.daySeed(workout.day) }
 
     var body: some View {
         GeometryReader { geo in
@@ -101,7 +98,6 @@ struct GameHost: View {
         case .tutorial:
             "tutorial-\(index)"
         case .playing: "play-\(index)"
-        case .bonus: "bonus-\(index)"
         case .interstitial: "inter-\(index)"
         case .summary: "summary"
         }
@@ -141,8 +137,6 @@ struct GameHost: View {
             } else {
                 Color.clear.onAppear { stage = .summary }
             }
-        case .bonus:
-            bonusView
         case .interstitial:
             interstitial
         case .summary:
@@ -150,33 +144,6 @@ struct GameHost: View {
                 onWorkoutDone(results)
             }
         }
-    }
-
-    private var bonusView: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            VStack(spacing: 12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 44, weight: .heavy))
-                    .foregroundStyle(Color.witsWarm)
-                Text("surprise ×\(bonusValue ?? 2)")
-                    .font(.witsDisplay(32))
-                    .foregroundStyle(Color.witsInk)
-                Text("lucky round — your score for that game just got multiplied.")
-                    .font(.witsBody(15.5))
-                    .foregroundStyle(Color.witsMuted)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(28)
-            .frame(maxWidth: .infinity)
-            .cardSurface()
-            .rise()
-            Spacer()
-            Cta(title: "nice") { withAnimation { proceed() } }
-                .rise(0.12)
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 12)
     }
 
     /// Endowed-progress dots: completed games already filled when this game starts.
@@ -221,29 +188,14 @@ struct GameHost: View {
 
     private func handle(_ result: GameResult) {
         var r = result
-        let base = result.baseScore ?? result.score
-        r.baseScore = base
-        let bonus = RewardEngine.bonus(seed: daySeed, index: index)
-        if let bonus {
-            r.bonusMultiplier = bonus
-            r.score = base * bonus
-        } else {
-            r.bonusMultiplier = 1
-            r.score = base
-        }
+        r.baseScore = result.baseScore ?? result.score
         results.append(r)
         onGameResult(r)
-        if let bonus {
-            bonusValue = bonus
-            withAnimation { stage = .bonus }
-        } else {
-            withAnimation { proceed() }
-        }
+        withAnimation { proceed() }
     }
 
     /// Advance to the next game's lead-in, or the summary.
     private func proceed() {
-        bonusValue = nil
         if index + 1 < workout.games.count {
             index += 1
             stage = .interstitial
@@ -326,14 +278,6 @@ private struct WorkoutSummary: View {
                             }
                         }
                         Spacer()
-                        if r.bonusMultiplier > 1 {
-                            Text("×\(r.bonusMultiplier)")
-                                .font(.system(size: 12, weight: .heavy, design: .rounded))
-                                .foregroundStyle(Color.witsWarm)
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(Color.witsWarm.opacity(0.14), in: Capsule())
-                        }
                         VStack(alignment: .trailing, spacing: 1) {
                             Text("\(Int((r.accuracy * 100).rounded()))%")
                                 .font(.system(size: 15, weight: .heavy, design: .rounded))

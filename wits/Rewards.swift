@@ -2,10 +2,8 @@
 //  Rewards.swift
 //  wits
 //
-//  Variable rewards — the dopamine layer, kept ethical: variability rides on top
-//  of genuine performance (a surprise multiplier on a score you earned), never
-//  on whether money pays off. Seeded by the day so it's deterministic and not
-//  exploitable, and it always sits beside a finite daily loop.
+//  Day-seeded variety: the optional surprise daily challenge. Deterministic per
+//  day so it's not exploitable, and it always sits beside a finite daily loop.
 //
 
 import Foundation
@@ -25,16 +23,6 @@ struct SeededRNG {
 }
 
 enum RewardEngine {
-    /// A surprise score multiplier for the game at `index` in today's workout
-    /// (nil = no bonus). Roughly: ~12% chance ×3, ~18% chance ×2.
-    static func bonus(seed: UInt64, index: Int) -> Int? {
-        var rng = SeededRNG(seed: seed &+ UInt64(index) &* 0x100000001B3)
-        let r = rng.unit()
-        if r < 0.12 { return 3 }
-        if r < 0.30 { return 2 }
-        return nil
-    }
-
     /// An optional surprise daily challenge (an extra game) — appears some days.
     static func dailyChallenge(seed: UInt64) -> GameID? {
         var rng = SeededRNG(seed: seed &* 0x2545F4914F6CDD1D)

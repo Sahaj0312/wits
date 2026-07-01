@@ -121,22 +121,6 @@ final class ScoringTests: XCTestCase {
         XCTAssertEqual(rollup.counts[CognitiveDomain.focus.rawValue], 2)
     }
 
-    func testBonusMultiplierDoesNotChangeBaseScore() {
-        var result = GameResult(game: .numberRush,
-                                score: 300,
-                                baseScore: 100,
-                                bonusMultiplier: 3,
-                                accuracy: 1,
-                                trials: 10,
-                                durationMs: 45_000)
-        result.raw = ["correct": 10, "timeOnTaskMs": 45_000]
-
-        let scored = ScoringEngine.score(result, previous: .seed(for: .numberRush))
-
-        XCTAssertEqual(scored.baseScore, 100)
-        XCTAssertEqual(scored.displayScore, 300)
-    }
-
     func testWordConnectPersistsUnlockedLevel() {
         var result = GameResult(game: .wordConnect, score: 0, accuracy: 0.9, trials: 10)
         result.raw = ["boardsSolved": 2, "requiredWordsFound": 9, "levelStart": 1, "levelEnd": 2]

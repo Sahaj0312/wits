@@ -22,8 +22,6 @@ struct ScoredRun: Codable, Equatable {
 struct ScoredSession: Codable, Equatable {
     var result: GameResult
     var baseScore: Int
-    var bonusMultiplier: Int
-    var displayScore: Int
     var run: ScoredRun
     var previous: DifficultyState
     var next: DifficultyState
@@ -131,7 +129,6 @@ enum ScoringEngine {
     static func score(_ result: GameResult, previous: DifficultyState) -> ScoredSession {
         var r = result
         let base = r.baseScore ?? r.score
-        let multiplier = max(1, r.bonusMultiplier)
         let policy = ScoringPolicies.policy(for: r.game)
         let run = policy.score(r, prior: previous)
         let next = policy.nextState(from: r, prior: previous, run: run)
@@ -139,7 +136,6 @@ enum ScoringEngine {
         let priorAG = ScoringCalibrator.calibratedAbility(game: r.game, mastery: previous.masteryOrLevel)
 
         r.baseScore = base
-        r.bonusMultiplier = multiplier
         r.previousDifficulty = previous
         r.newDifficulty = next
         r.performanceQuality = run.performance
@@ -152,8 +148,6 @@ enum ScoringEngine {
         r.scoringVersion = r.game.difficultyScoringVersion
         r.raw.merge(run.metrics) { _, new in new }
         r.raw["baseScore"] = Double(base)
-        r.raw["bonusMultiplier"] = Double(multiplier)
-        r.raw["displayScore"] = Double(r.score)
         r.raw["performanceQuality"] = run.performance
         r.raw["performanceConfidence"] = run.confidence
         r.raw["abilitySignal"] = run.abilitySignal
@@ -165,8 +159,6 @@ enum ScoringEngine {
         return ScoredSession(
             result: r,
             baseScore: base,
-            bonusMultiplier: multiplier,
-            displayScore: r.score,
             run: run,
             previous: previous,
             next: next,
@@ -726,7 +718,6 @@ enum ScoringDiagnostics {
         testDPrimeAntiGaming()
         testRCSMonotonicity()
         testDailyAggregation()
-        testBonusIsolation()
         testWordConnectLevelPersistence()
         testLaunchCalibrationUsesFullScale()
         testMatchBackLevelAntiGaming()
@@ -786,13 +777,6 @@ enum ScoringDiagnostics {
         let rollup = ScoringAggregator.aggregateGameStates(states)
         assert(rollup.scores[CognitiveDomain.focus.rawValue] == 2000, "Same-domain games should aggregate, not overwrite")
         assert(rollup.counts[CognitiveDomain.focus.rawValue] == 2, "Domain count should include both games")
-    }
-
-    private static func testBonusIsolation() {
-        var result = GameResult(game: .numberRush, score: 300, baseScore: 100, bonusMultiplier: 3, accuracy: 1, trials: 10, durationMs: 45_000)
-        result.raw = ["correct": 10, "timeOnTaskMs": 45_000]
-        let scored = ScoringEngine.score(result, previous: .seed(for: .numberRush))
-        assert(scored.baseScore == 100 && scored.displayScore == 300, "Base/display score split broke")
     }
 
     private static func testWordConnectLevelPersistence() {

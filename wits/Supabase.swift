@@ -378,8 +378,6 @@ final class SupabaseManager {
 
         var row = legacyRow
         row["base_score"] = r.baseScoreValue
-        row["bonus_multiplier"] = r.bonusMultiplier
-        row["display_score"] = r.displayScoreValue
         if let v = r.performanceQuality { row["performance_quality"] = v }
         if let v = r.performanceConfidence { row["performance_confidence"] = v }
         if let v = r.abilitySignal {

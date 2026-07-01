@@ -473,7 +473,6 @@ struct GameResult: Codable, Equatable {
     let game: GameID
     var score: Int
     var baseScore: Int? = nil
-    var bonusMultiplier: Int = 1
     var accuracy: Double            // 0...1 — the mastery adjustment signal
     var medianRTms: Int? = nil
     var threshold: Double? = nil    // converged difficulty parameter this run
@@ -495,12 +494,10 @@ struct GameResult: Codable, Equatable {
 
     var domain: CognitiveDomain { game.domain }
     var baseScoreValue: Int { baseScore ?? score }
-    var displayScoreValue: Int { score }
 
     init(game: GameID,
          score: Int,
          baseScore: Int? = nil,
-         bonusMultiplier: Int = 1,
          accuracy: Double,
          medianRTms: Int? = nil,
          threshold: Double? = nil,
@@ -522,7 +519,6 @@ struct GameResult: Codable, Equatable {
         self.game = game
         self.score = score
         self.baseScore = baseScore
-        self.bonusMultiplier = bonusMultiplier
         self.accuracy = accuracy
         self.medianRTms = medianRTms
         self.threshold = threshold
@@ -544,7 +540,7 @@ struct GameResult: Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case game, score, baseScore, bonusMultiplier, accuracy, medianRTms, threshold, trials
+        case game, score, baseScore, accuracy, medianRTms, threshold, trials
         case newDifficulty, previousDifficulty, performanceQuality, performanceConfidence
         case abilitySignal, challengeLevel, calibratedAbility, wpiDelta, varianceAfter
         case scoringVersion, startedAt, durationMs, raw, text
@@ -555,7 +551,6 @@ struct GameResult: Codable, Equatable {
         game = try c.decode(GameID.self, forKey: .game)
         score = try c.decode(Int.self, forKey: .score)
         baseScore = try c.decodeIfPresent(Int.self, forKey: .baseScore)
-        bonusMultiplier = try c.decodeIfPresent(Int.self, forKey: .bonusMultiplier) ?? 1
         accuracy = try c.decode(Double.self, forKey: .accuracy)
         medianRTms = try c.decodeIfPresent(Int.self, forKey: .medianRTms)
         threshold = try c.decodeIfPresent(Double.self, forKey: .threshold)
@@ -581,7 +576,6 @@ struct GameResult: Codable, Equatable {
         try c.encode(game, forKey: .game)
         try c.encode(score, forKey: .score)
         try c.encodeIfPresent(baseScore, forKey: .baseScore)
-        try c.encode(bonusMultiplier, forKey: .bonusMultiplier)
         try c.encode(accuracy, forKey: .accuracy)
         try c.encodeIfPresent(medianRTms, forKey: .medianRTms)
         try c.encodeIfPresent(threshold, forKey: .threshold)
@@ -674,7 +668,6 @@ struct GameConfig {
     var difficulty: DifficultyState
     var targetDurationSec: Double = 45
     var mode: GameMode = .workout
-    var rewardSeed: UInt64 = 0
     var pauseController: GamePauseController?
     /// Back-compat: existing call sites read `isFreePlay`.
     var isFreePlay: Bool { mode == .freePlay }
