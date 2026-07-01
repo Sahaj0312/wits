@@ -388,6 +388,12 @@ extension GameID {
                 "cover every square on the board.",
                 "paths cannot cross each other."
             ]
+        case .oneLine:
+            [
+                "choose a starting dot on the graph.",
+                "move dot to dot along unused segments.",
+                "solve the board when every segment has been used once."
+            ]
         case .towerOfHanoi:
             [
                 "move one top disk at a time.",

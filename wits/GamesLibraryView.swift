@@ -219,6 +219,8 @@ private struct GameLauncher: View {
                             WordConnectSafeAreaBackground()
                         } else if game == .dotsConnect {
                             DotsConnectSafeAreaBackground()
+                        } else if game == .oneLine {
+                            OneLineSafeAreaBackground()
                         } else {
                             Color.witsBg.ignoresSafeArea()
                         }

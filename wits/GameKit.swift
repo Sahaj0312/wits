@@ -19,7 +19,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     case spotSpeed, colorClash, matchBack, ruleFinder
     // expanded library
     case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
-    case wordConnect, memoryLock, dotsConnect, towerOfHanoi
+    case wordConnect, memoryLock, dotsConnect, oneLine, towerOfHanoi
     // Standalone survival mode. Playable in the library, not prescribed in daily
     // workouts, and not connected to WPI/mastery scoring.
     case split
@@ -30,7 +30,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder,
          .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect, .dotsConnect,
-         .memoryLock, .towerOfHanoi]
+         .oneLine, .memoryLock, .towerOfHanoi]
     }
     var isLive: Bool { Self.live.contains(self) }
 
@@ -47,7 +47,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     /// their own top/bottom spacing.
     var ownsSafeAreaSurface: Bool {
         switch self {
-        case .echoGrid, .pathKeeper, .wordConnect, .memoryLock, .dotsConnect, .towerOfHanoi: true
+        case .echoGrid, .pathKeeper, .wordConnect, .memoryLock, .dotsConnect, .oneLine, .towerOfHanoi: true
         default: false
         }
     }
@@ -55,7 +55,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     /// Some games place their own primary top-left control inside the playfield.
     var usesEmbeddedQuitControl: Bool {
         switch self {
-        case .dotsConnect: true
+        case .dotsConnect, .oneLine: true
         default: false
         }
     }
@@ -86,7 +86,7 @@ extension GameID {
         case .crowdControl: .multitasking
         case .echoGrid, .matchBack, .lastSeen, .pathKeeper: .memory
         case .colorClash, .tileShift: .flexibility
-        case .ruleFinder, .dotsConnect, .towerOfHanoi: .reasoning
+        case .ruleFinder, .dotsConnect, .oneLine, .towerOfHanoi: .reasoning
         case .numberRush, .estimator: .math
         case .wordConnect, .memoryLock: .language
         case .split: .multitasking
@@ -111,6 +111,7 @@ extension GameID {
         case .wordConnect: "word connect"
         case .memoryLock: "memory lock"
         case .dotsConnect: "dots connect"
+        case .oneLine: "one line"
         case .towerOfHanoi: "tower of hanoi"
         case .split: "split"
         }
@@ -135,6 +136,7 @@ extension GameID {
         case .wordConnect: "connect letters into hidden words."
         case .memoryLock: "solve the word before the clues fade."
         case .dotsConnect: "connect matching dots without crossing paths."
+        case .oneLine: "draw every segment in a single stroke."
         case .towerOfHanoi: "clear the tower campaign one level at a time."
         case .split: "fly and pick at once. one slip ends it."
         }
@@ -147,7 +149,7 @@ extension GameID {
         case .spotSpeed: "speed"
         case .echoGrid, .matchBack, .lastSeen, .pathKeeper: "memory"
         case .colorClash, .tileShift: "flexibility"
-        case .ruleFinder, .dotsConnect, .towerOfHanoi: "problem solving"
+        case .ruleFinder, .dotsConnect, .oneLine, .towerOfHanoi: "problem solving"
         case .numberRush, .estimator: "math"
         case .wordConnect, .memoryLock: "language"
         case .split: "attention"
@@ -173,6 +175,7 @@ extension GameID {
         case .wordConnect: "vocabulary"
         case .memoryLock: "lexical memory"
         case .dotsConnect: "planning"
+        case .oneLine: "logical reasoning"
         case .towerOfHanoi: "sequential planning"
         case .split: "dual-tasking"
         }
@@ -197,6 +200,7 @@ extension GameID {
         case .wordConnect: "connect letters in the wheel to uncover every hidden word in the grid. clear two boards to unlock the next level."
         case .memoryLock: "guess the hidden word in 6 tries. after each guess, green means right letter and right spot, yellow means right letter but wrong spot, and gray means that letter is not in the word. clues fade after 1 second."
         case .dotsConnect: "draw paths between matching dots, cover every square, and avoid crossing another path."
+        case .oneLine: "trace the graph in one continuous route. each segment can be used once, so every choice changes what remains open."
         case .towerOfHanoi: "clear a 36-level tower campaign. each level gives you a source tower and a target tower; move the stack across in as few moves as possible."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         }
@@ -215,6 +219,7 @@ extension GameID {
         case .tileShift: "task switching is adapting quickly when the goal keeps changing underneath you."
         case .ruleFinder: "logical reasoning is recognising patterns, drawing conclusions, and making decisions."
         case .dotsConnect: "planning is building a sequence of moves that satisfies several constraints at the same time."
+        case .oneLine: "logical reasoning is recognising structure, spotting constraints, and planning a path that leaves no segment stranded."
         case .towerOfHanoi: "sequential planning is thinking several moves ahead while respecting a changing set of constraints."
         case .numberRush: "arithmetic is performing quick mental calculations accurately under time pressure."
         case .estimator: "mental arithmetic is composing numbers quickly: scanning options, choosing operations, and keeping the result in mind."
@@ -243,6 +248,7 @@ extension GameID {
         case .wordConnect: "textformat.abc"
         case .memoryLock: "lock.fill"
         case .dotsConnect: "point.topleft.down.to.point.bottomright.curvepath.fill"
+        case .oneLine: "point.topleft.down.to.point.bottomright.curvepath.fill"
         case .towerOfHanoi: "square.stack.3d.up.fill"
         case .split: "rectangle.split.1x2.fill"
         }
@@ -267,6 +273,7 @@ extension GameID {
         case .wordConnect: (0x315EC8, 0x24306D)
         case .memoryLock: (0x3A2350, 0x151C38)
         case .dotsConnect: (0x6C0588, 0x135DB7)
+        case .oneLine: (0x8D55F6, 0x22B8EA)
         case .towerOfHanoi: (0x224D63, 0x123447)
         case .split: (0x123A33, 0x0F2A2A)
         }
@@ -276,7 +283,7 @@ extension GameID {
     var seedLevel: Double {
         switch self {
         case .crowdControl, .echoGrid, .lastSeen, .pathKeeper, .matchBack: 1
-        case .wordConnect, .memoryLock, .dotsConnect, .towerOfHanoi: 1
+        case .wordConnect, .memoryLock, .dotsConnect, .oneLine, .towerOfHanoi: 1
         default: 2
         }
     }
@@ -296,6 +303,7 @@ extension GameID {
         case .wordConnect: "wordsFound"
         case .memoryLock: "wordsSolved"
         case .dotsConnect: "boardsSolved"
+        case .oneLine: "perfectBoards"
         case .towerOfHanoi: "efficiency"
         case .split: "maxLevel"
         case .estimator: "exact"
@@ -317,6 +325,7 @@ extension GameID {
         case .wordConnect: "\(Int(v)) words"
         case .memoryLock: "\(Int(v)) solved"
         case .dotsConnect: "\(Int(v)) boards"
+        case .oneLine: "\(Int(v)) perfect"
         case .towerOfHanoi: "\(Int(v))% optimal"
         case .split: "level \(Int(v))"
         case .estimator: "\(Int(v)) exact"

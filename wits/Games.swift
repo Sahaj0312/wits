@@ -121,6 +121,13 @@ enum DotsConnect: Game {
     }
 }
 
+enum OneLine: Game {
+    static let id = GameID.oneLine
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(OneLineScreen(cfg: config, onResult: onComplete))
+    }
+}
+
 enum TowerOfHanoi: Game {
     static let id = GameID.towerOfHanoi
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -148,6 +155,7 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .wordConnect: WordConnect.makeView(config: config, onComplete: onComplete)
     case .memoryLock:  MemoryLock.makeView(config: config, onComplete: onComplete)
     case .dotsConnect: DotsConnect.makeView(config: config, onComplete: onComplete)
+    case .oneLine:     OneLine.makeView(config: config, onComplete: onComplete)
     case .towerOfHanoi: TowerOfHanoi.makeView(config: config, onComplete: onComplete)
     case .split:       AnyView(EmptyView())
     }

@@ -113,6 +113,8 @@ enum ScoringPolicies {
             TowerPolicy()
         case .dotsConnect:
             DotsPolicy()
+        case .oneLine:
+            OneLinePolicy()
         case .wordConnect:
             WordConnectPolicy()
         case .ruleFinder:
@@ -539,6 +541,42 @@ struct DotsPolicy: GameScoringPolicy {
             confidence: confidence,
             abilitySignal: result.raw["puzzleDifficulty"] ?? prior.level,
             metrics: ["completion": completion]
+        )
+    }
+}
+
+struct OneLinePolicy: GameScoringPolicy {
+    var targetQuality: Double { 0.82 }
+    var stepSize: Double { 0.34 }
+    var maxUp: Double { 0.40 }
+    var maxDown: Double { 0.28 }
+    var abilitySignalWeight: Double { 0.25 }
+
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let boards = result.raw["boardsSolved"] ?? 0
+        let perRun = max(1, Double(result.trials))
+        let completion = ScoringMath.clamp(boards / perRun, 0, 1)
+        let totalEdges = max(1, result.raw["totalEdges"] ?? result.raw["correctEdges"] ?? perRun)
+        let mistakes = result.raw["mistakes"] ?? 0
+        let hints = result.raw["hintsUsed"] ?? 0
+        let resets = result.raw["resets"] ?? 0
+        let undos = result.raw["undos"] ?? 0
+        let moveQuality = result.raw["oneLineMoveQuality"]
+            ?? ScoringMath.clamp(totalEdges / max(totalEdges, totalEdges + mistakes + hints * 2 + resets * 2), 0, 1)
+        let assistPenalty = min(0.36, mistakes * 0.035 + hints * 0.085 + resets * 0.065 + undos * 0.012)
+        let quality = ScoringMath.clamp(0.68 * completion + 0.32 * moveQuality - assistPenalty, 0, 1)
+        let difficulty = result.raw["avgPuzzleDifficulty"] ?? result.raw["puzzleDifficulty"] ?? result.raw["levelStart"] ?? prior.level
+        let ability = ScoringMath.clamp(difficulty + (moveQuality - targetQuality) * 1.2 - min(0.7, assistPenalty), 1, 10)
+        let confidence = completion >= 1 ? 0.95 : ScoringMath.clamp(0.45 + 0.45 * completion, 0.40, 0.90)
+        return ScoredRun(
+            performance: quality,
+            confidence: confidence,
+            abilitySignal: ability,
+            metrics: [
+                "completion": completion,
+                "oneLineQuality": quality,
+                "oneLineMoveQuality": moveQuality
+            ]
         )
     }
 }

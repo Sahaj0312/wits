@@ -151,6 +151,55 @@ final class ScoringTests: XCTestCase {
         XCTAssertEqual(scored.next.level, 2)
     }
 
+    func testOneLineCleanSolvedRunOutscoresAssistedRun() {
+        let prior = DifficultyState(level: 4, mastery: 4, confidence: 1)
+        var clean = GameResult(game: .oneLine, score: 2400, accuracy: 1, trials: 2)
+        clean.raw = [
+            "boardsSolved": 2,
+            "totalEdges": 24,
+            "correctEdges": 24,
+            "mistakes": 0,
+            "hintsUsed": 0,
+            "resets": 0,
+            "undos": 0,
+            "puzzleDifficulty": 4,
+            "oneLineMoveQuality": 1
+        ]
+        var assisted = GameResult(game: .oneLine, score: 1600, accuracy: 0.72, trials: 2)
+        assisted.raw = [
+            "boardsSolved": 2,
+            "totalEdges": 24,
+            "correctEdges": 24,
+            "mistakes": 3,
+            "hintsUsed": 2,
+            "resets": 1,
+            "undos": 4,
+            "puzzleDifficulty": 4,
+            "oneLineMoveQuality": 0.75
+        ]
+
+        let cleanScored = ScoringEngine.score(clean, previous: prior)
+        let assistedScored = ScoringEngine.score(assisted, previous: prior)
+
+        XCTAssertGreaterThan(cleanScored.run.performance, assistedScored.run.performance)
+        XCTAssertGreaterThan(cleanScored.next.mastery, assistedScored.next.mastery)
+    }
+
+    func testOneLinePuzzleBankHasManyVariantsAndComplexitiesPerLevel() {
+        let counts = OneLineScreen.debugPuzzleCountsByLevel
+        let edgeCounts = OneLineScreen.debugEdgeCountsByLevel
+        let edgeRanges = OneLineScreen.debugEdgeRangesByLevel
+
+        for level in 1...10 {
+            XCTAssertGreaterThanOrEqual(counts[level] ?? 0, 36)
+            XCTAssertGreaterThanOrEqual(edgeCounts[level]?.count ?? 0, 2)
+            XCTAssertGreaterThanOrEqual(edgeCounts[level]?.min() ?? 0, edgeRanges[level]?.lowerBound ?? .max)
+            XCTAssertLessThanOrEqual(edgeCounts[level]?.max() ?? .max, edgeRanges[level]?.upperBound ?? 0)
+        }
+        XCTAssertTrue(OneLineScreen.debugUnreadablePuzzleIDs.isEmpty,
+                      "Unreadable One Line puzzles: \(OneLineScreen.debugUnreadablePuzzleIDs.prefix(8))")
+    }
+
     func testLaunchCalibrationUsesFullScaleAndSharedCeiling() {
         XCTAssertEqual(ScoringCalibrator.calibratedAbility(game: .matchBack, mastery: 10), 5000)
         XCTAssertEqual(ScoringCalibrator.calibratedAbility(game: .numberRush, mastery: 10), 5000)
@@ -237,6 +286,7 @@ final class ScoringTests: XCTestCase {
         XCTAssertFalse(ScoringPolicies.policy(for: .crowdControl) is AccuracyPolicy)
         XCTAssertFalse(ScoringPolicies.policy(for: .echoGrid) is AccuracyPolicy)
         XCTAssertFalse(ScoringPolicies.policy(for: .pathKeeper) is AccuracyPolicy)
+        XCTAssertFalse(ScoringPolicies.policy(for: .oneLine) is AccuracyPolicy)
         XCTAssertTrue(ScoringPolicies.policy(for: .numberRush) is NumberRushPolicy)
         XCTAssertFalse(ScoringPolicies.policy(for: .estimator) is ThroughputPolicy)
         XCTAssertTrue(ScoringPolicies.policy(for: .estimator) is TargetForgePolicy)

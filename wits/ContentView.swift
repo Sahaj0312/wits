@@ -34,6 +34,18 @@ struct ContentView: View {
 /// Dev-only: launch straight into one game for screenshots/feel testing.
 struct DebugGameHarness: View {
     let id: GameID
+
+    private var debugDifficulty: DifficultyState {
+        if let raw = ProcessInfo.processInfo.environment["WITS_LEVEL"],
+           let level = Double(raw) {
+            return DifficultyState(level: level,
+                                   mastery: level,
+                                   variance: 1.2,
+                                   scoringVersion: id.difficultyScoringVersion)
+        }
+        return .seed(for: id)
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -41,10 +53,12 @@ struct DebugGameHarness: View {
                     WordConnectSafeAreaBackground()
                 } else if id == .dotsConnect {
                     DotsConnectSafeAreaBackground()
+                } else if id == .oneLine {
+                    OneLineSafeAreaBackground()
                 } else {
                     Color.witsBg.ignoresSafeArea()
                 }
-                makeGameView(id, config: .standard(id, difficulty: .seed(for: id), freePlay: true)) { _ in }
+                makeGameView(id, config: .standard(id, difficulty: debugDifficulty, freePlay: true)) { _ in }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(.top, id.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.top, 8))
                     .padding(.bottom, id.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.bottom, 8))
