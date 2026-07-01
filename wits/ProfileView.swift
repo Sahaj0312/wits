@@ -68,104 +68,100 @@ struct ProfileView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            titleBar
+        ScrollView {
+            VStack(spacing: 0) {
+                pageHeader
 
-            ScrollView {
-                VStack(spacing: 0) {
-                    profileSummary
-
-                    settingsSection("settings") {
-                        Button { showReminder = true } label: {
-                            settingsValueRow(icon: "bell.fill",
-                                             tint: Color(light: 0x24A8FF, dark: 0x24A8FF),
-                                             title: "Daily Reminder",
-                                             value: reminderStatusLabel,
-                                             showsChevron: true)
-                        }
-                        .buttonStyle(.plain)
-                        settingsDivider
-                        settingsToggleRow(icon: "speaker.wave.2.fill",
-                                          tint: Color(light: 0x5B5CFF, dark: 0x7A78FF),
-                                          title: "Sound Effects",
-                                          isOn: $soundEffectsEnabled)
-                        settingsDivider
-                        settingsToggleRow(icon: "hand.tap.fill",
-                                          tint: Color.witsWarm,
-                                          title: "Haptics",
-                                          isOn: $hapticsEnabled)
-                    }
-
-                    settingsSection("training") {
-                        settingsValueRow(icon: "calendar.badge.clock",
-                                         tint: Color.witsAccent,
-                                         title: "Weekly Target",
-                                         value: "\(app.profile.trainingDays) days")
-                        settingsDivider
-                        settingsValueRow(icon: "target",
+                settingsSection("settings") {
+                    Button { showReminder = true } label: {
+                        settingsValueRow(icon: "bell.fill",
                                          tint: Color(light: 0x24A8FF, dark: 0x24A8FF),
-                                         title: "Goals",
-                                         value: goalsLabel)
-                        settingsDivider
-                        settingsValueRow(icon: "slider.horizontal.3",
-                                         tint: Color(light: 0x5B5CFF, dark: 0x7A78FF),
-                                         title: "Difficulty",
-                                         value: difficultyLabel)
-                        settingsDivider
-                        settingsValueRow(icon: "quote.bubble.fill",
-                                         tint: Color(light: 0xD950C9, dark: 0xD950C9),
-                                         title: "Encouragement",
-                                         value: encouragementLabel)
-                        settingsDivider
-                        settingsValueRow(icon: "figure.run",
-                                         tint: Color.witsWarm,
-                                         title: "Routine",
-                                         value: routineLabel)
+                                         title: "Daily Reminder",
+                                         value: reminderStatusLabel,
+                                         showsChevron: true)
                     }
-
-                    settingsSection("wits") {
-                        settingsValueRow(icon: "person.fill",
-                                         tint: Color.witsAccent,
-                                         title: "Account",
-                                         value: accountStatus)
-                        settingsDivider
-                        settingsValueRow(icon: "creditcard.fill",
-                                         tint: Color.witsWarm,
-                                         title: "Plan",
-                                         value: entitlementLabel)
-                        settingsDivider
-                        Button {
-                            hasCompletedOnboarding = false
-                        } label: {
-                            settingsValueRow(icon: "arrow.clockwise",
-                                             tint: Color(light: 0x5B5CFF, dark: 0x7A78FF),
-                                             title: "Replay Onboarding",
-                                             value: "",
-                                             showsChevron: true)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    settingsSection("account") {
-                        Button {
-                            supa.signOut()
-                            hasCompletedOnboarding = false
-                        } label: {
-                            settingsValueRow(icon: "rectangle.portrait.and.arrow.right",
-                                             tint: Color.witsWarm,
-                                             title: "Sign Out",
-                                             value: "")
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Text("You're using \(entitlementLabel).")
-                        .font(.system(size: 17, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 28)
-                        .padding(.bottom, 124)
+                    .buttonStyle(.plain)
+                    settingsDivider
+                    settingsToggleRow(icon: "speaker.wave.2.fill",
+                                      tint: Color(light: 0x5B5CFF, dark: 0x7A78FF),
+                                      title: "Sound Effects",
+                                      isOn: $soundEffectsEnabled)
+                    settingsDivider
+                    settingsToggleRow(icon: "hand.tap.fill",
+                                      tint: Color.witsWarm,
+                                      title: "Haptics",
+                                      isOn: $hapticsEnabled)
                 }
+
+                settingsSection("training") {
+                    settingsValueRow(icon: "calendar.badge.clock",
+                                     tint: Color.witsAccent,
+                                     title: "Weekly Target",
+                                     value: "\(app.profile.trainingDays) days")
+                    settingsDivider
+                    settingsValueRow(icon: "target",
+                                     tint: Color(light: 0x24A8FF, dark: 0x24A8FF),
+                                     title: "Goals",
+                                     value: goalsLabel)
+                    settingsDivider
+                    settingsValueRow(icon: "slider.horizontal.3",
+                                     tint: Color(light: 0x5B5CFF, dark: 0x7A78FF),
+                                     title: "Difficulty",
+                                     value: difficultyLabel)
+                    settingsDivider
+                    settingsValueRow(icon: "quote.bubble.fill",
+                                     tint: Color(light: 0xD950C9, dark: 0xD950C9),
+                                     title: "Encouragement",
+                                     value: encouragementLabel)
+                    settingsDivider
+                    settingsValueRow(icon: "figure.run",
+                                     tint: Color.witsWarm,
+                                     title: "Routine",
+                                     value: routineLabel)
+                }
+
+                settingsSection("wits") {
+                    settingsValueRow(icon: "person.fill",
+                                     tint: Color.witsAccent,
+                                     title: "Account",
+                                     value: accountStatus)
+                    settingsDivider
+                    settingsValueRow(icon: "creditcard.fill",
+                                     tint: Color.witsWarm,
+                                     title: "Plan",
+                                     value: entitlementLabel)
+                    settingsDivider
+                    Button {
+                        hasCompletedOnboarding = false
+                    } label: {
+                        settingsValueRow(icon: "arrow.clockwise",
+                                         tint: Color(light: 0x5B5CFF, dark: 0x7A78FF),
+                                         title: "Replay Onboarding",
+                                         value: "",
+                                         showsChevron: true)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                settingsSection("account") {
+                    Button {
+                        supa.signOut()
+                        hasCompletedOnboarding = false
+                    } label: {
+                        settingsValueRow(icon: "rectangle.portrait.and.arrow.right",
+                                         tint: Color.witsWarm,
+                                         title: "Sign Out",
+                                         value: "")
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Text("You're using \(entitlementLabel).")
+                    .font(.system(size: 17, weight: .medium, design: .rounded))
+                    .foregroundStyle(Color.witsMuted)
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 28)
+                    .padding(.bottom, 124)
             }
         }
         .background(Color.witsBg.ignoresSafeArea())
@@ -183,52 +179,19 @@ struct ProfileView: View {
         }
     }
 
-    private var titleBar: some View {
-        Text("Profile")
-            .font(.system(size: 25, weight: .heavy, design: .rounded))
-            .foregroundStyle(Color.witsInk)
-            .frame(maxWidth: .infinity)
-            .padding(.top, 18)
-            .padding(.bottom, 20)
-            .background(Color.witsCard)
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(Color.witsLine)
-                    .frame(height: 1)
-            }
-    }
-
-    private var profileSummary: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                Circle()
-                    .fill(Color.witsAccent.opacity(0.13))
-                Text(String(displayName.prefix(1)).lowercased())
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsAccent)
-            }
-            .frame(width: 52, height: 52)
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text(displayName)
-                    .font(.system(size: 22, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                Text(accountStatus)
-                    .font(.system(size: 14.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-            }
-
-            Spacer(minLength: 0)
+    private var pageHeader: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            WitsBrandMark()
+            Text("Hi \(displayName)")
+                .font(.witsDisplay(30))
+                .foregroundStyle(Color.witsInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
         }
-        .padding(.horizontal, 36)
-        .padding(.vertical, 22)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.witsCard)
-        .overlay(alignment: .bottom) {
-            Rectangle()
-                .fill(Color.witsLine)
-                .frame(height: 1)
-        }
+        .padding(.horizontal, WitsMetrics.screenPadding)
+        .padding(.top, 8)
+        .padding(.bottom, 16)
     }
 
     private func settingsSection<Content: View>(_ title: String,
