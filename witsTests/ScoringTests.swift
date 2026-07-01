@@ -488,3 +488,49 @@ final class NotificationPlannerTests: XCTestCase {
         XCTAssertTrue(kinds.contains(.trialEndsToday))
     }
 }
+
+@MainActor
+final class SlidePuzzleTests: XCTestCase {
+    func testSlidePuzzleEfficientSolveRaisesLevelAndSloppySolveLowersIt() {
+        let prior = DifficultyState(level: 5, mastery: 5, confidence: 1)
+
+        var clean = GameResult(game: .slidePuzzle, score: 0, accuracy: 0.95, trials: 40, durationMs: 45_000)
+        clean.raw = ["moves": 40, "parMoves": 44, "parSeconds": 57, "seconds": 45, "slideLevel": 5]
+        var sloppy = GameResult(game: .slidePuzzle, score: 0, accuracy: 0.4, trials: 130, durationMs: 180_000)
+        sloppy.raw = ["moves": 130, "parMoves": 44, "parSeconds": 57, "seconds": 180, "slideLevel": 5]
+
+        let cleanScored = ScoringEngine.score(clean, previous: prior)
+        let sloppyScored = ScoringEngine.score(sloppy, previous: prior)
+
+        XCTAssertGreaterThan(cleanScored.next.level, prior.level)
+        XCTAssertLessThan(sloppyScored.next.level, prior.level)
+        XCTAssertGreaterThan(cleanScored.run.performance, sloppyScored.run.performance)
+    }
+
+    func testSlidePuzzleScrambleProducesValidUnsolvedBoards() {
+        for level in stride(from: 1.0, through: 10.0, by: 1.0) {
+            let spec = SlidePuzzleScreen.boardSpec(for: level)
+            let tiles = SlidePuzzleScreen.scrambledTiles(size: spec.size, depth: spec.depth)
+
+            XCTAssertEqual(tiles.count, spec.size * spec.size)
+            XCTAssertEqual(Set(tiles), Set(0..<(spec.size * spec.size)), "Scramble must be a permutation")
+            XCTAssertFalse(SlidePuzzleScreen.isSolved(tiles), "Scramble must not hand out a solved board")
+
+            let manhattan = SlidePuzzleScreen.manhattan(tiles, size: spec.size)
+            XCTAssertGreaterThan(manhattan, 0)
+            XCTAssertLessThanOrEqual(manhattan, spec.depth, "Manhattan distance can't exceed the scramble walk length")
+        }
+    }
+
+    func testSlidePuzzleDifficultyBandsScaleWithLevel() {
+        let low = SlidePuzzleScreen.boardSpec(for: 1)
+        let mid = SlidePuzzleScreen.boardSpec(for: 5)
+        let high = SlidePuzzleScreen.boardSpec(for: 10)
+
+        XCTAssertEqual(low.size, 3)
+        XCTAssertEqual(mid.size, 4)
+        XCTAssertEqual(high.size, 5)
+        XCTAssertLessThan(low.depth, mid.depth)
+        XCTAssertLessThan(mid.depth, high.depth)
+    }
+}

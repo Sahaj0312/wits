@@ -135,6 +135,13 @@ enum TowerOfHanoi: Game {
     }
 }
 
+enum SlidePuzzle: Game {
+    static let id = GameID.slidePuzzle
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(SlidePuzzleScreen(cfg: config, onResult: onComplete))
+    }
+}
+
 /// Single dispatch the host uses to launch any game.
 @MainActor
 func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -157,6 +164,7 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .dotsConnect: DotsConnect.makeView(config: config, onComplete: onComplete)
     case .oneLine:     OneLine.makeView(config: config, onComplete: onComplete)
     case .towerOfHanoi: TowerOfHanoi.makeView(config: config, onComplete: onComplete)
+    case .slidePuzzle: SlidePuzzle.makeView(config: config, onComplete: onComplete)
     case .split:       AnyView(EmptyView())
     }
 }

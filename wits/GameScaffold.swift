@@ -400,6 +400,12 @@ extension GameID {
                 "never place a bigger disk on a smaller disk.",
                 "move the stack to the target tower in as few moves as you can."
             ]
+        case .slidePuzzle:
+            [
+                "tap any tile in the same row or column as the gap to slide it.",
+                "put the numbers back in order, reading left to right.",
+                "fewer moves and a faster solve score higher."
+            ]
         case .split:
             [
                 "tap the left side to keep the flyer up.",

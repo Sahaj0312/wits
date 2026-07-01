@@ -109,6 +109,8 @@ enum ScoringPolicies {
             LastSeenPolicy()
         case .towerOfHanoi:
             TowerPolicy()
+        case .slidePuzzle:
+            SlidePuzzlePolicy()
         case .dotsConnect:
             DotsPolicy()
         case .oneLine:
@@ -584,6 +586,29 @@ struct TowerPolicy: GameScoringPolicy {
             return DifficultyState.clamp(prior.level + adaptiveDelta(for: run))
         }
         return Self.level(forCampaignLevel: end)
+    }
+}
+
+struct SlidePuzzlePolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.20 }
+
+    /// A run only completes on a solve, so quality is pure efficiency: moves
+    /// against the Manhattan-derived par (dominant) plus time against par.
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let moves = max(1, result.raw["moves"] ?? Double(result.trials))
+        let par = max(1, result.raw["parMoves"] ?? moves)
+        let seconds = max(1, result.raw["seconds"] ?? Double(result.durationMs) / 1000.0)
+        let parSeconds = max(10, result.raw["parSeconds"] ?? (par * 1.15 + 6))
+        let moveEfficiency = min(1, par / moves)
+        let timeEfficiency = min(1, parSeconds / seconds)
+        let quality = ScoringMath.clamp(0.70 * moveEfficiency + 0.30 * timeEfficiency, 0, 1)
+        return ScoredRun(
+            performance: quality,
+            confidence: 1.0,
+            // The challenge actually served this run (board size + scramble).
+            abilitySignal: result.raw["slideLevel"] ?? prior.level,
+            metrics: ["moveEfficiency": moveEfficiency, "timeEfficiency": timeEfficiency]
+        )
     }
 }
 
