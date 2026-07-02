@@ -304,8 +304,6 @@ struct TowerOfHanoiScreen: View {
             HStack {
                 Label("\(diskCount) disks", systemImage: "square.stack.3d.up.fill")
                 Spacer()
-                Text("level \(campaignLevel)/\(Self.campaignLevelCount)")
-                Spacer()
                 Text("optimal \(optimalMoves)")
             }
             .font(.system(size: 13, weight: .heavy, design: .rounded))
