@@ -266,25 +266,62 @@ struct SlidePuzzleScreen: View {
 
     // MARK: Board math
 
-    /// Level 1…10 → board side + scramble depth (random blank moves from solved).
+    /// Level 1…10 → board side + scramble depth. Board size is the staircase
+    /// (steps at 4 and 8); depth ramps smoothly with the *continuous* level
+    /// inside each band, so every fractional adaptive gain deepens the next
+    /// board a little. Each new size starts shallower than the previous
+    /// band's end — a fresh, learnable start instead of a wall.
     static func boardSpec(for level: Double) -> (size: Int, depth: Int) {
-        switch level {
-        case ..<2: (3, 10)
-        case ..<3: (3, 18)
-        case ..<4: (3, 28)
-        case ..<5: (4, 24)
-        case ..<6: (4, 34)
-        case ..<7: (4, 46)
-        case ..<8: (4, 60)
-        case ..<9: (5, 46)
-        case ..<10: (5, 64)
-        default: (5, 84)
+        let l = min(10, max(1, level))
+        if l < 4 {
+            let t = (l - 1) / 3
+            return (3, Int((8 + t * 16).rounded()))     // 8 → 24
         }
+        if l < 8 {
+            let t = (l - 4) / 4
+            return (4, Int((14 + t * 46).rounded()))    // 14 → 60
+        }
+        let t = (l - 8) / 2
+        return (5, Int((36 + t * 54).rounded()))        // 36 → 90
     }
 
-    /// Scramble by random-walking the blank — always solvable, and the walk
-    /// never immediately undoes its previous step so depth ≈ real disorder.
+    /// Scramble by random-walking the blank — always solvable. Boards are
+    /// re-rolled until their Manhattan distance lands in a small window
+    /// around the level's target, so two boards at the same level feel
+    /// comparably hard instead of swinging with walk luck.
     static func scrambledTiles(size: Int, depth: Int) -> [Int] {
+        let target = targetManhattan(size: size, depth: depth)
+        let tolerance = max(2, target / 6)
+        var best: [Int] = []
+        var bestGap = Int.max
+        for _ in 0..<24 {
+            let tiles = randomWalk(size: size, depth: depth)
+            guard !isSolved(tiles) else { continue }
+            let gap = abs(manhattan(tiles, size: size) - target)
+            if gap <= tolerance { return tiles }
+            if gap < bestGap {
+                best = tiles
+                bestGap = gap
+            }
+        }
+        while best.isEmpty {
+            let tiles = randomWalk(size: size, depth: depth)
+            if !isSolved(tiles) { best = tiles }
+        }
+        return best
+    }
+
+    /// The Manhattan distance a `depth`-step walk is steered toward: ~0.85
+    /// per step while the walk is short, saturating near the board's
+    /// fully-mixed average (≈14 / 38 / 77 for 3×3 / 4×4 / 5×5).
+    static func targetManhattan(size: Int, depth: Int) -> Int {
+        let mixed = size == 3 ? 14.2 : (size == 4 ? 37.5 : 76.8)
+        return max(3, Int(min(Double(depth) * 0.85, mixed * 0.9).rounded()))
+    }
+
+    /// One scramble attempt: `depth` random blank moves from solved, never
+    /// immediately undoing the previous step so depth ≈ real disorder.
+    private static func randomWalk(size: Int, depth: Int) -> [Int] {
         var tiles = Array(1..<(size * size)) + [0]
         var blank = size * size - 1
         var previous = -1
@@ -304,7 +341,6 @@ struct SlidePuzzleScreen: View {
             blank = pick
             done += 1
         }
-        if isSolved(tiles) { return scrambledTiles(size: size, depth: depth) }
         return tiles
     }
 

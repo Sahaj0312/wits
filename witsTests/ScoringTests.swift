@@ -533,4 +533,33 @@ final class SlidePuzzleTests: XCTestCase {
         XCTAssertLessThan(low.depth, mid.depth)
         XCTAssertLessThan(mid.depth, high.depth)
     }
+
+    func testSlidePuzzleDepthRampsWithFractionalLevelAndDipsAtNewBoardSizes() {
+        // Every adaptive gain (~+0.3/run) must show up as a deeper scramble,
+        // not three identical boards followed by a cliff.
+        XCTAssertLessThan(SlidePuzzleScreen.boardSpec(for: 1).depth,
+                          SlidePuzzleScreen.boardSpec(for: 1.7).depth)
+        XCTAssertLessThan(SlidePuzzleScreen.boardSpec(for: 1.7).depth,
+                          SlidePuzzleScreen.boardSpec(for: 2.4).depth)
+
+        // A new board size starts shallower than the previous band's end.
+        XCTAssertLessThan(SlidePuzzleScreen.boardSpec(for: 4).depth,
+                          SlidePuzzleScreen.boardSpec(for: 3.9).depth)
+        XCTAssertLessThan(SlidePuzzleScreen.boardSpec(for: 8).depth,
+                          SlidePuzzleScreen.boardSpec(for: 7.9).depth)
+    }
+
+    func testSlidePuzzleScrambleDifficultyIsConsistentAtAFixedLevel() {
+        let spec = SlidePuzzleScreen.boardSpec(for: 1)
+        let distances = (0..<12).map { _ in
+            SlidePuzzleScreen.manhattan(
+                SlidePuzzleScreen.scrambledTiles(size: spec.size, depth: spec.depth),
+                size: spec.size
+            )
+        }
+
+        XCTAssertGreaterThanOrEqual(distances.min() ?? 0, 4, "A level-1 board should never be nearly solved")
+        XCTAssertLessThanOrEqual((distances.max() ?? 0) - (distances.min() ?? 0), 6,
+                                 "Same-level boards should feel comparably hard")
+    }
 }
