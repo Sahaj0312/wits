@@ -565,7 +565,9 @@ struct TowerPolicy: GameScoringPolicy {
         let moves = max(1, result.raw["moves"] ?? Double(result.trials))
         let optimal = max(1, result.raw["optimalMoves"] ?? moves)
         let seconds = max(1, result.raw["seconds"] ?? Double(result.durationMs) / 1000.0)
-        let targetSeconds = optimal * 2.65
+        // The game reports its own time budget (random-state puzzles get a
+        // looser per-move allowance); fall back to the legacy 2.65s/move.
+        let targetSeconds = result.raw["targetSeconds"] ?? optimal * 2.65
         let invalid = result.raw["invalidMoves"] ?? 0
         let moveEfficiency = min(1, optimal / moves)
         let timeEfficiency = min(1, targetSeconds / seconds)

@@ -2,11 +2,116 @@
 //  TowerOfHanoi.swift
 //  wits
 //
-//  Sequential planning puzzle. Move the full stack from A to C, one top disk at
-//  a time, without ever placing a larger disk on a smaller one.
+//  Sequential planning puzzle, random-state edition. Each level deals a random
+//  legal disk arrangement plus a random goal arrangement; rebuild the goal in
+//  as few moves as possible. Difficulty scales by minimum solution length,
+//  computed exactly with a BFS over the 3^n state space, so the memorized
+//  full-stack transfer procedure never applies.
 //
 
 import SwiftUI
+
+/// A single random-state puzzle. `start` and `goal` assign each disk (index 0
+/// = smallest disk) to a peg 0...2. Any assignment is a legal state because
+/// disks sharing a peg are necessarily ordered by size.
+struct HanoiPuzzle: Equatable {
+    let disks: Int
+    let start: [Int]
+    let goal: [Int]
+    let optimal: Int
+
+    static func stacks(from assignment: [Int]) -> [[Int]] {
+        var stacks: [[Int]] = [[], [], []]
+        for disk in stride(from: assignment.count, through: 1, by: -1) {
+            stacks[assignment[disk - 1]].append(disk)
+        }
+        return stacks
+    }
+}
+
+enum HanoiGenerator {
+    /// Deal a puzzle whose optimal solution is `targetDistance` moves, or the
+    /// closest achievable below it. A random goal's eccentricity can sit well
+    /// under the graph diameter (2^n - 1), so re-roll the goal a few times
+    /// when it cannot reach the requested distance.
+    static func puzzle(disks: Int, targetDistance: Int) -> HanoiPuzzle {
+        let stateCount = pow3(disks)
+        let target = max(1, min(targetDistance, (1 << disks) - 1))
+        var goal = Int.random(in: 0..<stateCount)
+        var distances = bfs(from: goal, disks: disks)
+        var attempts = 0
+        while (distances.max() ?? 0) < target, attempts < 15 {
+            let candidate = Int.random(in: 0..<stateCount)
+            let candidateDistances = bfs(from: candidate, disks: disks)
+            if (candidateDistances.max() ?? 0) > (distances.max() ?? 0) {
+                goal = candidate
+                distances = candidateDistances
+            }
+            attempts += 1
+        }
+        let want = min(target, distances.max() ?? 1)
+        let starts = (0..<stateCount).filter { distances[$0] == want }
+        let start = starts.randomElement() ?? goal
+        return HanoiPuzzle(
+            disks: disks,
+            start: decode(start, disks: disks),
+            goal: decode(goal, disks: disks),
+            optimal: want
+        )
+    }
+
+    /// Exact move distance from every state to `origin`.
+    static func bfs(from origin: Int, disks: Int) -> [Int] {
+        var distances = [Int](repeating: -1, count: pow3(disks))
+        distances[origin] = 0
+        var queue = [origin]
+        var head = 0
+        while head < queue.count {
+            let current = queue[head]
+            head += 1
+            for next in neighbors(of: current, disks: disks) where distances[next] == -1 {
+                distances[next] = distances[current] + 1
+                queue.append(next)
+            }
+        }
+        return distances
+    }
+
+    static func neighbors(of code: Int, disks: Int) -> [Int] {
+        let pegs = decode(code, disks: disks)
+        var top = [Int?](repeating: nil, count: 3)
+        for disk in stride(from: disks, through: 1, by: -1) { top[pegs[disk - 1]] = disk }
+        var result: [Int] = []
+        for from in 0..<3 {
+            guard let disk = top[from] else { continue }
+            for to in 0..<3 where to != from {
+                if let blocker = top[to], blocker < disk { continue }
+                result.append(code + (to - from) * pow3(disk - 1))
+            }
+        }
+        return result
+    }
+
+    static func encode(_ assignment: [Int]) -> Int {
+        var code = 0
+        for peg in assignment.reversed() { code = code * 3 + peg }
+        return code
+    }
+
+    static func decode(_ code: Int, disks: Int) -> [Int] {
+        var value = code
+        return (0..<disks).map { _ in
+            defer { value /= 3 }
+            return value % 3
+        }
+    }
+
+    static func pow3(_ n: Int) -> Int {
+        var result = 1
+        for _ in 0..<n { result *= 3 }
+        return result
+    }
+}
 
 struct TowerOfHanoiScreen: View {
     var cfg: GameConfig
@@ -19,10 +124,10 @@ struct TowerOfHanoiScreen: View {
     private struct LevelSpec {
         let number: Int
         let disks: Int
-        let source: Int
-        let target: Int
+        let moves: Int
     }
 
+    @State private var puzzle: HanoiPuzzle
     @State private var state: TowerState
     @State private var campaignLevel: Int
     @State private var selectedTower: Int?
@@ -31,7 +136,7 @@ struct TowerOfHanoiScreen: View {
     @State private var elapsed = 0.0
     @State private var timerStartedAt = Date()
     @State private var completedPuzzles = 0
-    @State private var hint = "tap a tower to pick up its top disk"
+    @State private var hint = "rebuild the goal shown above the towers"
     @State private var flashTower: Int?
     @State private var finished = false
 
@@ -40,6 +145,9 @@ struct TowerOfHanoiScreen: View {
     private let level: Double
     private static let campaignLevelCount = 36
     private static let campaignLevelKey = "wits.towerOfHanoi.currentLevel"
+    // Random-state puzzles need real lookahead, so the time budget per
+    // optimal move is looser than the old rote-procedure 2.65s.
+    private static let secondsPerOptimalMove = 3.1
 
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
@@ -48,31 +156,48 @@ struct TowerOfHanoiScreen: View {
         self.baseDiskCount = Self.diskCount(for: cfg.difficulty.level)
         let savedLevel = Self.savedCampaignLevel()
         _campaignLevel = State(initialValue: savedLevel)
-        _state = State(initialValue: TowerState(stacks: Self.initialStacks(for: Self.levelSpec(savedLevel))))
-    }
-
-    private var currentSpec: LevelSpec {
-        cfg.isSurvival ? LevelSpec(number: completedPuzzles + 1, disks: diskCount, source: 0, target: 2) : Self.levelSpec(campaignLevel)
+        let initialPuzzle: HanoiPuzzle
+        if cfg.isSurvival {
+            initialPuzzle = HanoiGenerator.puzzle(
+                disks: Self.diskCount(for: cfg.difficulty.level),
+                targetDistance: Self.survivalDistance(afterPuzzles: 0)
+            )
+        } else {
+            let spec = Self.levelSpec(savedLevel)
+            initialPuzzle = HanoiGenerator.puzzle(disks: spec.disks, targetDistance: spec.moves)
+        }
+        _puzzle = State(initialValue: initialPuzzle)
+        _state = State(initialValue: TowerState(stacks: HanoiPuzzle.stacks(from: initialPuzzle.start)))
     }
 
     private var diskCount: Int {
-        cfg.isSurvival ? min(6, baseDiskCount + completedPuzzles / 2) : currentSpec.disks
-    }
-
-    private var sourceTower: Int {
-        currentSpec.source
-    }
-
-    private var targetTower: Int {
-        currentSpec.target
+        puzzle.disks
     }
 
     private var optimalMoves: Int {
-        (1 << diskCount) - 1
+        puzzle.optimal
     }
 
     private var targetSeconds: Double {
-        Double(optimalMoves) * 2.65
+        Double(optimalMoves) * Self.secondsPerOptimalMove
+    }
+
+    private var goalStacks: [[Int]] {
+        HanoiPuzzle.stacks(from: puzzle.goal)
+    }
+
+    /// Peg index per disk for the current board, comparable against
+    /// `puzzle.goal` (an assignment fully determines the stacks).
+    private var currentAssignment: [Int] {
+        var pegs = [Int](repeating: 0, count: diskCount)
+        for (peg, stack) in state.stacks.enumerated() {
+            for disk in stack { pegs[disk - 1] = peg }
+        }
+        return pegs
+    }
+
+    private var matchedDisks: Int {
+        zip(currentAssignment, puzzle.goal).filter(==).count
     }
 
     var body: some View {
@@ -84,7 +209,10 @@ struct TowerOfHanoiScreen: View {
                         .padding(.top, 8)
                         .padding(.horizontal, WitsMetrics.screenPadding)
 
-                    Spacer(minLength: 24)
+                    Spacer(minLength: 16)
+
+                    HanoiGoalPreview(goalStacks: goalStacks, diskCount: diskCount)
+                        .padding(.horizontal, WitsMetrics.screenPadding)
 
                     Text(hint)
                         .font(.system(size: 16, weight: .heavy, design: .rounded))
@@ -97,23 +225,24 @@ struct TowerOfHanoiScreen: View {
                         .frame(maxWidth: .infinity)
                         .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                         .padding(.horizontal, WitsMetrics.screenPadding)
+                        .padding(.top, 10)
                         .opacity(hint.isEmpty ? 0 : 1)
                         .animation(.easeOut(duration: 0.18), value: hint)
 
                     HanoiBoard(
                         stacks: state.stacks,
+                        goalStacks: goalStacks,
                         selectedTower: selectedTower,
                         flashTower: flashTower,
                         diskCount: diskCount,
-                        targetTower: targetTower,
                         tapTower: tapTower
                     )
                     .frame(maxWidth: .infinity)
-                    .frame(height: min(geo.size.height * 0.48, 380))
+                    .frame(height: min(geo.size.height * 0.44, 360))
                     .padding(.horizontal, 14)
-                    .padding(.top, 18)
+                    .padding(.top, 14)
 
-                    Spacer(minLength: 24)
+                    Spacer(minLength: 20)
 
                     if !cfg.isSurvival {
                         progressStrip
@@ -182,7 +311,7 @@ struct TowerOfHanoiScreen: View {
             .font(.system(size: 13, weight: .heavy, design: .rounded))
             .foregroundStyle(.white.opacity(0.78))
 
-            ProgressView(value: min(1, Double(state.stacks[targetTower].count) / Double(diskCount)))
+            ProgressView(value: min(1, Double(matchedDisks) / Double(diskCount)))
                 .tint(Color(red: 0.24, green: 0.82, blue: 0.20))
                 .background(.white.opacity(0.16), in: Capsule())
         }
@@ -233,13 +362,13 @@ struct TowerOfHanoiScreen: View {
             selectedTower = nil
             moves += 1
         }
-        hint = state.stacks[targetTower].count == diskCount ? "" : "good. keep moving the stack to tower \(Self.towerName(targetTower))"
+        hint = ""
         GameFeel.shared.play(.correct(combo: max(1, min(6, moves))))
         checkCompletion()
     }
 
     private func checkCompletion() {
-        guard state.stacks[targetTower].count == diskCount else { return }
+        guard currentAssignment == puzzle.goal else { return }
 
         if cfg.isSurvival {
             completedPuzzles += 1
@@ -260,19 +389,23 @@ struct TowerOfHanoiScreen: View {
     }
 
     private func resetForNextSurvivalPuzzle() {
-        let nextDisks = diskCount
-        state = TowerState(stacks: Self.initialStacks(disks: nextDisks, source: 0))
+        let disks = min(6, max(3, baseDiskCount + completedPuzzles / 3))
+        puzzle = HanoiGenerator.puzzle(
+            disks: disks,
+            targetDistance: Self.survivalDistance(afterPuzzles: completedPuzzles)
+        )
+        state = TowerState(stacks: HanoiPuzzle.stacks(from: puzzle.start))
         selectedTower = nil
         moves = 0
         invalidMoves = 0
         elapsed = 0
         timerStartedAt = Date()
-        hint = "next tower: \(nextDisks) disks"
+        hint = "next puzzle: \(puzzle.optimal) moves to par"
     }
 
     private func survivalPuzzlePoints() -> Int {
         let moveEfficiency = min(1, Double(optimalMoves) / Double(max(1, moves)))
-        return Int((Double(diskCount) * 180 + 420 * moveEfficiency).rounded())
+        return Int((Double(optimalMoves) * 50 + 420 * moveEfficiency).rounded())
     }
 
     private func finish() {
@@ -281,7 +414,7 @@ struct TowerOfHanoiScreen: View {
         let timeEfficiency = min(1, targetSeconds / seconds)
         let penalty = max(0, 1 - Double(invalidMoves) * 0.10)
         let accuracy = max(0, min(1, (moveEfficiency * 0.75 + timeEfficiency * 0.25) * penalty))
-        let score = max(0, Int((Double(diskCount) * 400 + moveEfficiency * 1200 + timeEfficiency * 800 - Double(invalidMoves) * 75).rounded()))
+        let score = max(0, Int((Double(optimalMoves) * 55 + moveEfficiency * 1200 + timeEfficiency * 800 - Double(invalidMoves) * 75).rounded()))
 
         var result = GameResult(game: .towerOfHanoi, score: score, accuracy: accuracy)
         result.trials = moves + invalidMoves
@@ -292,14 +425,13 @@ struct TowerOfHanoiScreen: View {
             "moves": Double(moves),
             "optimalMoves": Double(optimalMoves),
             "seconds": seconds.rounded(),
+            "targetSeconds": targetSeconds,
             "diskCount": Double(diskCount),
             "hanoiLevel": Double(campaignLevel),
             // Campaign level to play next (finish() only runs on a solve in
             // campaign mode) — TowerPolicy pins the adaptive level to this.
             "hanoiLevelEnd": Double(cfg.isSurvival ? campaignLevel : min(Self.campaignLevelCount, campaignLevel + 1)),
             "hanoiLevelCount": Double(Self.campaignLevelCount),
-            "sourceTower": Double(sourceTower),
-            "targetTower": Double(targetTower),
             "invalidMoves": Double(invalidMoves)
         ]
         onResult(result)
@@ -319,7 +451,7 @@ struct TowerOfHanoiScreen: View {
     }
 
     private func showHelp() {
-        hint = "move all disks to tower \(Self.towerName(targetTower)). only smaller disks can sit on larger ones"
+        hint = "match the goal layout shown above. only smaller disks can sit on larger ones"
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             if !finished {
                 hint = selectedTower == nil ? "tap a tower to pick up its top disk" : "now tap the tower where this disk should go"
@@ -337,7 +469,11 @@ struct TowerOfHanoiScreen: View {
     }
 
     private static func diskCount(for level: Double) -> Int {
-        min(6, max(2, Int((level + 1) / 2) + 1))
+        min(6, max(3, Int((level + 1) / 2) + 1))
+    }
+
+    private static func survivalDistance(afterPuzzles completed: Int) -> Int {
+        4 + completed * 2
     }
 
     private static func savedCampaignLevel() -> Int {
@@ -345,34 +481,16 @@ struct TowerOfHanoiScreen: View {
         return min(campaignLevelCount, max(1, saved == 0 ? 1 : saved))
     }
 
+    /// Difficulty ladder: disk count sets the board scale, `moves` sets the
+    /// exact optimal-solution length the generator deals.
     private static func levelSpec(_ level: Int) -> LevelSpec {
         let clamped = min(campaignLevelCount, max(1, level))
-        let disks: Int
         switch clamped {
-        case 1...6: disks = 2
-        case 7...16: disks = 3
-        case 17...26: disks = 4
-        case 27...32: disks = 5
-        default: disks = 6
+        case 1...6:   return LevelSpec(number: clamped, disks: 3, moves: 1 + clamped)              // 2...7
+        case 7...16:  return LevelSpec(number: clamped, disks: 4, moves: 6 + (clamped - 7))        // 6...15
+        case 17...26: return LevelSpec(number: clamped, disks: 5, moves: 12 + 2 * (clamped - 17)) // 12...30
+        default:      return LevelSpec(number: clamped, disks: 6, moves: 22 + 2 * (clamped - 27)) // 22...40
         }
-
-        let routes = [(0, 2), (0, 1), (1, 2), (2, 0), (1, 0), (2, 1)]
-        let route = routes[(clamped - 1) % routes.count]
-        return LevelSpec(number: clamped, disks: disks, source: route.0, target: route.1)
-    }
-
-    private static func initialStacks(for spec: LevelSpec) -> [[Int]] {
-        initialStacks(disks: spec.disks, source: spec.source)
-    }
-
-    private static func initialStacks(disks: Int, source: Int) -> [[Int]] {
-        var stacks: [[Int]] = [[], [], []]
-        stacks[min(2, max(0, source))] = Array(stride(from: disks, through: 1, by: -1))
-        return stacks
-    }
-
-    private static func towerName(_ tower: Int) -> String {
-        ["A", "B", "C"][min(2, max(0, tower))]
     }
 
     private static func clock(_ seconds: Double) -> String {
@@ -381,12 +499,81 @@ struct TowerOfHanoiScreen: View {
     }
 }
 
+private enum HanoiPalette {
+    static let diskColors: [Color] = [
+        Color(red: 0.91, green: 0.22, blue: 0.19),
+        Color(red: 1.00, green: 0.34, blue: 0.02),
+        Color(red: 0.98, green: 0.74, blue: 0.13),
+        Color(red: 0.55, green: 0.83, blue: 0.10),
+        Color(red: 0.18, green: 0.56, blue: 0.93),
+        Color(red: 0.47, green: 0.36, blue: 0.86)
+    ]
+
+    static func color(for disk: Int) -> Color {
+        diskColors[(disk - 1) % diskColors.count]
+    }
+}
+
+private struct HanoiGoalPreview: View {
+    var goalStacks: [[Int]]
+    var diskCount: Int
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 14) {
+            Text("goal")
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white.opacity(0.65))
+                .padding(.bottom, 14)
+
+            HStack(alignment: .bottom, spacing: 18) {
+                ForEach(0..<3, id: \.self) { peg in
+                    VStack(spacing: 3) {
+                        VStack(spacing: 2) {
+                            ForEach(goalStacks[peg].reversed(), id: \.self) { disk in
+                                Capsule()
+                                    .fill(HanoiPalette.color(for: disk))
+                                    .frame(width: miniDiskWidth(disk), height: 7)
+                            }
+                        }
+                        Capsule()
+                            .fill(.white.opacity(0.5))
+                            .frame(width: 48, height: 3)
+                        Text(["A", "B", "C"][peg])
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.65))
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.black.opacity(0.22), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Goal arrangement")
+        .accessibilityValue(goalDescription)
+    }
+
+    private func miniDiskWidth(_ disk: Int) -> CGFloat {
+        let fraction = CGFloat(disk) / CGFloat(max(1, diskCount))
+        return 16 + fraction * 30
+    }
+
+    private var goalDescription: String {
+        (0..<3).map { peg in
+            let disks = goalStacks[peg]
+            let list = disks.isEmpty ? "empty" : disks.map(String.init).joined(separator: ", ")
+            return "Tower \(["A", "B", "C"][peg]): \(list)"
+        }.joined(separator: ". ")
+    }
+}
+
 private struct HanoiBoard: View {
     var stacks: [[Int]]
+    var goalStacks: [[Int]]
     var selectedTower: Int?
     var flashTower: Int?
     var diskCount: Int
-    var targetTower: Int
     var tapTower: (Int) -> Void
 
     var body: some View {
@@ -405,7 +592,7 @@ private struct HanoiBoard: View {
                             disks: stacks[index],
                             diskCount: diskCount,
                             selected: selectedTower == index,
-                            highlighted: index == targetTower,
+                            highlighted: !goalStacks[index].isEmpty && stacks[index] == goalStacks[index],
                             flashing: flashTower == index
                         )
                         .frame(width: towerWidth, height: towerHeight)
@@ -478,7 +665,7 @@ private struct HanoiTowerView: View {
         let fraction = CGFloat(disk) / CGFloat(max(1, diskCount))
         let width = 0.38 + fraction * 0.54
         return RoundedRectangle(cornerRadius: 7, style: .continuous)
-            .fill(Self.diskColors[(disk - 1) % Self.diskColors.count])
+            .fill(HanoiPalette.color(for: disk))
             .frame(width: maxWidth * width, height: 27)
             .overlay {
                 Text("\(disk)")
@@ -488,15 +675,6 @@ private struct HanoiTowerView: View {
             }
             .shadow(color: .black.opacity(0.14), radius: 5, y: 3)
     }
-
-    private static let diskColors: [Color] = [
-        Color(red: 0.91, green: 0.22, blue: 0.19),
-        Color(red: 1.00, green: 0.34, blue: 0.02),
-        Color(red: 0.98, green: 0.74, blue: 0.13),
-        Color(red: 0.55, green: 0.83, blue: 0.10),
-        Color(red: 0.18, green: 0.56, blue: 0.93),
-        Color(red: 0.47, green: 0.36, blue: 0.86)
-    ]
 }
 
 private struct HanoiSkyline: Shape {

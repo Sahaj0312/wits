@@ -138,7 +138,7 @@ extension GameID {
         case .memoryLock: "solve the word before the clues fade."
         case .dotsConnect: "connect matching dots without crossing paths."
         case .oneLine: "draw every segment in a single stroke."
-        case .towerOfHanoi: "clear the tower campaign one level at a time."
+        case .towerOfHanoi: "rebuild the goal arrangement in as few moves as you can."
         case .slidePuzzle: "slide the tiles back into order."
         case .split: "fly and pick at once. one slip ends it."
         }
@@ -204,7 +204,7 @@ extension GameID {
         case .memoryLock: "guess the hidden word in 6 tries. after each guess, green means right letter and right spot, yellow means right letter but wrong spot, and gray means that letter is not in the word. clues fade after a moment — faster, with longer words, as your level climbs."
         case .dotsConnect: "draw paths between matching dots, cover every square, and avoid crossing another path."
         case .oneLine: "trace the graph in one continuous route. each segment can be used once, so every choice changes what remains open."
-        case .towerOfHanoi: "clear a 36-level tower campaign. each level gives you a source tower and a target tower; move the stack across in as few moves as possible."
+        case .towerOfHanoi: "clear a 36-level tower campaign. every level deals a scrambled tower and a goal arrangement; plan ahead and rebuild the goal in as few moves as possible."
         case .slidePuzzle: "the numbered tiles are scrambled around one empty square. slide them through the gap until they read in order — in as few moves as you can."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         }

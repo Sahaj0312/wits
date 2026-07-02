@@ -436,7 +436,7 @@ extension GameID {
             [
                 "move one top disk at a time.",
                 "never place a bigger disk on a smaller disk.",
-                "move the stack to the target tower in as few moves as you can."
+                "rebuild the goal arrangement shown above the towers in as few moves as you can."
             ]
         case .slidePuzzle:
             [
