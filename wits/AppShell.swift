@@ -109,7 +109,8 @@ struct ActivityTab: View {
                         ForEach(CognitiveDomain.allCases) { domain in
                             if let value = domainScores[domain] {
                                 MetricBar(label: domain.label, value: value,
-                                          series: ProgressMath.domainSeries(app.progressDays, domain))
+                                          series: ProgressMath.domainSeries(app.progressDays, domain),
+                                          tint: domain.color)
                             } else {
                                 untrainedDomainRow(domain)
                             }
@@ -145,13 +146,16 @@ struct ActivityTab: View {
     }
 
     private func untrainedDomainRow(_ domain: CognitiveDomain) -> some View {
-        HStack {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(domain.color.opacity(0.45))
+                .frame(width: 8, height: 8)
             Text(domain.label)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
                 .foregroundStyle(Color.witsInk)
             Spacer()
             Text("not trained yet")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(.witsLabel(12))
                 .foregroundStyle(Color.witsFaint)
         }
         .padding(16)
@@ -192,21 +196,21 @@ private struct ScoringInfoSheet: View {
                             body: "WPI estimates your current skill from recent performance, measured against each game's own difficulty.")
                     divider
                     infoRow(icon: "number",
-                            title: "Points and WPI are separate",
-                            body: "Points reward one round. WPI moves more slowly from accuracy, speed, challenge, and confidence.")
+                            title: "points and WPI are separate",
+                            body: "points reward one round. WPI moves more slowly from accuracy, speed, challenge, and confidence.")
                     divider
                     infoRow(icon: "arrow.up.arrow.down",
-                            title: "Scores can move both ways",
-                            body: "Strong runs raise your estimate. Weaker or stale areas become less certain, so WPI reflects current training.")
+                            title: "scores can move both ways",
+                            body: "strong runs raise your estimate. weaker or stale areas become less certain, so WPI reflects current training.")
                     divider
                     infoRow(icon: "chart.bar.fill",
-                            title: "Overall is an average",
-                            body: "Each skill area has its own score out of 5000. New areas calibrate as you train them.")
+                            title: "overall is an average",
+                            body: "each skill area has its own score out of 5000. new areas calibrate as you train them.")
                 }
                 .padding(14)
                 .cardSurface()
 
-                Text("Raw points still matter for a single round, but WPI is the long-term progress system.")
+                Text("raw points still matter for a single round, but WPI is the long-term progress system.")
                     .font(.witsBody(13.5))
                     .foregroundStyle(Color.witsMuted)
                     .multilineTextAlignment(.leading)

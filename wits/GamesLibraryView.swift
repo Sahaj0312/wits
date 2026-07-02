@@ -62,7 +62,7 @@ struct GamesLibraryView: View {
             HStack(spacing: 8) {
                 FilterChip(label: "all", selected: filter == nil) { filter = nil }
                 ForEach(CognitiveDomain.allCases) { d in
-                    FilterChip(label: d.label, selected: filter == d) { filter = d }
+                    FilterChip(label: d.label, selected: filter == d, tint: d.color) { filter = d }
                 }
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
@@ -112,23 +112,38 @@ struct GamesLibraryView: View {
     }
 
     private func gameIcon(_ g: GameID) -> some View {
-        Image(systemName: g.symbol)
-            .font(.system(size: 21, weight: .heavy))
-            .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
-            .frame(width: 44, height: 44)
-            .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.14),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        Group {
+            if g.isPlayable {
+                Image(systemName: g.symbol)
+                    .font(.system(size: 19, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(
+                        LinearGradient(colors: [g.domain.color, g.domain.heroTopColor],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: WitsMetrics.chipRadius, style: .continuous)
+                    )
+                    .shadow(color: g.domain.color.opacity(0.35), radius: 6, y: 3)
+            } else {
+                Image(systemName: g.symbol)
+                    .font(.system(size: 19, weight: .heavy))
+                    .foregroundStyle(Color.witsFaint)
+                    .frame(width: 44, height: 44)
+                    .background(Color.witsFaint.opacity(0.14),
+                                in: RoundedRectangle(cornerRadius: WitsMetrics.chipRadius, style: .continuous))
+            }
+        }
     }
 
     private func gameBadge(_ g: GameID) -> some View {
         Text(gameBadgeLabel(g))
-            .font(.system(size: 10.5, weight: .heavy, design: .rounded))
-            .foregroundStyle(g.isPlayable ? Color.witsAccent : Color.witsFaint)
+            .font(.witsLabel(10.5))
+            .foregroundStyle(g.isPlayable ? g.domain.color : Color.witsFaint)
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
-            .background((g.isPlayable ? Color.witsAccent : Color.witsFaint).opacity(0.12), in: Capsule())
+            .background((g.isPlayable ? g.domain.color : Color.witsFaint).opacity(0.13), in: Capsule())
     }
 
     private func gameBadgeLabel(_ g: GameID) -> String {
@@ -142,19 +157,27 @@ struct GamesLibraryView: View {
 private struct FilterChip: View {
     var label: String
     var selected: Bool
+    var tint: Color = .witsAccent
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(label)
-                .font(.system(size: 13.5, weight: .heavy, design: .rounded))
-                .foregroundStyle(selected ? Color.witsBg : Color.witsInk)
-                .padding(.horizontal, 15)
-                .padding(.vertical, 9)
-                .background(selected ? Color.witsAccent : Color.witsCard, in: Capsule())
-                .overlay(Capsule().strokeBorder(selected ? .clear : Color.witsLine, lineWidth: 1.5))
+            HStack(spacing: 6) {
+                if tint != .witsAccent {
+                    Circle()
+                        .fill(selected ? .white : tint)
+                        .frame(width: 7, height: 7)
+                }
+                Text(label)
+                    .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(selected ? .white : Color.witsInk)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 9)
+            .background(selected ? tint : Color.witsCard, in: Capsule())
+            .overlay(Capsule().strokeBorder(selected ? .clear : Color.witsLine, lineWidth: 1.5))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressScale())
         .animation(.easeOut(duration: 0.12), value: selected)
     }
 }
@@ -351,9 +374,9 @@ private struct GameResultView: View {
         guard let moves = hanoiMoves, let optimal = hanoiOptimalMoves else { return nil }
         let extra = max(0, moves - optimal)
         if extra == 0 {
-            return "You matched the minimum number of moves required"
+            return "you matched the minimum number of moves required"
         }
-        return "You made \(extra) \(extra == 1 ? "move" : "moves") more than the minimum number of moves required"
+        return "you made \(extra) \(extra == 1 ? "move" : "moves") more than the minimum number of moves required"
     }
     private var wordAccuracy: Double {
         guard game == .wordConnect else { return 0 }
@@ -415,26 +438,37 @@ private struct GameResultView: View {
             VStack(spacing: 0) {
             VStack(spacing: 8) {
                 Image(systemName: game.symbol)
-                    .font(.system(size: 34, weight: .heavy))
-                    .foregroundStyle(Color.witsAccent)
+                    .font(.system(size: 24, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 56, height: 56)
+                    .background(
+                        LinearGradient(colors: [game.domain.color, game.domain.heroTopColor],
+                                       startPoint: .top, endPoint: .bottom),
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    )
+                    .shadow(color: game.domain.color.opacity(0.4), radius: 10, y: 5)
+                    .popIn()
                 Text(game.displayName)
                     .font(.witsBody(15, weight: .semibold))
                     .foregroundStyle(Color.witsMuted)
-                Text("\(result?.score ?? 0)")
-                    .font(.system(size: 64, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .monospacedDigit()
+                CountUpText(value: result?.score ?? 0)
                 Text("points")
-                    .font(.witsBody(13, weight: .semibold))
+                    .font(.witsLabel(13))
                     .foregroundStyle(Color.witsMuted)
                 if isNewBest {
                     Text("NEW BEST")
                         .font(.system(size: 12, weight: .heavy, design: .rounded))
                         .kerning(1)
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.witsWarm, in: Capsule())
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 5)
+                        .background(
+                            LinearGradient(colors: [.witsGold, .witsWarm],
+                                           startPoint: .leading, endPoint: .trailing),
+                            in: Capsule()
+                        )
+                        .shadow(color: Color.witsGold.opacity(0.45), radius: 8, y: 3)
+                        .popIn(0.55)
                 }
                 if game == .wordConnect, let wordLevelText {
                     VStack(spacing: 6) {
@@ -521,6 +555,11 @@ private struct GameResultView: View {
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.witsBg.ignoresSafeArea())
+        .overlay {
+            if isNewBest {
+                ConfettiBurst().ignoresSafeArea()
+            }
+        }
     }
 
     private var replayTitle: String {
@@ -562,14 +601,14 @@ private struct GameResultView: View {
             }
             hanoiResultRow(
                 icon: "timer",
-                title: "Time",
+                title: "time",
                 value: hanoiSeconds.map { "\($0) sec" } ?? "—",
                 detail: nil
             )
             Divider().overlay(Color.witsLine)
             hanoiResultRow(
                 icon: "scribble.variable",
-                title: "Moves",
+                title: "moves",
                 value: hanoiMoves.map { "\($0)" } ?? "—",
                 detail: hanoiMoveDetail
             )
@@ -608,11 +647,11 @@ private struct GameResultView: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.system(size: 20, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsAccent)
+                .font(.witsValue(20))
+                .foregroundStyle(game.domain.color)
                 .monospacedDigit()
             Text(label)
-                .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                .font(.witsLabel(11.5))
                 .foregroundStyle(Color.witsMuted)
         }
     }

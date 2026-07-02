@@ -187,10 +187,10 @@ struct TodayView: View {
 
     private func workoutHeroCard(_ day: TodayWorkoutDay) -> some View {
         ZStack(alignment: .bottomTrailing) {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
+            RoundedRectangle(cornerRadius: WitsMetrics.heroRadius, style: .continuous)
                 .fill(Color.witsCard)
 
-            FocusCardArtwork()
+            FocusCardArtwork(colors: dayDomains(day).map(\.color))
                 .padding(.trailing, -24)
                 .padding(.bottom, -30)
                 .allowsHitTesting(false)
@@ -232,6 +232,8 @@ struct TodayView: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
+                domainChips(day)
+
                 HStack(spacing: 9) {
                     heroStat("\(day.rows.count)", "games")
                     heroStat("3-4", "min")
@@ -249,10 +251,35 @@ struct TodayView: View {
         .frame(maxWidth: .infinity)
         .frame(minHeight: 318)
         .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
+            RoundedRectangle(cornerRadius: WitsMetrics.heroRadius, style: .continuous)
                 .strokeBorder(Color.witsLine, lineWidth: 1)
         }
-        .shadow(color: .witsShadow, radius: 16, y: 8)
+        .shadow(color: .witsShadow, radius: 18, y: 10)
+    }
+
+    /// The distinct cognitive domains in a day's lineup, in row order.
+    private func dayDomains(_ day: TodayWorkoutDay) -> [CognitiveDomain] {
+        var seen = Set<CognitiveDomain>()
+        return day.rows.map(\.game.domain).filter { seen.insert($0).inserted }
+    }
+
+    /// Small colored capsules naming what today trains.
+    private func domainChips(_ day: TodayWorkoutDay) -> some View {
+        HStack(spacing: 6) {
+            ForEach(dayDomains(day)) { domain in
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(domain.color)
+                        .frame(width: 6, height: 6)
+                    Text(domain.label)
+                        .font(.witsLabel(11))
+                        .foregroundStyle(domain.color)
+                }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(domain.color.opacity(0.12), in: Capsule())
+            }
+        }
     }
 
     @ViewBuilder
@@ -261,7 +288,7 @@ struct TodayView: View {
         case .today, .inProgress:
             Button(action: beginWorkout) {
                 HStack(spacing: 10) {
-                    Text(day.state == .inProgress ? "Resume Workout" : "Start Workout")
+                    Text(day.state == .inProgress ? "resume workout" : "start workout")
                     Image(systemName: "chevron.right")
                         .font(.system(size: 20, weight: .heavy))
                 }
@@ -275,13 +302,13 @@ struct TodayView: View {
             }
             .buttonStyle(.plain)
         case .done, .doneToday:
-            heroStatePill("Workout Complete", icon: "checkmark.circle.fill")
+            heroStatePill("workout complete", icon: "checkmark.circle.fill")
         case .partial:
-            heroStatePill("\(day.completedCount)/\(day.rows.count) Games Done", icon: "clock.fill")
+            heroStatePill("\(day.completedCount)/\(day.rows.count) games done", icon: "clock.fill")
         case .missed:
-            heroStatePill("No Workout Recorded", icon: "calendar.badge.exclamationmark")
+            heroStatePill("no workout recorded", icon: "calendar.badge.exclamationmark")
         case .locked:
-            heroStatePill("Unlocks \(Self.shortDateFormatter.string(from: day.date))", icon: "lock.fill")
+            heroStatePill("unlocks \(Self.shortDateFormatter.string(from: day.date))", icon: "lock.fill")
         }
     }
 
@@ -303,30 +330,30 @@ struct TodayView: View {
     private func heroTitle(for day: TodayWorkoutDay) -> String {
         switch day.state {
         case .done, .doneToday:
-            return Calendar.current.isDateInToday(day.date) ? "Nice work today" : "\(day.title) complete"
+            return Calendar.current.isDateInToday(day.date) ? "nice work today" : "\(day.title) complete"
         case .locked:
-            return "Queued for later"
+            return "queued for later"
         default:
-            return Calendar.current.isDateInToday(day.date) ? "Your focus set is ready" : "\(day.title) is ready"
+            return Calendar.current.isDateInToday(day.date) ? "your focus set is ready" : "\(day.title) is ready"
         }
     }
 
     private func heroSubtitle(for day: TodayWorkoutDay) -> String {
         switch day.state {
         case .today:
-            return "A short set built from the skills that need the most attention right now."
+            return "a short set built from the skills that need the most attention right now."
         case .inProgress:
-            return "Pick up where you left off and keep your streak moving."
+            return "pick up where you left off and keep your streak moving."
         case .doneToday:
-            return "You finished the set. Tomorrow brings a fresh mix."
+            return "you finished the set. tomorrow brings a fresh mix."
         case .done:
-            return "You completed all \(day.rows.count) games for this day."
+            return "you completed all \(day.rows.count) games for this day."
         case .partial:
-            return "You started this workout. Finish the remaining games when you're ready."
+            return "you started this workout. finish the remaining games when you're ready."
         case .missed:
-            return "No workout was recorded for this day."
+            return "no workout was recorded for this day."
         case .locked:
-            return "This workout opens on \(Self.detailDateFormatter.string(from: day.date))."
+            return "this workout opens on \(Self.detailDateFormatter.string(from: day.date))."
         }
     }
 
@@ -368,12 +395,28 @@ struct TodayView: View {
 
     private func workoutGameRow(_ row: TodayWorkoutRow, locked: Bool) -> some View {
         HStack(spacing: 14) {
-            Image(systemName: row.game.symbol)
-                .font(.system(size: 16, weight: .heavy))
-                .foregroundStyle(locked ? Color.witsFaint : row.tint)
-                .frame(width: 42, height: 42)
-                .background((locked ? Color.witsFaint : row.tint).opacity(0.14),
-                            in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            Group {
+                if locked {
+                    Image(systemName: row.game.symbol)
+                        .font(.system(size: 16, weight: .heavy))
+                        .foregroundStyle(Color.witsFaint)
+                        .frame(width: 42, height: 42)
+                        .background(Color.witsFaint.opacity(0.14),
+                                    in: RoundedRectangle(cornerRadius: WitsMetrics.chipRadius, style: .continuous))
+                } else {
+                    Image(systemName: row.game.symbol)
+                        .font(.system(size: 16, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(width: 42, height: 42)
+                        .background(
+                            LinearGradient(colors: [row.game.domain.color, row.game.domain.heroTopColor],
+                                           startPoint: .topLeading, endPoint: .bottomTrailing),
+                            in: RoundedRectangle(cornerRadius: WitsMetrics.chipRadius, style: .continuous)
+                        )
+                        .shadow(color: row.game.domain.color.opacity(0.3), radius: 5, y: 2)
+                        .saturation(row.done ? 0.35 : 1)
+                }
+            }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text(row.game.displayName)
@@ -389,12 +432,12 @@ struct TodayView: View {
 
             if let level = row.level {
                 Text("lvl \(Int(min(10, max(1, level.rounded(.down)))))")
-                    .font(.system(size: 11.5, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsAccent)
+                    .font(.witsLabel(11.5))
+                    .foregroundStyle(row.game.domain.color)
                     .monospacedDigit()
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                    .background(row.game.domain.color.opacity(0.13), in: Capsule())
             }
 
             Image(systemName: row.trailingSymbol(locked: locked))
@@ -461,9 +504,7 @@ struct TodayView: View {
             }
         } label: {
             HStack(spacing: 6) {
-                Image(systemName: "flame.fill")
-                    .font(.system(size: 14, weight: .heavy))
-                    .foregroundStyle(app.streak.current > 0 ? Color.witsWarm : Color.witsFaint)
+                StreakFlame(active: app.streak.current > 0)
                 Text("\(app.streak.current)")
                     .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsInk)
@@ -472,9 +513,10 @@ struct TodayView: View {
             .padding(.horizontal, 13)
             .padding(.vertical, 10)
             .background(Color.witsCard, in: Capsule())
+            .overlay(Capsule().strokeBorder(Color.witsLine, lineWidth: 1))
             .shadow(color: .witsShadow, radius: 8, y: 4)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressScale())
         .accessibilityLabel("training week history")
     }
 
@@ -657,10 +699,6 @@ private struct TodayWorkoutRow: Identifiable {
 
     var id: String { game.rawValue }
 
-    var tint: Color {
-        done ? Color.witsAccent : Color.witsMuted
-    }
-
     var detailText: String {
         "\(game.domain.label) · \(game.subskill)"
     }
@@ -692,7 +730,7 @@ private struct WeekTrainingPanel: View {
                     Text("training rhythm")
                         .font(.witsDisplay(22))
                         .foregroundStyle(Color.witsInk)
-                    Text("Your streak at a glance.")
+                    Text("your streak at a glance.")
                         .font(.witsBody(13, weight: .semibold))
                         .foregroundStyle(Color.witsMuted)
                 }
@@ -751,8 +789,8 @@ private struct WeekTrainingPanel: View {
 
     private var streakPrompt: String {
         currentStreak > 0
-            ? "Keep your \(currentStreak)-day streak going!"
-            : "Train every day to build your streak!"
+            ? "keep your \(currentStreak)-day streak going!"
+            : "train every day to build your streak!"
     }
 }
 
@@ -887,28 +925,67 @@ private struct TrainingProgressRing: View {
     }
 
     private var accentColor: Color {
-        state == .partial || state == .inProgress ? Color(light: 0x7C3DFF, dark: 0xA589FF) : Color.witsAccent
+        state == .partial || state == .inProgress ? Color.witsViolet : Color.witsAccent
     }
 }
 
+/// Corner artwork tinted by the day's domains, so the hero card quietly shifts
+/// with each day's lineup.
 private struct FocusCardArtwork: View {
+    var colors: [Color]
+
+    private var c1: Color { colors.first ?? .witsAccent }
+    private var c2: Color { colors.count > 1 ? colors[1] : .witsWarm }
+    private var c3: Color { colors.count > 2 ? colors[2] : c1 }
+
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .fill(Color.witsAccent.opacity(0.12))
+                .fill(c1.opacity(0.13))
                 .frame(width: 134, height: 134)
                 .rotationEffect(.degrees(16))
 
             Circle()
-                .stroke(Color.witsWarm.opacity(0.22), lineWidth: 16)
+                .stroke(c2.opacity(0.22), lineWidth: 16)
                 .frame(width: 94, height: 94)
                 .offset(x: 20, y: -18)
 
+            Circle()
+                .fill(c3.opacity(0.16))
+                .frame(width: 34, height: 34)
+                .offset(x: -48, y: 42)
+
             Image(systemName: "brain.head.profile")
                 .font(.system(size: 50, weight: .semibold))
-                .foregroundStyle(Color.witsAccent.opacity(0.2))
+                .foregroundStyle(c1.opacity(0.22))
                 .offset(x: 7, y: 3)
         }
         .frame(width: 154, height: 154)
+    }
+}
+
+/// The streak flame: gently pulses while a streak is alive.
+private struct StreakFlame: View {
+    let active: Bool
+    @State private var pulsing = false
+
+    var body: some View {
+        Image(systemName: "flame.fill")
+            .font(.system(size: 14, weight: .heavy))
+            .foregroundStyle(
+                active
+                    ? AnyShapeStyle(LinearGradient(colors: [.witsGold, .witsWarm],
+                                                   startPoint: .top, endPoint: .bottom))
+                    : AnyShapeStyle(Color.witsFaint)
+            )
+            .scaleEffect(active && pulsing ? 1.16 : 1)
+            .shadow(color: active ? Color.witsWarm.opacity(pulsing ? 0.5 : 0.15) : .clear,
+                    radius: 6)
+            .onAppear {
+                guard active else { return }
+                withAnimation(.easeInOut(duration: 1.1).repeatForever(autoreverses: true)) {
+                    pulsing = true
+                }
+            }
     }
 }

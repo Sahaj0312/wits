@@ -244,7 +244,7 @@ private struct WorkoutSummary: View {
                 .rise(0.08)
 
             HStack(spacing: 12) {
-                statCard(value: "\(totalScore)", label: "points")
+                statCard(value: "\(totalScore)", label: "points", countUp: totalScore)
                 statCard(value: "\(avgAccuracy)%", label: "accuracy")
             }
             .padding(.top, 22)
@@ -259,9 +259,9 @@ private struct WorkoutSummary: View {
                     HStack {
                         Image(systemName: r.game.symbol)
                             .font(.system(size: 15, weight: .heavy))
-                            .foregroundStyle(Color.witsAccent)
+                            .foregroundStyle(r.game.domain.color)
                             .frame(width: 34, height: 34)
-                            .background(Color.witsAccent.opacity(0.14), in: Circle())
+                            .background(r.game.domain.color.opacity(0.14), in: Circle())
                         VStack(alignment: .leading, spacing: 1) {
                             Text(r.game.displayName)
                                 .font(.system(size: 15, weight: .bold, design: .rounded))
@@ -304,6 +304,9 @@ private struct WorkoutSummary: View {
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 16)
+        .overlay {
+            ConfettiBurst().ignoresSafeArea()
+        }
     }
 
     /// "lvl 3 → 4" when the whole-number level moved this run, else "lvl 4".
@@ -314,14 +317,21 @@ private struct WorkoutSummary: View {
         return before != after ? ("lvl \(before) → \(after)", true) : ("lvl \(after)", false)
     }
 
-    private func statCard(value: String, label: String) -> some View {
+    private func statCard(value: String, label: String, countUp: Int? = nil) -> some View {
         VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 30, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsAccent)
-                .monospacedDigit()
+            if let countUp {
+                CountUpText(value: countUp,
+                            font: .system(size: 30, weight: .heavy, design: .rounded),
+                            color: .witsAccent,
+                            haptics: false)
+            } else {
+                Text(value)
+                    .font(.system(size: 30, weight: .heavy, design: .rounded))
+                    .foregroundStyle(Color.witsAccent)
+                    .monospacedDigit()
+            }
             Text(label)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .font(.witsLabel(13))
                 .foregroundStyle(Color.witsMuted)
         }
         .frame(maxWidth: .infinity)

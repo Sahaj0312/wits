@@ -97,22 +97,21 @@ struct GameCard: View {
     // MARK: Hero
 
     private var hero: some View {
-        let (a, b) = game.heroColors
-        return ZStack(alignment: .bottomLeading) {
-            LinearGradient(colors: [Color(hexAny: a), Color(hexAny: b)],
-                           startPoint: .top, endPoint: .bottom)
-            Circle().fill(Color.witsAccent.opacity(0.13)).frame(width: 230, height: 230).offset(x: 110, y: -85)
-            Circle().fill(Color.white.opacity(0.05)).frame(width: 110, height: 110).offset(x: -60, y: 20)
-            Image(systemName: game.symbol)
-                .font(.system(size: 118, weight: .heavy))
-                .foregroundStyle(.white.opacity(0.08))
-                .offset(x: 154, y: 12)
+        ZStack(alignment: .bottomLeading) {
+            GameHeroArt(game: game)
+            // legibility scrim behind the text column
+            LinearGradient(colors: [.clear, .black.opacity(0.28)],
+                           startPoint: .center, endPoint: .bottom)
             VStack(alignment: .leading, spacing: 12) {
                 Image(systemName: game.symbol)
                     .font(.system(size: 21, weight: .heavy))
                     .foregroundStyle(.white)
                     .frame(width: 48, height: 48)
-                    .background(.white.opacity(0.13), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .background(.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(.white.opacity(0.22), lineWidth: 1)
+                    )
                 VStack(alignment: .leading, spacing: 5) {
                     Text(game.displayName)
                         .font(.witsDisplay(34))
@@ -120,8 +119,8 @@ struct GameCard: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.72)
                     Text(game.tagline)
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white.opacity(0.66))
+                        .font(.witsValue(14))
+                        .foregroundStyle(.white.opacity(0.72))
                         .lineLimit(2)
                 }
             }
@@ -136,14 +135,14 @@ struct GameCard: View {
     private var breadcrumb: some View {
         HStack(spacing: 6) {
             Text(game.domainTitle.uppercased())
-                .foregroundStyle(Color.witsAccent)
+                .foregroundStyle(game.domain.color)
             Image(systemName: "chevron.right")
                 .font(.system(size: 9, weight: .heavy))
-                .foregroundStyle(Color.witsAccent.opacity(0.7))
+                .foregroundStyle(game.domain.color.opacity(0.7))
             Text(game.subskill.uppercased())
-                .foregroundStyle(Color.witsAccent)
+                .foregroundStyle(game.domain.color)
         }
-        .font(.system(size: 12, weight: .heavy, design: .rounded))
+        .font(.witsLabel(12))
         .kerning(0.6)
     }
 
@@ -166,18 +165,18 @@ struct GameCard: View {
                     .foregroundStyle(Color.witsInk)
                 Spacer(minLength: 8)
                 Text(levelProgressSummary)
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsAccent)
+                    .font(.witsValue(14))
+                    .foregroundStyle(game.domain.color)
                     .monospacedDigit()
             }
-            ProgressTrack(fraction: levelProgress, animated: false)
+            ProgressTrack(fraction: levelProgress, animated: false, tint: game.domain.color)
                 .frame(height: 8)
             HStack {
                 Text(currentLevelLabel)
                 Spacer(minLength: 8)
                 Text(nextLevelLabel)
             }
-            .font(.system(size: 12, weight: .heavy, design: .rounded))
+            .font(.witsLabel(12))
             .foregroundStyle(Color.witsMuted)
             .monospacedDigit()
             Text("your starting difficulty for this game")
@@ -200,10 +199,10 @@ struct GameCard: View {
     private func statTile(_ label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Text(label)
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .font(.witsLabel(12))
                 .foregroundStyle(Color.witsFaint)
             Text(value)
-                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .font(.witsValue(16))
                 .foregroundStyle(Color.witsInk)
                 .monospacedDigit()
                 .lineLimit(1)
@@ -239,15 +238,5 @@ struct GameCard: View {
                 .accessibilityLabel("close")
         }
         .buttonStyle(.plain)
-    }
-}
-
-private extension Color {
-    init(hexAny: UInt32) {
-        self.init(
-            red: Double((hexAny >> 16) & 0xFF) / 255,
-            green: Double((hexAny >> 8) & 0xFF) / 255,
-            blue: Double(hexAny & 0xFF) / 255
-        )
     }
 }

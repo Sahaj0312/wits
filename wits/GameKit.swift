@@ -260,32 +260,6 @@ extension GameID {
         }
     }
 
-    /// Card hero gradient (top, bottom) as hex.
-    var heroColors: (UInt32, UInt32) {
-        switch self {
-        case .arrowStorm: (0x243155, 0x141B33)
-        case .crowdControl: (0x123A33, 0x0F2A2A)
-        case .echoGrid: (0x1F2A4D, 0x141B33)
-        case .spotSpeed: (0x2A3A5E, 0x16243F)
-        case .colorClash: (0x3A2350, 0x201433)
-        case .matchBack: (0x14304D, 0x10233A)
-        case .ruleFinder: (0x243155, 0x141B33)
-        case .numberRush: (0x5E3A1E, 0x331F14)
-        case .estimator: (0x214E63, 0x132F42)
-        case .oddOneOut: (0x2E2A5E, 0x1A1840)
-        case .tileShift: (0x4A1E50, 0x2D1433)
-        case .lastSeen: (0x123A4D, 0x0F2A3A)
-        case .pathKeeper: (0x1E3A5E, 0x14243F)
-        case .wordConnect: (0x315EC8, 0x24306D)
-        case .memoryLock: (0x3A2350, 0x151C38)
-        case .dotsConnect: (0x6C0588, 0x135DB7)
-        case .oneLine: (0x8D55F6, 0x22B8EA)
-        case .towerOfHanoi: (0x224D63, 0x123447)
-        case .slidePuzzle: (0x4A3A22, 0x2B2112)
-        case .split: (0x123A33, 0x0F2A2A)
-        }
-    }
-
     /// Starting mastery/difficulty level for a brand-new player (1…10).
     var seedLevel: Double {
         switch self {

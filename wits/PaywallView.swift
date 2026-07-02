@@ -28,8 +28,15 @@ struct PaywallView: View {
             Spacer()
             VStack(spacing: 14) {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 42, weight: .heavy))
-                    .foregroundStyle(Color.witsAccent)
+                    .font(.system(size: 30, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 72, height: 72)
+                    .background(
+                        LinearGradient(colors: [.witsAccent, .witsSky],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+                    )
+                    .shadow(color: Color.witsAccent.opacity(0.4), radius: 12, y: 6)
                 Text("wits premium")
                     .font(.witsDisplay(30))
                     .foregroundStyle(Color.witsInk)
@@ -40,7 +47,7 @@ struct PaywallView: View {
             }
             .padding(28)
             .frame(maxWidth: .infinity)
-            .cardSurface()
+            .cardSurface(radius: WitsMetrics.panelRadius, elevation: .hero)
             Spacer()
             Cta(title: "continue") { dismiss() }
         }

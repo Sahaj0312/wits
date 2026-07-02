@@ -66,6 +66,16 @@ final class GameFeel {
         synth.stop()
     }
 
+    /// Light haptic for UI moments outside gameplay (count-ups, reveals).
+    func uiTick(_ intensity: CGFloat = 0.5) {
+        haptics.impact(.light, intensity: intensity)
+    }
+
+    /// Success haptic for UI celebrations (haptic-only; no synth dependency).
+    func uiSuccess() {
+        haptics.notify(.success)
+    }
+
     func play(_ e: FeelEvent) {
         switch e {
         case .correct(let combo):

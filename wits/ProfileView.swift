@@ -45,7 +45,7 @@ struct ProfileView: View {
     }
 
     private var reminderStatusLabel: String {
-        reminderEnabled ? "On · \(reminderLabel)" : "Off"
+        reminderEnabled ? "on · \(reminderLabel)" : "off"
     }
 
     private var goalsLabel: String {
@@ -75,68 +75,68 @@ struct ProfileView: View {
                 settingsSection("settings") {
                     Button { showReminder = true } label: {
                         settingsValueRow(icon: "bell.fill",
-                                         tint: Color(light: 0x24A8FF, dark: 0x24A8FF),
-                                         title: "Daily Reminder",
+                                         tint: .witsSky,
+                                         title: "daily reminder",
                                          value: reminderStatusLabel,
                                          showsChevron: true)
                     }
                     .buttonStyle(.plain)
                     settingsDivider
                     settingsToggleRow(icon: "speaker.wave.2.fill",
-                                      tint: Color(light: 0x5B5CFF, dark: 0x7A78FF),
-                                      title: "Sound Effects",
+                                      tint: .witsViolet,
+                                      title: "sound effects",
                                       isOn: $soundEffectsEnabled)
                     settingsDivider
                     settingsToggleRow(icon: "hand.tap.fill",
-                                      tint: Color.witsWarm,
-                                      title: "Haptics",
+                                      tint: .witsWarm,
+                                      title: "haptics",
                                       isOn: $hapticsEnabled)
                 }
 
                 settingsSection("training") {
                     settingsValueRow(icon: "calendar.badge.clock",
-                                     tint: Color.witsAccent,
-                                     title: "Weekly Target",
+                                     tint: .witsAccent,
+                                     title: "weekly target",
                                      value: "\(app.profile.trainingDays) days")
                     settingsDivider
                     settingsValueRow(icon: "target",
-                                     tint: Color(light: 0x24A8FF, dark: 0x24A8FF),
-                                     title: "Goals",
+                                     tint: .witsSky,
+                                     title: "goals",
                                      value: goalsLabel)
                     settingsDivider
                     settingsValueRow(icon: "slider.horizontal.3",
-                                     tint: Color(light: 0x5B5CFF, dark: 0x7A78FF),
-                                     title: "Difficulty",
+                                     tint: .witsViolet,
+                                     title: "difficulty",
                                      value: difficultyLabel)
                     settingsDivider
                     settingsValueRow(icon: "quote.bubble.fill",
-                                     tint: Color(light: 0xD950C9, dark: 0xD950C9),
-                                     title: "Encouragement",
+                                     tint: .witsPink,
+                                     title: "encouragement",
                                      value: encouragementLabel)
                     settingsDivider
                     settingsValueRow(icon: "figure.run",
-                                     tint: Color.witsWarm,
-                                     title: "Routine",
+                                     tint: .witsWarm,
+                                     title: "routine",
                                      value: routineLabel)
                 }
 
                 settingsSection("wits") {
                     settingsValueRow(icon: "person.fill",
-                                     tint: Color.witsAccent,
-                                     title: "Account",
+                                     tint: .witsAccent,
+                                     title: "account",
                                      value: accountStatus)
                     settingsDivider
                     settingsValueRow(icon: "creditcard.fill",
-                                     tint: Color.witsWarm,
-                                     title: "Plan",
+                                     tint: .witsGold,
+                                     title: "plan",
                                      value: entitlementLabel)
                     settingsDivider
                     Button {
                         hasCompletedOnboarding = false
                     } label: {
                         settingsValueRow(icon: "arrow.clockwise",
-                                         tint: Color(light: 0x5B5CFF, dark: 0x7A78FF),
-                                         title: "Replay Onboarding",
+                                         tint: .witsViolet,
+                                         title: "replay onboarding",
                                          value: "",
                                          showsChevron: true)
                     }
@@ -150,19 +150,19 @@ struct ProfileView: View {
                         hasCompletedOnboarding = false
                     } label: {
                         settingsValueRow(icon: "rectangle.portrait.and.arrow.right",
-                                         tint: Color.witsWarm,
-                                         title: "Sign Out",
+                                         tint: .witsWarm,
+                                         title: "sign out",
                                          value: "")
                     }
                     .buttonStyle(.plain)
                 }
 
-                Text("You're using \(entitlementLabel).")
-                    .font(.system(size: 17, weight: .medium, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
+                Text("you're using \(entitlementLabel).")
+                    .font(.witsBody(14))
+                    .foregroundStyle(Color.witsFaint)
                     .frame(maxWidth: .infinity)
                     .padding(.top, 28)
-                    .padding(.bottom, 124)
+                    .padding(.bottom, 60)
             }
         }
         .background(Color.witsBg.ignoresSafeArea())
@@ -183,7 +183,7 @@ struct ProfileView: View {
     private var pageHeader: some View {
         VStack(alignment: .leading, spacing: 2) {
             WitsBrandMark()
-            Text("Hi \(displayName)")
+            Text("hi \(displayName)")
                 .font(.witsDisplay(30))
                 .foregroundStyle(Color.witsInk)
                 .lineLimit(1)
@@ -199,42 +199,45 @@ struct ProfileView: View {
                                                 @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
-                .font(.system(size: 18, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsInk)
+                .font(.witsLabel(12.5))
+                .foregroundStyle(Color.witsFaint)
                 .textCase(.uppercase)
-                .padding(.horizontal, 30)
-                .padding(.top, 26)
-                .padding(.bottom, 14)
+                .kerning(0.8)
+                .padding(.horizontal, WitsMetrics.screenPadding + 16)
+                .padding(.top, 24)
+                .padding(.bottom, 10)
 
             VStack(spacing: 0) {
                 content()
             }
-            .background(Color.witsCard)
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(Color.witsLine)
-                    .frame(height: 1)
-            }
-            .overlay(alignment: .bottom) {
-                Rectangle()
-                    .fill(Color.witsLine)
-                    .frame(height: 1)
-            }
+            .cardSurface(radius: WitsMetrics.panelRadius)
+            .padding(.horizontal, WitsMetrics.screenPadding)
         }
+    }
+
+    private func settingsIcon(_ icon: String, tint: Color, dimmed: Bool = false) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: 14, weight: .bold))
+            .foregroundStyle(.white)
+            .frame(width: 30, height: 30)
+            .background(
+                dimmed
+                    ? AnyShapeStyle(Color.witsFaint)
+                    : AnyShapeStyle(LinearGradient(colors: [tint.opacity(0.85), tint],
+                                                   startPoint: .top, endPoint: .bottom)),
+                in: RoundedRectangle(cornerRadius: 8, style: .continuous)
+            )
     }
 
     private func settingsToggleRow(icon: String,
                                    tint: Color,
                                    title: String,
                                    isOn: Binding<Bool>) -> some View {
-        HStack(spacing: 18) {
-            Image(systemName: icon)
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(tint)
-                .frame(width: 38, height: 38)
+        HStack(spacing: 14) {
+            settingsIcon(icon, tint: tint)
 
             Text(title)
-                .font(.system(size: 22, weight: .medium, design: .rounded))
+                .font(.system(size: 16.5, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color.witsInk)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -246,8 +249,8 @@ struct ProfileView: View {
                 .labelsHidden()
                 .tint(Color.witsAccent)
         }
-        .padding(.horizontal, 30)
-        .frame(minHeight: 74)
+        .padding(.horizontal, 16)
+        .frame(minHeight: 56)
         .contentShape(Rectangle())
     }
 
@@ -257,41 +260,36 @@ struct ProfileView: View {
                                   value: String,
                                   isDimmed: Bool = false,
                                   showsChevron: Bool = false) -> some View {
-        HStack(alignment: .center, spacing: 18) {
-            Image(systemName: icon)
-                .font(.system(size: 22, weight: .medium))
-                .foregroundStyle(isDimmed ? Color.witsFaint : tint)
-                .frame(width: 38, height: 38)
+        HStack(alignment: .center, spacing: 14) {
+            settingsIcon(icon, tint: tint, dimmed: isDimmed)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.system(size: 22, weight: .medium, design: .rounded))
-                    .foregroundStyle(isDimmed ? Color.witsFaint : Color.witsInk)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.76)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if !value.isEmpty {
-                    Text(value)
-                        .font(.system(size: 16.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(isDimmed ? Color.witsFaint : Color.witsAccent)
-                        .lineLimit(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .layoutPriority(1)
+            Text(title)
+                .font(.system(size: 16.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(isDimmed ? Color.witsFaint : Color.witsInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
+                .layoutPriority(1)
 
             Spacer(minLength: 8)
 
+            if !value.isEmpty {
+                Text(value)
+                    .font(.system(size: 14.5, weight: .semibold, design: .rounded))
+                    .foregroundStyle(isDimmed ? Color.witsFaint : Color.witsMuted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .multilineTextAlignment(.trailing)
+            }
+
             if showsChevron {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Color.witsFaint)
             }
         }
-        .padding(.horizontal, 30)
-        .padding(.vertical, 12)
-        .frame(minHeight: 78)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(minHeight: 56)
         .contentShape(Rectangle())
     }
 
@@ -299,7 +297,7 @@ struct ProfileView: View {
         Rectangle()
             .fill(Color.witsLine)
             .frame(height: 1)
-            .padding(.leading, 86)
+            .padding(.leading, 60)
     }
 
     private func syncGameFeelSettings() {

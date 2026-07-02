@@ -61,11 +61,20 @@ struct LeaderboardPanel: View {
         .animation(.easeOut(duration: 0.2), value: snapshot)
     }
 
+    private func rankColor(_ rank: Int, highlighted: Bool) -> Color {
+        switch rank {
+        case 1: .witsGold
+        case 2: .witsSky
+        case 3: .witsWarm
+        default: highlighted ? .witsAccent : .witsFaint
+        }
+    }
+
     private func row(rank: Int, name: String, score: Int, highlighted: Bool) -> some View {
         HStack(spacing: 10) {
             Text("#\(rank)")
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
-                .foregroundStyle(highlighted ? Color.witsAccent : Color.witsFaint)
+                .foregroundStyle(rankColor(rank, highlighted: highlighted))
                 .monospacedDigit()
                 .frame(width: 36, alignment: .leading)
             Text(name)

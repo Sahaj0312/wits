@@ -38,16 +38,94 @@ extension Color {
     static let witsLine = Color(light: 0x1C2740, dark: 0xEDF0F8, lightAlpha: 0.10, darkAlpha: 0.13)
     static let witsTint = Color(light: 0x1C2740, dark: 0xEDF0F8, lightAlpha: 0.045, darkAlpha: 0.06)
     static let witsShadow = Color(light: 0x1C2740, dark: 0x000000, lightAlpha: 0.07, darkAlpha: 0.22)
-    static let witsAccent = Color(light: 0x17B3A3, dark: 0x17B3A3)
-    static let witsWarm = Color(light: 0xF0795F, dark: 0xF0795F)
+    static let witsAccent = Color(light: 0x17B3A3, dark: 0x1BC7B5)
+    static let witsWarm = Color(light: 0xF0795F, dark: 0xFF8A70)
+
+    // Extended palette — every non-domain tint in the app comes from here,
+    // never from ad-hoc hex values inside views.
+    static let witsSky = Color(light: 0x0E9BD8, dark: 0x38C4F2)
+    static let witsViolet = Color(light: 0x7C5CF0, dark: 0xA78BFA)
+    static let witsPink = Color(light: 0xE0489A, dark: 0xF472B6)
+    static let witsGold = Color(light: 0xE8930C, dark: 0xFFB03B)
+}
+
+// MARK: - Domain colors
+//
+// Each cognitive domain owns a color; teal stays reserved for brand + CTAs.
+// Applied to library cards, workout rows, heroes, charts, and chips so the
+// domain a game trains is legible at a glance everywhere in the app.
+
+extension CognitiveDomain {
+    var color: Color {
+        switch self {
+        case .focus: .witsGold
+        case .multitasking: .witsSky
+        case .memory: .witsViolet
+        case .flexibility: .witsPink
+        case .reasoning: Color(light: 0x3D6DE8, dark: 0x6E96FA)
+        case .math: .witsWarm
+        case .language: Color(light: 0x2FA45C, dark: 0x53CF82)
+        }
+    }
+
+    /// Deep variant used as the dark end of hero gradients (same hue family,
+    /// pulled toward the app's navy so heroes feel like one system).
+    var deepColor: Color {
+        switch self {
+        case .focus: Color(hexAny: 0x4A3208)
+        case .multitasking: Color(hexAny: 0x0A3A52)
+        case .memory: Color(hexAny: 0x2C2058)
+        case .flexibility: Color(hexAny: 0x4A1638)
+        case .reasoning: Color(hexAny: 0x16295E)
+        case .math: Color(hexAny: 0x4E2016)
+        case .language: Color(hexAny: 0x0F3A22)
+        }
+    }
+
+    /// Mid variant for the top of hero gradients.
+    var heroTopColor: Color {
+        switch self {
+        case .focus: Color(hexAny: 0x8A5E10)
+        case .multitasking: Color(hexAny: 0x0E5E80)
+        case .memory: Color(hexAny: 0x4A3894)
+        case .flexibility: Color(hexAny: 0x7E2760)
+        case .reasoning: Color(hexAny: 0x2547A0)
+        case .math: Color(hexAny: 0x8A3A28)
+        case .language: Color(hexAny: 0x1B6238)
+        }
+    }
+}
+
+extension Color {
+    /// Fixed (non-adaptive) color from hex — used where art must read the same
+    /// in light and dark mode, e.g. hero gradients.
+    init(hexAny: UInt32) {
+        self.init(
+            red: Double((hexAny >> 16) & 0xFF) / 255,
+            green: Double((hexAny >> 8) & 0xFF) / 255,
+            blue: Double(hexAny & 0xFF) / 255
+        )
+    }
 }
 
 // MARK: - Type
 
 extension Font {
-    /// Heavy display type (design uses Plus Jakarta Sans 800; SF rounded heavy is the native stand-in).
+    /// Heavy display type — reserved for screen titles and hero headlines only.
     static func witsDisplay(_ size: CGFloat) -> Font {
         .system(size: size, weight: .heavy, design: .rounded)
+    }
+    /// Section headings and emphasized rows.
+    static func witsHeading(_ size: CGFloat = 17) -> Font {
+        .system(size: size, weight: .bold, design: .rounded)
+    }
+    /// Stat values, badges, buttons — semibold, not heavy.
+    static func witsValue(_ size: CGFloat = 16) -> Font {
+        .system(size: size, weight: .semibold, design: .rounded)
+    }
+    /// Small caps-style labels above values.
+    static func witsLabel(_ size: CGFloat = 12) -> Font {
+        .system(size: size, weight: .semibold, design: .rounded)
     }
     static func witsBody(_ size: CGFloat = 16, weight: Font.Weight = .medium) -> Font {
         .system(size: size, weight: weight, design: .rounded)
@@ -55,7 +133,11 @@ extension Font {
 }
 
 enum WitsMetrics {
+    /// Radius scale: chip 12, card 16, panel 20, hero 28. Nothing else.
+    static let chipRadius: CGFloat = 12
     static let radius: CGFloat = 16
+    static let panelRadius: CGFloat = 20
+    static let heroRadius: CGFloat = 28
     static let screenPadding: CGFloat = 24
 }
 
@@ -83,9 +165,38 @@ extension View {
         modifier(RiseIn(delay: delay))
     }
 
-    func cardSurface(radius: CGFloat = WitsMetrics.radius) -> some View {
-        background(Color.witsCard, in: RoundedRectangle(cornerRadius: radius, style: .continuous))
-            .shadow(color: .witsShadow, radius: 10, y: 6)
+    /// Three-tier elevation so shadows carry meaning: `.flat` for quiet inline
+    /// blocks, `.raised` for standard cards, `.hero` for the one primary card
+    /// on a screen.
+    func cardSurface(radius: CGFloat = WitsMetrics.radius,
+                     elevation: WitsElevation = .raised) -> some View {
+        modifier(CardSurface(radius: radius, elevation: elevation))
+    }
+}
+
+enum WitsElevation { case flat, raised, hero }
+
+private struct CardSurface: ViewModifier {
+    let radius: CGFloat
+    let elevation: WitsElevation
+
+    func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        switch elevation {
+        case .flat:
+            content
+                .background(Color.witsTint, in: shape)
+        case .raised:
+            content
+                .background(Color.witsCard, in: shape)
+                .overlay(shape.strokeBorder(Color.witsLine, lineWidth: 1))
+                .shadow(color: .witsShadow, radius: 8, y: 4)
+        case .hero:
+            content
+                .background(Color.witsCard, in: shape)
+                .overlay(shape.strokeBorder(Color.witsLine, lineWidth: 1))
+                .shadow(color: .witsShadow, radius: 18, y: 10)
+        }
     }
 }
 
@@ -133,17 +244,18 @@ struct WitsBrandMark: View {
 
 // MARK: - CTA
 
-private struct PressScale: ButtonStyle {
+struct PressScale: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.spring(response: 0.28, dampingFraction: 0.6), value: configuration.isPressed)
     }
 }
 
 struct Cta: View {
     var title: String
     var dimmed = false
+    var tint: Color = .witsAccent
     var action: () -> Void
 
     var body: some View {
@@ -153,10 +265,17 @@ struct Cta: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 17)
-                .background(Color.witsAccent, in: Capsule())
+                .background(
+                    LinearGradient(colors: [tint.opacity(0.92), tint],
+                                   startPoint: .top, endPoint: .bottom),
+                    in: Capsule()
+                )
+                .overlay(
+                    Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1)
+                )
         }
         .buttonStyle(PressScale())
-        .shadow(color: .witsAccent.opacity(dimmed ? 0 : 0.35), radius: 9, y: 6)
+        .shadow(color: tint.opacity(dimmed ? 0 : 0.35), radius: 9, y: 6)
         .opacity(dimmed ? 0.4 : 1)
         .animation(.easeOut(duration: 0.2), value: dimmed)
     }
@@ -181,13 +300,14 @@ struct QuietButton: View {
 struct ProgressTrack: View {
     var fraction: Double
     var animated = true
+    var tint: Color = .witsAccent
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.witsLine)
                 Capsule()
-                    .fill(Color.witsAccent)
+                    .fill(tint)
                     .frame(width: max(0, geo.size.width * fraction))
             }
         }

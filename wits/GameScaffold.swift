@@ -184,9 +184,14 @@ struct FirstPlayTutorial: View {
             }
             GameTopTag(text: "first play tutorial")
                 .padding(.bottom, 18)
-            HeroPanel {
+            ZStack {
+                GameHeroArt(game: game, patternOpacity: 0.45)
                 GameTutorialHero(game: game)
             }
+            .frame(height: 195)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous))
+            .shadow(color: .witsShadow, radius: 10, y: 6)
             ScrollView(showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("how to play \(game.displayName)")
@@ -199,7 +204,9 @@ struct FirstPlayTutorial: View {
                         .rise(0.14)
                     VStack(spacing: 10) {
                         ForEach(game.tutorialSteps.indices, id: \.self) { index in
-                            TutorialStepRow(number: index + 1, text: game.tutorialSteps[index])
+                            TutorialStepRow(number: index + 1,
+                                            text: game.tutorialSteps[index],
+                                            tint: game.domain.color)
                         }
                     }
                     .padding(.top, 2)
@@ -262,14 +269,15 @@ private struct GameTutorialHero: View {
 private struct TutorialStepRow: View {
     let number: Int
     let text: String
+    var tint: Color = .witsAccent
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsAccent)
+                .foregroundStyle(tint)
                 .frame(width: 28, height: 28)
-                .background(Color.witsAccent.opacity(0.14), in: Circle())
+                .background(tint.opacity(0.14), in: Circle())
             Text(text)
                 .font(.witsBody(15, weight: .semibold))
                 .foregroundStyle(Color.witsInk)

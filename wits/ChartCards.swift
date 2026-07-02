@@ -12,6 +12,7 @@ import Charts
 /// A bare score-over-time line (no card chrome) — shown when a metric bar expands.
 struct TrendLine: View {
     let points: [SeriesPoint]
+    var tint: Color = .witsAccent
 
     private var yDomain: ClosedRange<Double> {
         let vs = points.map(\.value)
@@ -25,15 +26,15 @@ struct TrendLine: View {
             AreaMark(x: .value("day", p.day), y: .value("score", p.value))
                 .interpolationMethod(.catmullRom)
                 .foregroundStyle(
-                    LinearGradient(colors: [Color.witsAccent.opacity(0.22), Color.witsAccent.opacity(0.01)],
+                    LinearGradient(colors: [tint.opacity(0.22), tint.opacity(0.01)],
                                    startPoint: .top, endPoint: .bottom)
                 )
             LineMark(x: .value("day", p.day), y: .value("score", p.value))
                 .interpolationMethod(.catmullRom)
                 .lineStyle(StrokeStyle(lineWidth: 3))
-                .foregroundStyle(Color.witsAccent)
+                .foregroundStyle(tint)
             PointMark(x: .value("day", p.day), y: .value("score", p.value))
-                .foregroundStyle(Color.witsAccent)
+                .foregroundStyle(tint)
                 .symbolSize(points.count <= 8 ? 36 : 0)
         }
         .chartYScale(domain: yDomain)
@@ -59,20 +60,26 @@ struct MetricBar: View {
     let value: Double            // 0...5000 current WPI
     let series: [SeriesPoint]
     var emphasized = false       // the overall WPI bar
+    var tint: Color = .witsAccent
 
     var body: some View {
         NavigationLink {
-            MetricDetailView(title: label, value: value, series: series)
+            MetricDetailView(title: label, value: value, series: series, tint: tint)
         } label: {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 8) {
+                    if !emphasized {
+                        Circle()
+                            .fill(tint)
+                            .frame(width: 8, height: 8)
+                    }
                     Text(label)
                         .font(.system(size: emphasized ? 15.5 : 14, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.witsInk)
                     Spacer()
                     Text("\(Int(value))")
-                        .font(.system(size: emphasized ? 17 : 15, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
+                        .font(.witsValue(emphasized ? 17 : 15))
+                        .foregroundStyle(tint)
                         .monospacedDigit()
                     Image(systemName: "chevron.right")
                         .font(.system(size: 11, weight: .heavy))
@@ -81,7 +88,11 @@ struct MetricBar: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.witsLine)
-                        Capsule().fill(Color.witsAccent)
+                        Capsule()
+                            .fill(
+                                LinearGradient(colors: [tint.opacity(0.75), tint],
+                                               startPoint: .leading, endPoint: .trailing)
+                            )
                             .frame(width: max(6, geo.size.width * max(0, min(1, value / ProgressMath.maxScore))))
                     }
                 }
@@ -91,7 +102,7 @@ struct MetricBar: View {
             .frame(maxWidth: .infinity)
             .overlay(
                 RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-                    .strokeBorder(emphasized ? Color.witsAccent.opacity(0.5) : .clear, lineWidth: 1.5)
+                    .strokeBorder(emphasized ? tint.opacity(0.5) : .clear, lineWidth: 1.5)
             )
             .cardSurface()
         }
@@ -104,6 +115,7 @@ struct MetricDetailView: View {
     let title: String
     let value: Double
     let series: [SeriesPoint]
+    var tint: Color = .witsAccent
 
     private var best: Double? { series.map(\.value).max() }
     private var avg: Double? {
@@ -128,7 +140,7 @@ struct MetricDetailView: View {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text("\(Int(value))")
                         .font(.system(size: 56, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
+                        .foregroundStyle(tint)
                         .monospacedDigit()
                     Text("/ 5000")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
@@ -139,7 +151,7 @@ struct MetricDetailView: View {
                     .font(.witsBody(15, weight: .bold))
                     .foregroundStyle(Color.witsMuted)
                 if series.count >= 2 {
-                    TrendLine(points: series)
+                    TrendLine(points: series, tint: tint)
                         .padding(16)
                         .frame(maxWidth: .infinity)
                         .background(Color.witsCard, in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
@@ -172,11 +184,11 @@ struct MetricDetailView: View {
     private func stat(_ value: String, _ label: String) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(size: 22, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsAccent)
+                .font(.witsValue(22))
+                .foregroundStyle(tint)
                 .monospacedDigit()
             Text(label)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .font(.witsLabel(12))
                 .foregroundStyle(Color.witsMuted)
         }
         .frame(maxWidth: .infinity)
@@ -223,19 +235,22 @@ struct DomainRadarChart: View {
                 if i == 0 { dp.move(to: q) } else { dp.addLine(to: q) }
             }
             dp.closeSubpath()
-            ctx.fill(dp, with: .color(.witsAccent.opacity(0.22)))
+            ctx.fill(dp, with: .color(.witsAccent.opacity(0.20)))
             ctx.stroke(dp, with: .color(.witsAccent), lineWidth: 2)
+            // domain-colored vertices
             for i in 0..<n {
                 let q = pt(i, max(0.03, vals[i]))
-                ctx.fill(Path(ellipseIn: CGRect(x: q.x - 3, y: q.y - 3, width: 6, height: 6)),
-                         with: .color(.witsAccent))
+                ctx.fill(Path(ellipseIn: CGRect(x: q.x - 4, y: q.y - 4, width: 8, height: 8)),
+                         with: .color(domains[i].color))
+                ctx.stroke(Path(ellipseIn: CGRect(x: q.x - 4, y: q.y - 4, width: 8, height: 8)),
+                           with: .color(.witsCard), lineWidth: 1.5)
             }
-            // axis labels
+            // axis labels in each domain's color
             for i in 0..<n {
                 let q = pt(i, 1.16)
                 ctx.draw(Text(domains[i].label)
                     .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.witsMuted), at: q, anchor: .center)
+                    .foregroundStyle(domains[i].color), at: q, anchor: .center)
             }
         }
         .frame(height: 250)
