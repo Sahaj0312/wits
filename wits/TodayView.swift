@@ -263,9 +263,11 @@ struct TodayView: View {
         return day.rows.map(\.game.domain).filter { seen.insert($0).inserted }
     }
 
-    /// Small colored capsules naming what today trains.
+    /// Small colored capsules naming what today trains. Laid out with
+    /// FlowLayout so chips wrap to new rows on narrow screens instead of
+    /// compressing and breaking labels mid-word.
     private func domainChips(_ day: TodayWorkoutDay) -> some View {
-        HStack(spacing: 6) {
+        FlowLayout(spacing: 6) {
             ForEach(dayDomains(day)) { domain in
                 HStack(spacing: 5) {
                     Circle()
@@ -274,12 +276,15 @@ struct TodayView: View {
                     Text(domain.label)
                         .font(.witsLabel(11))
                         .foregroundStyle(domain.color)
+                        .lineLimit(1)
+                        .fixedSize()
                 }
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(domain.color.opacity(0.12), in: Capsule())
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder

@@ -144,6 +144,8 @@ struct GameCard: View {
         }
         .font(.witsLabel(12))
         .kerning(0.6)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
     }
 
     // MARK: Stats
