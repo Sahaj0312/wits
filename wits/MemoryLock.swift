@@ -78,9 +78,7 @@ struct MemoryLockScreen: View {
 
     var body: some View {
         GeometryReader { geo in
-            let safeTop = geo.safeAreaInsets.top
-            let safeBottom = geo.safeAreaInsets.bottom
-            let availableHeight = geo.size.height - safeTop - safeBottom
+            let availableHeight = geo.size.height
             let cramped = availableHeight < 620
             let compact = availableHeight < 790
             VStack(spacing: 0) {
@@ -106,8 +104,8 @@ struct MemoryLockScreen: View {
                     .padding(.horizontal, compact ? 8 : 10)
                     .frame(maxWidth: 720)
             }
-            .padding(.top, safeTop + (cfg.isSurvival ? 6 : 4))
-            .padding(.bottom, safeBottom + (compact ? 8 : 10))
+            .padding(.top, cfg.isSurvival ? 6 : 4)
+            .padding(.bottom, compact ? 8 : 10)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .background(Color.witsBg.ignoresSafeArea())

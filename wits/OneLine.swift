@@ -216,7 +216,7 @@ struct OneLineScreen: View {
         GeometryReader { geo in
             let width = geo.size.width
             let boardWidth = min(width - 28, 520)
-            let availableHeight = max(300, geo.size.height - geo.safeAreaInsets.top - geo.safeAreaInsets.bottom - 230)
+            let availableHeight = max(300, geo.size.height - 230)
             let boardHeight = min(availableHeight, boardWidth * 1.10)
             let controlInset = max(18, min(42, width * 0.09))
             let controlSize = min(72, max(56, (width - controlInset * 2 - 56) / 3))
@@ -226,7 +226,7 @@ struct OneLineScreen: View {
                 VStack(spacing: 0) {
                     header
                         .padding(.horizontal, WitsMetrics.screenPadding)
-                        .padding(.top, geo.safeAreaInsets.top + 14)
+                        .padding(.top, 14)
 
                     Spacer(minLength: 12)
 
@@ -238,7 +238,7 @@ struct OneLineScreen: View {
 
                     controlBar(buttonSize: controlSize)
                         .padding(.horizontal, controlInset)
-                        .padding(.bottom, geo.safeAreaInsets.bottom + 16)
+                        .padding(.bottom, 16)
                 }
             }
         }

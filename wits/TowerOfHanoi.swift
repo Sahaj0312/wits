@@ -81,7 +81,7 @@ struct TowerOfHanoiScreen: View {
                 background
                 VStack(spacing: 0) {
                     topBar
-                        .padding(.top, geo.safeAreaInsets.top + 8)
+                        .padding(.top, 8)
                         .padding(.horizontal, WitsMetrics.screenPadding)
 
                     Spacer(minLength: 24)
@@ -118,7 +118,7 @@ struct TowerOfHanoiScreen: View {
                     if !cfg.isSurvival {
                         progressStrip
                             .padding(.horizontal, WitsMetrics.screenPadding)
-                            .padding(.bottom, geo.safeAreaInsets.bottom + 12)
+                            .padding(.bottom, 12)
                     }
                 }
                 HanoiSkyline()
@@ -133,15 +133,7 @@ struct TowerOfHanoiScreen: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: [
-                Color(light: 0x24536A, dark: 0x16384A),
-                Color(light: 0x1A465D, dark: 0x102E41)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        GameStageBackground(game: .towerOfHanoi)
     }
 
     private var topBar: some View {

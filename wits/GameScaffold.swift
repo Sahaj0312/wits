@@ -14,6 +14,36 @@ enum GamePhase {
     case intro, tutorial, ready, playing
 }
 
+/// Full-bleed stage painted behind a running game. Hosts draw this edge-to-edge
+/// (through both safe areas) so a game's surface color never bands at the top
+/// or bottom of the screen, no matter how the playfield itself is inset.
+struct GameStageBackground: View {
+    let game: GameID
+
+    var body: some View {
+        switch game {
+        case .wordConnect:
+            WordConnectSafeAreaBackground()
+        case .dotsConnect:
+            DotsConnectSafeAreaBackground()
+        case .oneLine:
+            OneLineSafeAreaBackground()
+        case .slidePuzzle:
+            LinearGradient(colors: [Color(light: 0x4A3A22, dark: 0x33270F),
+                                    Color(light: 0x392C18, dark: 0x261C0B)],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+        case .towerOfHanoi:
+            LinearGradient(colors: [Color(light: 0x24536A, dark: 0x16384A),
+                                    Color(light: 0x1A465D, dark: 0x102E41)],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+        default:
+            Color.witsBg.ignoresSafeArea()
+        }
+    }
+}
+
 struct GameTopTag: View {
     var text: String
     var body: some View {

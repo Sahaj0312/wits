@@ -129,8 +129,8 @@ struct DotsConnectScreen: View {
                     hintRow
                 }
                 .padding(.horizontal, WitsMetrics.screenPadding)
-                .padding(.top, geo.safeAreaInsets.top + 8)
-                .padding(.bottom, geo.safeAreaInsets.bottom + 12)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
             }
         }
         .onAppear { resetPaths() }

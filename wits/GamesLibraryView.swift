@@ -236,17 +236,11 @@ private struct GameLauncher: View {
                     onQuit: { dismiss() }
                 )
             } else {
-                GeometryReader { geo in
+                GeometryReader { _ in
                     ZStack {
-                        if game == .wordConnect {
-                            WordConnectSafeAreaBackground()
-                        } else if game == .dotsConnect {
-                            DotsConnectSafeAreaBackground()
-                        } else if game == .oneLine {
-                            OneLineSafeAreaBackground()
-                        } else {
-                            Color.witsBg.ignoresSafeArea()
-                        }
+                        // Full-bleed stage matching the game's surface, so no
+                        // app-background band shows in the safe areas.
+                        GameStageBackground(game: game)
                         makeGameView(game, config: .standard(game,
                                                              difficulty: app.difficultyFor(game),
                                                              freePlay: true,
@@ -261,8 +255,11 @@ private struct GameLauncher: View {
                         }
                         .id(attempt)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.top, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.top, 8))
-                        .padding(.bottom, game.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.bottom, 8))
+                        // Content already sits inside the safe area; the top
+                        // padding is a strip for the floating pause button,
+                        // not another safe-area inset.
+                        .padding(.top, game.ownsSafeAreaSurface ? 0 : 36)
+                        .padding(.bottom, game.ownsSafeAreaSurface ? 0 : 8)
                         .allowsHitTesting(!pauseController.isPaused)
                         .clipped()
                     }

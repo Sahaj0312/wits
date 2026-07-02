@@ -57,7 +57,7 @@ struct SlidePuzzleScreen: View {
                 background
                 VStack(spacing: 0) {
                     topBar
-                        .padding(.top, geo.safeAreaInsets.top + 8)
+                        .padding(.top, 8)
                         .padding(.horizontal, WitsMetrics.screenPadding)
 
                     Spacer(minLength: 24)
@@ -91,7 +91,7 @@ struct SlidePuzzleScreen: View {
 
                     progressStrip
                         .padding(.horizontal, WitsMetrics.screenPadding)
-                        .padding(.bottom, geo.safeAreaInsets.bottom + 12)
+                        .padding(.bottom, 12)
                 }
             }
         }
@@ -101,15 +101,7 @@ struct SlidePuzzleScreen: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: [
-                Color(light: 0x4A3A22, dark: 0x33270F),
-                Color(light: 0x392C18, dark: 0x261C0B)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        GameStageBackground(game: .slidePuzzle)
     }
 
     private var topBar: some View {

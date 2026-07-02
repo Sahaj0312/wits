@@ -49,15 +49,24 @@ struct GameHost: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
+        GeometryReader { _ in
             ZStack {
-                Color.witsBg.ignoresSafeArea()
+                // Full-bleed stage matching the running game's surface, so no
+                // app-background band shows in the safe areas during play.
+                if stage == .playing, let game = currentGame {
+                    GameStageBackground(game: game)
+                } else {
+                    Color.witsBg.ignoresSafeArea()
+                }
                 content
                     .id(stageKey)
                     .transition(.opacity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, stage == .playing && currentGame?.ownsSafeAreaSurface != true ? max(geo.safeAreaInsets.top, 8) : 0)
-                    .padding(.bottom, stage == .playing && currentGame?.ownsSafeAreaSurface != true ? max(geo.safeAreaInsets.bottom, 8) : 0)
+                    // Content is already laid out inside the safe area, so the
+                    // top padding is only a strip for the floating pause button
+                    // — not another safe-area inset.
+                    .padding(.top, stage == .playing && currentGame?.ownsSafeAreaSurface != true ? 36 : 0)
+                    .padding(.bottom, stage == .playing && currentGame?.ownsSafeAreaSurface != true ? 8 : 0)
                     .allowsHitTesting(!pauseController.isPaused)
                     .clipped()
             }

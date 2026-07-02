@@ -339,8 +339,8 @@ struct WordConnectScreen: View {
                                      bonusVisible: !foundBonus.isEmpty,
                                      hasTopBar: !cfg.isSurvival,
                                      idealBoardHeight: targetBoardIdealHeight,
-                                     topSafeInset: geo.safeAreaInsets.top,
-                                     bottomSafeInset: geo.safeAreaInsets.bottom)
+                                     topSafeInset: 0,
+                                     bottomSafeInset: 0)
             ZStack {
                 background.ignoresSafeArea()
                 VStack(spacing: layout.spacing) {

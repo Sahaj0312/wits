@@ -47,21 +47,13 @@ struct DebugGameHarness: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
+        GeometryReader { _ in
             ZStack {
-                if id == .wordConnect {
-                    WordConnectSafeAreaBackground()
-                } else if id == .dotsConnect {
-                    DotsConnectSafeAreaBackground()
-                } else if id == .oneLine {
-                    OneLineSafeAreaBackground()
-                } else {
-                    Color.witsBg.ignoresSafeArea()
-                }
+                GameStageBackground(game: id)
                 makeGameView(id, config: .standard(id, difficulty: debugDifficulty, freePlay: true)) { _ in }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(.top, id.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.top, 8))
-                    .padding(.bottom, id.ownsSafeAreaSurface ? 0 : max(geo.safeAreaInsets.bottom, 8))
+                    .padding(.top, id.ownsSafeAreaSurface ? 0 : 36)
+                    .padding(.bottom, id.ownsSafeAreaSurface ? 0 : 8)
                     .clipped()
             }
         }

@@ -27,10 +27,12 @@ struct GamePauseButtonLayer: View {
     var action: () -> Void
 
     var body: some View {
+        // Sits in the safe-area coordinate space: directly below the status
+        // bar, aligned with the leading slot games reserve in their top bars.
         GeometryReader { _ in
             GamePauseButton(action: action)
-                .position(x: 24,
-                          y: 56)
+                .position(x: 36,
+                          y: 26)
         }
     }
 }
