@@ -292,8 +292,10 @@ struct BellCurveChart: View {
                 at: CGPoint(x: min(size.width - 30, max(30, xPos(mean))), y: baseline + 10),
                 anchor: .center)
 
-            // the user's marker: dashed rule + "you" pill above it
-            let mx = xPos(marker)
+            // the user's marker: dashed rule + "you" pill above it. Inset the
+            // rule by its half-width so an extreme score never draws half-clipped
+            // at the canvas edge.
+            let mx = min(size.width - 1, max(1, xPos(marker)))
             var rule = Path()
             rule.move(to: CGPoint(x: mx, y: topPad - 4))
             rule.addLine(to: CGPoint(x: mx, y: baseline))
