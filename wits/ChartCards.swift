@@ -54,28 +54,6 @@ struct TrendLine: View {
     }
 }
 
-extension StatNorm {
-    /// "top 38%" only means what it sounds like above the median — below it,
-    /// "top 90%" reads as praise it isn't, so fall back to the plain percentile.
-    var headlineLabel: String {
-        pct >= 50 ? "top \(100 - pct)%" : "\(Self.ordinal(pct)) percentile"
-    }
-    /// Compact framing for the score-bar chip: unambiguous at any percentile.
-    var chipLabel: String { "beats \(pct)%" }
-
-    static func ordinal(_ n: Int) -> String {
-        let suffix: String
-        switch (n % 100, n % 10) {
-        case (11...13, _): suffix = "th"
-        case (_, 1): suffix = "st"
-        case (_, 2): suffix = "nd"
-        case (_, 3): suffix = "rd"
-        default: suffix = "th"
-        }
-        return "\(n)\(suffix)"
-    }
-}
-
 /// A horizontal score bar that opens a full trend page when tapped.
 struct MetricBar: View {
     let label: String
@@ -99,14 +77,6 @@ struct MetricBar: View {
                     Text(label)
                         .font(.system(size: emphasized ? 15.5 : 14, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.witsInk)
-                    if let norm {
-                        Text(norm.chipLabel)
-                            .font(.witsLabel(11))
-                            .foregroundStyle(tint)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(tint.opacity(0.12), in: Capsule())
-                    }
                     Spacer()
                     Text("\(Int(value))")
                         .font(.witsValue(emphasized ? 17 : 15))
@@ -184,14 +154,13 @@ struct MetricDetailView: View {
                         .font(.witsBody(15, weight: .bold))
                         .foregroundStyle(Color.witsMuted)
                     VStack(alignment: .leading, spacing: 12) {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            Text(norm.headlineLabel)
-                                .font(.system(size: 22, weight: .heavy, design: .rounded))
+                        (Text("higher than ")
+                            + Text("\(norm.pct)%")
+                                .font(.system(size: 17, weight: .heavy, design: .rounded))
                                 .foregroundStyle(tint)
-                            Text("higher than \(norm.pct)% of all users")
-                                .font(.witsBody(13.5))
-                                .foregroundStyle(Color.witsMuted)
-                        }
+                            + Text(" of all users"))
+                            .font(.witsBody(15))
+                            .foregroundStyle(Color.witsMuted)
                         if let mean = norm.mean, let sd = norm.sd, sd > 0 {
                             BellCurveChart(value: value, mean: mean, sd: sd, tint: tint)
                         }
