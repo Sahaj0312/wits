@@ -48,6 +48,8 @@ final class AppModel {
     var streak = StreakState.empty
     var difficulty: [GameID: DifficultyState] = [:]
     var gameStats: [GameID: GameStats] = [:]
+    /// Star-map progression (stars per game/level, marathon bests).
+    let levels = LevelProgressStore()
     var today: DailyWorkout
     var headlineIndex: Double? = nil
     var notificationsNeedSettings = false
@@ -69,6 +71,9 @@ final class AppModel {
         self.supa = supa
         self.today = WorkoutBuilder.build(for: Date())
         loadCache()
+        // One-time star-map migration: unlock levels equivalent to the old
+        // adaptive difficulty so existing users keep their frontier.
+        levels.seedIfNeeded(from: difficulty)
         // Cache is now hydrated → tune today's lineup to the user's weak spots,
         // unless cache restored a workout already underway today.
         if !(Calendar.current.isDate(today.day, inSameDayAs: Date()) && !today.results.isEmpty) {
@@ -87,6 +92,7 @@ final class AppModel {
         Task {
             await syncNotificationAuthorizationAndSchedule()
             await reconcile()
+            await syncLevelRecords()
         }
     }
 
@@ -230,7 +236,11 @@ final class AppModel {
         }
         let resetStats = id.shouldResetDifficulty(difficulty[id])
         let current = id.difficultyState(from: difficulty[id])
-        let scored = ScoringEngine.score(result, previous: current)
+        // Star-map runs are served at the level's frozen spec, so score the run
+        // against that challenge, not the drifting adaptive level.
+        let mapLevel = result.raw["mapLevel"].map { Int($0) }
+        let previous = mapLevel.map { LevelLadder.examDifficulty(for: id, level: $0, persisted: current) } ?? current
+        let scored = ScoringEngine.score(result, previous: previous)
         let next = scored.next
         difficulty[id] = next
         let r = scored.result
@@ -238,16 +248,33 @@ final class AppModel {
         if resetStats { gameStats[id] = nil }
         recordStats(for: r)
 
+        // Marathon links score normally but never award map stars (doc §1).
+        let recordsStars = mapLevel != nil && result.raw["marathon"] == nil
+        if let mapLevel, recordsStars {
+            let quality = r.performanceQuality ?? r.accuracy
+            levels.recordAttempt(game: id, level: mapLevel,
+                                 stars: StarGrader.stars(quality: quality), quality: quality)
+        }
+
         saveCache()
         Task {
             try? await supa.saveSession(r, source: source, workoutID: workoutID)
             try? await supa.upsertDifficulty(game: id, next)
+            if let mapLevel, recordsStars, let record = levels.record(for: id, level: mapLevel) {
+                try? await supa.upsertLevelRecord(game: id, level: mapLevel, record: record)
+            }
             // The session insert just updated the server leaderboard (trigger);
             // prefetch now so the post-game screen has the rank ready.
             await loadLeaderboard(for: id, force: true)
         }
 
         return r
+    }
+
+    /// Pull server star records once per launch (local best wins on merge).
+    func syncLevelRecords() async {
+        guard supa.isSignedIn, let rows = try? await supa.fetchLevelRecords() else { return }
+        levels.merge(serverRecords: rows)
     }
 
     /// Standalone modes are saved for history/stats, but intentionally bypass WPI,

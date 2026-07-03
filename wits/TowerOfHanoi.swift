@@ -157,7 +157,12 @@ struct TowerOfHanoiScreen: View {
         let savedLevel = Self.savedCampaignLevel()
         _campaignLevel = State(initialValue: savedLevel)
         let initialPuzzle: HanoiPuzzle
-        if cfg.isSurvival {
+        if let mapLevel = cfg.mapLevel {
+            // Star-map exam: the ladder is the spec (design doc §2) —
+            // par climbs one move per level, a disk joins every 10 levels.
+            let spec = Self.mapSpec(mapLevel)
+            initialPuzzle = HanoiGenerator.puzzle(disks: spec.disks, targetDistance: spec.moves)
+        } else if cfg.isSurvival {
             initialPuzzle = HanoiGenerator.puzzle(
                 disks: Self.diskCount(for: cfg.difficulty.level),
                 targetDistance: Self.survivalDistance(afterPuzzles: 0)
@@ -168,6 +173,21 @@ struct TowerOfHanoiScreen: View {
         }
         _puzzle = State(initialValue: initialPuzzle)
         _state = State(initialValue: TowerState(stacks: HanoiPuzzle.stacks(from: initialPuzzle.start)))
+    }
+
+    /// Star-map ladder (40 levels): par climbs 3...42 one move per level, and
+    /// the board uses the fewest disks whose state-graph diameter (2^n - 1)
+    /// can hold that par — so every rung is dealt at its exact distance.
+    static func mapSpec(_ mapLevel: Int) -> (disks: Int, moves: Int) {
+        let par = min(42, max(1, mapLevel) + 2)
+        let disks: Int
+        switch par {
+        case ...7: disks = 3
+        case ...15: disks = 4
+        case ...31: disks = 5
+        default: disks = 6
+        }
+        return (disks: disks, moves: par)
     }
 
     private var diskCount: Int {
@@ -425,18 +445,19 @@ struct TowerOfHanoiScreen: View {
             "seconds": seconds.rounded(),
             "targetSeconds": targetSeconds,
             "diskCount": Double(diskCount),
-            "hanoiLevel": Double(campaignLevel),
-            // Campaign level to play next (finish() only runs on a solve in
-            // campaign mode) — TowerPolicy pins the adaptive level to this.
-            "hanoiLevelEnd": Double(cfg.isSurvival ? campaignLevel : min(Self.campaignLevelCount, campaignLevel + 1)),
-            "hanoiLevelCount": Double(Self.campaignLevelCount),
             "invalidMoves": Double(invalidMoves)
         ]
+        if cfg.mapLevel == nil {
+            // Legacy campaign bookkeeping (pre-star-map runs only).
+            result.raw["hanoiLevel"] = Double(campaignLevel)
+            result.raw["hanoiLevelEnd"] = Double(cfg.isSurvival ? campaignLevel : min(Self.campaignLevelCount, campaignLevel + 1))
+            result.raw["hanoiLevelCount"] = Double(Self.campaignLevelCount)
+        }
         onResult(result)
     }
 
     private func unlockNextCampaignLevel() {
-        guard !cfg.isSurvival, campaignLevel < Self.campaignLevelCount else { return }
+        guard cfg.mapLevel == nil, !cfg.isSurvival, campaignLevel < Self.campaignLevelCount else { return }
         let next = campaignLevel + 1
         UserDefaults.standard.set(next, forKey: Self.campaignLevelKey)
     }

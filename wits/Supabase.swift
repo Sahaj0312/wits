@@ -378,6 +378,7 @@ final class SupabaseManager {
 
         var row = legacyRow
         row["base_score"] = r.baseScoreValue
+        if let v = r.raw["mapLevel"] { row["map_level"] = Int(v) }
         if let v = r.performanceQuality { row["performance_quality"] = v }
         if let v = r.performanceConfidence { row["performance_confidence"] = v }
         if let v = r.abilitySignal {
@@ -427,6 +428,44 @@ final class SupabaseManager {
                 prefer: "resolution=merge-duplicates,return=minimal",
                 query: query
             )
+        }
+    }
+
+    /// Star-map progression: one row per (user, game, level) with the best
+    /// stars/quality earned. Server keeps the max via the merge upsert +
+    /// a greatest() trigger (see game_levels migration).
+    func upsertLevelRecord(game: GameID, level: Int, record: LevelRecord) async throws {
+        guard let id = userID else { throw SupabaseError.notSignedIn }
+        let row: [String: Any] = [
+            "user_id": id,
+            "game": game.rawValue,
+            "level": level,
+            "stars": record.stars,
+            "best_quality": record.bestQuality,
+            "updated_at": Self.iso.string(from: Date()),
+        ]
+        try await restWrite(
+            table: "game_levels", body: [row],
+            prefer: "resolution=merge-duplicates,return=minimal",
+            query: [URLQueryItem(name: "on_conflict", value: "user_id,game,level")]
+        )
+    }
+
+    /// All of the caller's star records (RLS scopes the read).
+    func fetchLevelRecords() async throws -> [(game: GameID, level: Int, stars: Int, quality: Double)] {
+        struct Row: Decodable {
+            let game: String
+            let level: Int
+            let stars: Int
+            let best_quality: Double?
+        }
+        let data = try await restRead(table: "game_levels", query: [
+            URLQueryItem(name: "select", value: "game,level,stars,best_quality"),
+        ])
+        let rows = try JSONDecoder().decode([Row].self, from: data)
+        return rows.compactMap { row in
+            guard let game = GameID(rawValue: row.game) else { return nil }
+            return (game: game, level: row.level, stars: row.stars, quality: row.best_quality ?? 0)
         }
     }
 

@@ -28,6 +28,9 @@ struct GameHost: View {
     @State private var stage: Stage = .interstitial
     @State private var results: [GameResult] = []
     @State private var pauseController = GamePauseController()
+    /// Star-map level served for the current game (frontier, or a consolidation
+    /// replay when a page gate blocks it) — frozen when the game begins.
+    @State private var servedLevel = 1
 
     init(workout: DailyWorkout,
          difficultyFor: @escaping (GameID) -> DifficultyState,
@@ -139,7 +142,11 @@ struct GameHost: View {
                     progressDots
                         .padding(.top, 8)
                     makeGameView(game,
-                                 config: GameConfig.standard(game, difficulty: difficultyFor(game), pauseController: pauseController)) { result in
+                                 config: GameConfig.level(game,
+                                                          mapLevel: servedLevel,
+                                                          persisted: difficultyFor(game),
+                                                          freePlay: false,
+                                                          pauseController: pauseController)) { result in
                         handle(result)
                     }
                 }
@@ -173,8 +180,10 @@ struct GameHost: View {
             GameCard(
                 game: game,
                 stats: app.gameStats[game],
-                difficulty: app.difficultyFor(game),
+                difficulty: nil,
                 primaryTitle: index == 0 ? "start" : "play",
+                showsLevelProgress: false,
+                modeLabel: "level \(app.levels.workoutLevel(for: game))",
                 onPlay: {
                     pauseController.reset()
                     withAnimation { beginCurrentGame() }
@@ -192,12 +201,16 @@ struct GameHost: View {
             stage = .summary
             return
         }
+        servedLevel = app.levels.workoutLevel(for: game)
         stage = GameTutorialStore.shouldShow(for: game, hasPlayed: app.hasPlayed(game)) ? .tutorial : .playing
     }
 
     private func handle(_ result: GameResult) {
         var r = result
         r.baseScore = result.baseScore ?? result.score
+        // Tag the served map level so AppModel scores against the frozen exam
+        // spec and records stars (design doc §1/§6).
+        r.raw["mapLevel"] = Double(servedLevel)
         results.append(r)
         onGameResult(r)
         withAnimation { proceed() }
@@ -318,12 +331,12 @@ private struct WorkoutSummary: View {
         }
     }
 
-    /// "lvl 3 → 4" when the whole-number level moved this run, else "lvl 4".
+    /// "lvl 12 ★★☆" — the map level served and the stars this run earned.
     private func levelLine(_ r: GameResult) -> (text: String, moved: Bool)? {
-        guard r.game.usesAdaptiveLevelDisplay, let next = r.newDifficulty?.level else { return nil }
-        let after = Int(DifficultyState.clamp(next).rounded(.down))
-        let before = Int(DifficultyState.clamp(r.previousDifficulty?.level ?? next).rounded(.down))
-        return before != after ? ("lvl \(before) → \(after)", true) : ("lvl \(after)", false)
+        guard let mapLevel = r.raw["mapLevel"].map({ Int($0) }) else { return nil }
+        let stars = StarGrader.stars(quality: r.performanceQuality ?? r.accuracy)
+        let starText = String(repeating: "★", count: stars) + String(repeating: "☆", count: 3 - stars)
+        return ("lvl \(mapLevel) \(starText)", stars >= 1)
     }
 
     private func statCard(value: String, label: String, countUp: Int? = nil) -> some View {

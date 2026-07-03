@@ -652,6 +652,12 @@ struct GameConfig {
     var targetDurationSec: Double = 45
     var mode: GameMode = .workout
     var pauseController: GamePauseController?
+    /// Star-map level this run serves (nil = legacy adaptive run). The level's
+    /// frozen spec is already baked into `difficulty.level` via LevelLadder;
+    /// games that key on discrete ladders (e.g. Tower of Hanoi) read this.
+    var mapLevel: Int? = nil
+    /// This run is one link in a marathon chain (affects framing only).
+    var isMarathon: Bool = false
     /// Back-compat: existing call sites read `isFreePlay`.
     var isFreePlay: Bool { mode == .freePlay }
     var isSurvival: Bool { false }
@@ -662,6 +668,21 @@ struct GameConfig {
                          freePlay: Bool = false,
                          pauseController: GamePauseController? = nil) -> GameConfig {
         GameConfig(difficulty: difficulty, mode: freePlay ? .freePlay : .workout, pauseController: pauseController)
+    }
+
+    /// A fixed-exam run of a star-map level (design doc §1): the served spec
+    /// comes from the map ladder, not the user's adaptive state.
+    static func level(_ g: GameID,
+                      mapLevel: Int,
+                      persisted: DifficultyState,
+                      freePlay: Bool = true,
+                      marathon: Bool = false,
+                      pauseController: GamePauseController? = nil) -> GameConfig {
+        GameConfig(difficulty: LevelLadder.examDifficulty(for: g, level: mapLevel, persisted: persisted),
+                   mode: freePlay ? .freePlay : .workout,
+                   pauseController: pauseController,
+                   mapLevel: mapLevel,
+                   isMarathon: marathon)
     }
 
     func pause() {
