@@ -103,10 +103,10 @@ survive; difficulty **progresses along the same curves** past the map
 ceiling — never randomized (random difficulty has no tension arc and makes
 the result meaningless as a beatable number).
 
-- **Start-level select** (the Tetris solution to early-game boredom):
-  begin at any map level already passed; default a few below the frontier.
-  Death point is ability-determined regardless of start, so best-depth
-  stays comparable across players.
+- **Always starts at level 1** (user decision 2026-07-02, superseding the
+  earlier start-level-select idea): one shared origin keeps marathon results
+  maximally comparable and the mode dead simple. Early levels are seconds
+  long, so the warm-up cost is small.
 - Result is score + depth, not stars; personal best shown; near-miss /
   new-best framing per §4.
 - Marathon doubles as the data engine: high trial volume accelerates norm

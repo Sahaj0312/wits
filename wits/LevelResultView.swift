@@ -108,7 +108,6 @@ struct MarathonResultView: View {
     let game: GameID
     let depth: Int          // last level cleared this run
     let score: Int
-    let startLevel: Int
     let best: MarathonBest?
     let isNewBest: Bool
     let onRunAgain: () -> Void
@@ -123,7 +122,7 @@ struct MarathonResultView: View {
                 .foregroundStyle(game.domain.color)
                 .rise()
 
-            Text(depth >= startLevel ? "level \(depth)" : "level \(startLevel)")
+            Text("level \(max(1, depth))")
                 .font(.witsDisplay(46))
                 .foregroundStyle(Color.witsInk)
                 .monospacedDigit()

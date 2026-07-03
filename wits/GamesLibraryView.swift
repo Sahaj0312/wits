@@ -191,7 +191,6 @@ private struct GameLauncher: View {
     @State private var phase: Phase = .map
     @State private var playLevel = 1
     @State private var marathonActive = false
-    @State private var marathonStart = 1
     @State private var marathonDepth = 0     // last level cleared this run
     @State private var marathonScore = 0
     @State private var marathonNewBest = false
@@ -213,12 +212,11 @@ private struct GameLauncher: View {
                     playLevel = level
                     startRun()
                 },
-                onPlayMarathon: { start in
+                onPlayMarathon: {
                     marathonActive = true
-                    marathonStart = start
                     marathonDepth = 0
                     marathonScore = 0
-                    playLevel = start
+                    playLevel = 1
                     startRun()
                 },
                 onClose: { dismiss() }
@@ -290,7 +288,7 @@ private struct GameLauncher: View {
                                               onResume: { pauseController.resume() },
                                               onQuit: {
                                                   pauseController.reset()
-                                                  if marathonActive, marathonDepth >= marathonStart {
+                                                  if marathonActive, marathonDepth >= 1 {
                                                       endMarathon()
                                                   } else {
                                                       withAnimation { phase = .map }
@@ -326,13 +324,12 @@ private struct GameLauncher: View {
                 game: game,
                 depth: marathonDepth,
                 score: marathonScore,
-                startLevel: marathonStart,
                 best: app.levels.marathonBest(for: game),
                 isNewBest: marathonNewBest,
                 onRunAgain: {
                     marathonDepth = 0
                     marathonScore = 0
-                    playLevel = marathonStart
+                    playLevel = 1
                     startRun()
                 },
                 onMap: { withAnimation(.easeOut(duration: 0.2)) { phase = .map } }
@@ -395,7 +392,7 @@ private struct GameLauncher: View {
     }
 
     private func endMarathon() {
-        marathonNewBest = marathonDepth >= marathonStart
+        marathonNewBest = marathonDepth >= 1
             && app.levels.recordMarathon(game: game, depth: marathonDepth, score: marathonScore)
         withAnimation(.easeOut(duration: 0.2)) { phase = .marathonResult }
     }

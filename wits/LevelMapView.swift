@@ -13,7 +13,7 @@ import SwiftUI
 struct LevelMapView: View {
     let game: GameID
     var onPlayLevel: (Int) -> Void
-    var onPlayMarathon: (Int) -> Void   // start level
+    var onPlayMarathon: () -> Void   // marathon always starts at level 1
     var onClose: () -> Void
 
     private struct SelectedLevel: Identifiable {
@@ -24,18 +24,16 @@ struct LevelMapView: View {
     @Environment(AppModel.self) private var app
     @State private var page: Int
     @State private var selectedLevel: SelectedLevel?
-    @State private var marathonStart: Int
 
     init(game: GameID,
          onPlayLevel: @escaping (Int) -> Void,
-         onPlayMarathon: @escaping (Int) -> Void,
+         onPlayMarathon: @escaping () -> Void,
          onClose: @escaping () -> Void) {
         self.game = game
         self.onPlayLevel = onPlayLevel
         self.onPlayMarathon = onPlayMarathon
         self.onClose = onClose
         _page = State(initialValue: 0)
-        _marathonStart = State(initialValue: 1)
     }
 
     private var levelCount: Int { LevelLadder.levelCount(for: game) }
@@ -65,7 +63,6 @@ struct LevelMapView: View {
         .background(Color.witsBg.ignoresSafeArea())
         .onAppear {
             page = LevelLadder.page(of: min(frontier, levelCount))
-            marathonStart = max(1, frontier - 2)
         }
         .sheet(item: $selectedLevel) { selected in
             LevelDetailCard(
@@ -152,42 +149,19 @@ struct LevelMapView: View {
             }
             Text(isMarathonOnly
                  ? "one life. how far can you go?"
-                 : "no stars, no safety net — climb until you break.")
+                 : "everyone starts at level 1 — climb until you break.")
                 .font(.witsBody(13.5))
                 .foregroundStyle(.white.opacity(0.8))
 
-            HStack(spacing: 10) {
-                if !isMarathonOnly, frontier > 1 {
-                    Menu {
-                        ForEach(startOptions, id: \.self) { option in
-                            Button("start at level \(option)") { marathonStart = option }
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text("from level \(marathonStart)")
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .monospacedDigit()
-                            Image(systemName: "chevron.up.chevron.down")
-                                .font(.system(size: 10, weight: .bold))
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 9)
-                        .background(.white.opacity(0.18), in: Capsule())
-                    }
-                }
-                Button {
-                    onPlayMarathon(isMarathonOnly ? 1 : marathonStart)
-                } label: {
-                    Text("run")
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .foregroundStyle(game.domain.color)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(.white, in: Capsule())
-                }
-                .buttonStyle(PressScale())
+            Button(action: onPlayMarathon) {
+                Text("run")
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(game.domain.color)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(.white, in: Capsule())
             }
+            .buttonStyle(PressScale())
         }
         .padding(16)
         .background(
@@ -195,18 +169,6 @@ struct LevelMapView: View {
                            startPoint: .topLeading, endPoint: .bottomTrailing),
             in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
-    }
-
-    /// Start-level choices: level 1, every 5th passed level, and just below
-    /// the frontier (the default).
-    private var startOptions: [Int] {
-        var options: Set<Int> = [1, max(1, frontier - 2)]
-        var l = 5
-        while l < frontier {
-            options.insert(l)
-            l += 5
-        }
-        return options.sorted()
     }
 
     // MARK: Pages
@@ -240,7 +202,7 @@ struct LevelMapView: View {
     }
 
     private var levelGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
             ForEach(Array(LevelLadder.levels(inPage: page, of: game)), id: \.self) { level in
                 LevelTile(
                     level: level,
@@ -298,16 +260,18 @@ private struct LevelTile: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 5) {
+            HStack(spacing: 12) {
+                Text("\(level)")
+                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+                    .foregroundStyle(unlocked ? (isFrontier ? .white : Color.witsInk) : Color.witsFaint)
+                    .monospacedDigit()
+                    .frame(minWidth: 34, alignment: .leading)
+                Spacer(minLength: 0)
                 if unlocked {
-                    Text("\(level)")
-                        .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(isFrontier ? .white : Color.witsInk)
-                        .monospacedDigit()
-                    HStack(spacing: 1.5) {
+                    HStack(spacing: 3) {
                         ForEach(0..<3, id: \.self) { i in
                             Image(systemName: i < stars ? "star.fill" : "star")
-                                .font(.system(size: 7.5, weight: .heavy))
+                                .font(.system(size: 14, weight: .heavy))
                                 .foregroundStyle(i < stars
                                                  ? (isFrontier ? .white : Color.witsWarm)
                                                  : (isFrontier ? .white.opacity(0.45) : Color.witsFaint))
@@ -315,15 +279,16 @@ private struct LevelTile: View {
                     }
                 } else {
                     Image(systemName: "lock.fill")
-                        .font(.system(size: 14, weight: .heavy))
+                        .font(.system(size: 16, weight: .heavy))
                         .foregroundStyle(Color.witsFaint)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 56)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 66)
             .background(isFrontier ? tint : Color.witsCard,
-                        in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .strokeBorder(isFrontier ? .clear : Color.witsLine, lineWidth: 1.5)
             )
             .opacity(unlocked ? 1 : 0.55)
