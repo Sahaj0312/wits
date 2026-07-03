@@ -69,10 +69,19 @@ protocol ArcadeGame: AnyObject {
 
     /// Extra game-specific metrics to merge into GameResult.raw at finish.
     func resultMetrics(scene: ArcadeScene, hits: Int, misses: Int, nearMisses: Int) -> [String: Double]
+
+    /// Round-based games end after a fixed round count instead of the host's
+    /// countdown; non-nil replaces the timer HUD with "n of total" progress.
+    func roundProgress(scene: ArcadeScene) -> (done: Int, total: Int)?
+
+    /// A round-based run has served every round (host scores and finishes).
+    func isComplete(scene: ArcadeScene) -> Bool
 }
 
 extension ArcadeGame {
     func preStep(scene: ArcadeScene, dt: Double) {}
+    func roundProgress(scene: ArcadeScene) -> (done: Int, total: Int)? { nil }
+    func isComplete(scene: ArcadeScene) -> Bool { false }
     func overlay(scene: ArcadeScene) -> AnyView { AnyView(EmptyView()) }
     func advance(_ s: DifficultyState, accuracy: Double) -> DifficultyState { MasteryLadder.adjust(s, accuracy: accuracy) }
 

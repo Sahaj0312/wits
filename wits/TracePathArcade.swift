@@ -2,9 +2,11 @@
 //  TracePathArcade.swift
 //  wits
 //
-//  "Trace the Path" — nodes light up in sequence, then you drag one continuous
-//  stroke through them in order (forward = Path Keeper; reverse = Echo Grid).
-//  A single transposition is the near-miss. Round-based; span grows on success.
+//  "Trace the Path" — nodes light up in sequence, then you tap them back in
+//  order (forward = Path Keeper; reverse = Echo Grid). A single transposition
+//  is the near-miss. Each map level is a frozen exam spec (board × span ×
+//  flash speed) served for a fixed number of rounds — no wall clock, so an
+//  idle run never ends and unplayed rounds can't inflate the grade.
 //
 
 import SwiftUI
@@ -24,18 +26,55 @@ final class TracePathArcade: ArcadeGame {
     private var seq: [Int] = []          // node ids in presentation order
     private var entered: [Int] = []      // node ids the player has tapped, in order
     private var litID: Int?
-    private var litCursor = 0
     private var phaseT = 0.0
-    private var span = 3
-    private var showStep = 0.6
     private var maxSpan = 0
     private var perfectRounds = 0
+    private var roundsPlayed = 0
+    private var complete = false
+
+    // Frozen exam spec, fixed at seed() for the whole run.
+    private var grid = 4
+    private var span = 4
+    private var showStep = 0.5
+    private var roundsTotal = 6
+    private var stepX = 0.24
+    private var nodeRadius = 0.09
+    private var tapRadius = 0.11
 
     init(id: GameID, reverse: Bool) { self.id = id; self.reverse = reverse }
 
+    /// The exam spec for a map level. Bands overlap on purpose: a bigger board
+    /// resets span, so each band opens with a sideways-then-up step instead of
+    /// one unbroken ramp. Echo Grid runs one span lower — reverse recall is a
+    /// notch harder at the same length.
+    static func spec(for game: GameID, mapLevel: Int) -> (grid: Int, span: Int, step: Double, rounds: Int) {
+        let n = min(max(mapLevel, 1), 40)
+        let grid: Int
+        var span: Int
+        let step: Double
+        switch n {
+        case ...10:
+            grid = 3; span = 3 + (n - 1) / 4; step = 0.60 - 0.010 * Double(n - 1)
+        case ...22:
+            grid = 4; span = 4 + (n - 11) / 3; step = 0.54 - 0.011 * Double(n - 11)
+        case ...32:
+            grid = 5; span = 5 + (n - 23) / 3; step = 0.46 - 0.011 * Double(n - 23)
+        default:
+            grid = 5; span = 8 + (n - 33) / 4; step = 0.36 - 0.008 * Double(n - 33)
+        }
+        if game == .echoGrid { span = max(2, span - 1) }
+        return (grid, span, max(0.30, step), span >= 8 ? 5 : 6)
+    }
+
     func seed(level: Double, survival: Bool) -> Spawner {
-        span = max(2, 2 + Int(level / 2))
-        showStep = max(0.32, 0.62 - level * 0.03)
+        // legacyDifficulty(mapLevel) → nearestLevel roundtrips exactly, so the
+        // 1...10 level the host hands us recovers the served map level.
+        let mapLevel = LevelLadder.nearestLevel(for: id, legacyDifficulty: level)
+        let s = Self.spec(for: id, mapLevel: mapLevel)
+        grid = s.grid; span = s.span; showStep = s.step; roundsTotal = s.rounds
+        stepX = grid <= 3 ? 0.30 : grid == 4 ? 0.24 : 0.19
+        nodeRadius = stepX * 0.375
+        tapRadius = stepX * 0.45
         return Spawner(rate: 0, maxAlive: 99, speed: 0)   // round-based, no generic spawns
     }
 
@@ -53,20 +92,27 @@ final class TracePathArcade: ArcadeGame {
                 // light for 70% of each step
                 let withinStep = phaseT - Double(step) * showStep
                 litID = withinStep < showStep * 0.7 ? seq[step] : nil
-                litCursor = step
             }
         case .awaitTrace:
             break
         case .reveal:
-            if phaseT > 0.9 { startRound(scene) }
+            if phaseT > 0.9 {
+                if roundsPlayed >= roundsTotal { complete = true } else { startRound(scene) }
+            }
         }
     }
 
     func postStep(scene: ArcadeScene, dt: Double) -> [Resolution] { [] }
 
+    func roundProgress(scene: ArcadeScene) -> (done: Int, total: Int)? {
+        (done: roundsPlayed, total: roundsTotal)
+    }
+
+    func isComplete(scene: ArcadeScene) -> Bool { complete }
+
     func resolve(_ action: ArcadeAction, scene: ArcadeScene) -> Resolution? {
         guard phase == .awaitTrace, case let .tap(p) = action else { return nil }
-        guard let e = scene.nearest(to: p, maxDist: 0.11, where: { $0.kind == 1 }),
+        guard let e = scene.nearest(to: p, maxDist: tapRadius, where: { $0.kind == 1 }),
               !entered.contains(e.id) else { return nil }
 
         entered.append(e.id)
@@ -77,14 +123,13 @@ final class TracePathArcade: ArcadeGame {
 
         let expected = reverse ? Array(seq.reversed()) : seq
         phase = .reveal; phaseT = 0
+        roundsPlayed += 1
         let correct = zip(entered, expected).reduce(0) { $0 + ($1.0 == $1.1 ? 1 : 0) }
         if correct == expected.count {
             perfectRounds += 1
             maxSpan = max(maxSpan, expected.count)
-            span = min(8, span + 1)
             return Resolution(kind: .hit, points: 60 * expected.count)
         }
-        span = max(2, span - 1)
         // one transposition leaves all-but-two correct
         if correct >= expected.count - 2 {
             return Resolution(kind: .nearMiss, points: 0)
@@ -144,7 +189,10 @@ final class TracePathArcade: ArcadeGame {
     func resultMetrics(scene: ArcadeScene, hits: Int, misses: Int, nearMisses: Int) -> [String: Double] {
         [
             "maxSpan": Double(maxSpan),
-            "perfectRounds": Double(perfectRounds)
+            "perfectRounds": Double(perfectRounds),
+            "span": Double(span),
+            "gridSize": Double(grid),
+            "rounds": Double(roundsPlayed)
         ]
     }
 
@@ -152,21 +200,19 @@ final class TracePathArcade: ArcadeGame {
 
     private func placeNodes(_ scene: ArcadeScene) {
         scene.reset()
-        let cols = 4, rows = 4
         // Unit coords normalize x to width and y to height; on a tall field that
         // makes equal fractions look stretched vertically. Use the same *pixel* gap
         // for rows as columns (a true square grid), centered.
         let aspect = scene.bounds.height > 0 ? scene.bounds.width / scene.bounds.height : 390.0 / 700.0
-        let stepX = 0.24                   // larger grid, still leaving edge margin
         let stepY = stepX * aspect         // matching pixel gap between rows
-        let startX = 0.5 - stepX * Double(cols - 1) / 2
-        let startY = 0.5 - stepY * Double(rows - 1) / 2
-        for r in 0..<rows {
-            for c in 0..<cols {
+        let startX = 0.5 - stepX * Double(grid - 1) / 2
+        let startY = 0.5 - stepY * Double(grid - 1) / 2
+        for r in 0..<grid {
+            for c in 0..<grid {
                 let x = startX + Double(c) * stepX
                 let y = startY + Double(r) * stepY
                 scene.add(ArcadeEntity(id: scene.newID(), pos: CGPoint(x: x, y: y), vel: .zero,
-                                       radius: 0.09, kind: 1, b: r * cols + c))
+                                       radius: nodeRadius, kind: 1, b: r * grid + c))
             }
         }
     }
@@ -176,7 +222,7 @@ final class TracePathArcade: ArcadeGame {
         seq = Array(ids.prefix(span))
         entered = []
         for i in scene.entities.indices { scene.entities[i].a = 0 }   // clear prior selection
-        litCursor = 0; phaseT = 0; litID = nil
+        phaseT = 0; litID = nil
         phase = .show
     }
 }

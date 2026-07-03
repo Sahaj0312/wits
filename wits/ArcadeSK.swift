@@ -129,6 +129,7 @@ final class ArcadeSKScene: SKScene {
     }
 
     override func didChangeSize(_ oldSize: CGSize) {
+        layoutHUD()
         guard let style, style.size != size else { return }
         self.style = ArcadeStyle(size: size, dab: ArcadeTextures.dab, ring: ArcadeTextures.ring, spark: ArcadeTextures.spark)
         model.bounds = size
@@ -137,20 +138,41 @@ final class ArcadeSKScene: SKScene {
     // MARK: HUD + how-to
 
     private func setupHUD() {
-        let topInset: CGFloat = 64   // clear the status bar / Dynamic Island
         scoreLabel.attributedText = scoreText()
         scoreLabel.horizontalAlignmentMode = .left
         scoreLabel.verticalAlignmentMode = .top
-        scoreLabel.position = CGPoint(x: 24, y: size.height - topInset)
         scoreLabel.zPosition = 50
         if !cfg.isSurvival { addChild(scoreLabel) }
 
         timerLabel.horizontalAlignmentMode = .right
         timerLabel.verticalAlignmentMode = .top
-        timerLabel.position = CGPoint(x: size.width - 24, y: size.height - topInset)
         timerLabel.zPosition = 50
         if !cfg.isSurvival { addChild(timerLabel) }
+        layoutHUD()
         updateHUD()
+    }
+
+    /// The scene fills the whole screen (SpriteView ignores the safe area),
+    /// while the host floats its pause button at the safe area's top-left
+    /// (GamePauseButtonLayer: a 44pt button ending at x ≈ 58). Start the HUD
+    /// row in that button's vertical strip and to its right so the score
+    /// never sits under it. The SKView reports safe-area insets of 0 until it
+    /// joins a window — after the scene is already presented — so the layout
+    /// re-runs from update() whenever the reported inset changes.
+    private var hudSafeTop: CGFloat = -1
+
+    private func layoutHUD() {
+        // The SKView itself always reports zero insets (SwiftUI's SpriteView +
+        // ignoresSafeArea consumes them), so read the window's. It can be nil
+        // until the view attaches — layoutHUDIfNeeded retries from update().
+        hudSafeTop = view?.window?.safeAreaInsets.top ?? -1
+        let topInset = max(20, hudSafeTop >= 0 ? hudSafeTop : 59) + 10
+        scoreLabel.position = CGPoint(x: 72, y: size.height - topInset)
+        timerLabel.position = CGPoint(x: size.width - 24, y: size.height - topInset)
+    }
+
+    private func layoutHUDIfNeeded() {
+        if (view?.window?.safeAreaInsets.top ?? -1) != hudSafeTop { layoutHUD() }
     }
 
     private func scoreText() -> NSAttributedString {
@@ -161,7 +183,13 @@ final class ArcadeSKScene: SKScene {
     private func updateHUD() {
         guard !cfg.isSurvival else { return }
         scoreLabel.attributedText = scoreText()
-        timerLabel.attributedText = NSAttributedString(string: "\(Int(ceil(timeLeft)))s", attributes: [
+        let right: String
+        if let p = game.roundProgress(scene: model) {
+            right = "\(min(p.done + 1, p.total)) of \(p.total)"
+        } else {
+            right = "\(Int(ceil(timeLeft)))s"
+        }
+        timerLabel.attributedText = NSAttributedString(string: right, attributes: [
             .font: roundedUIFont(22), .foregroundColor: UIColor(Color.witsMuted)])
     }
 
@@ -196,6 +224,7 @@ final class ArcadeSKScene: SKScene {
 
     override func update(_ currentTime: TimeInterval) {
         defer { lastT = currentTime }
+        layoutHUDIfNeeded()
         guard running, !finished, style != nil, !cfg.isPaused else { return }
         let dt = min(max(currentTime - lastT, 0), 0.1)
         guard dt > 0 else { return }
@@ -213,9 +242,14 @@ final class ArcadeSKScene: SKScene {
         syncNodes()
 
         if !cfg.isSurvival {
-            timeLeft -= dt
-            updateHUD()
-            if timeLeft <= 0 { finish() }
+            if game.roundProgress(scene: model) != nil {
+                updateHUD()
+                if game.isComplete(scene: model) { finish() }
+            } else {
+                timeLeft -= dt
+                updateHUD()
+                if timeLeft <= 0 { finish() }
+            }
         }
     }
 
@@ -302,13 +336,16 @@ final class ArcadeSKScene: SKScene {
         res.trials = total
         res.threshold = model.spawner.speed
         res.startedAt = startedAt
-        res.durationMs = Int(cfg.targetDurationSec * 1000)
+        let seconds = game.roundProgress(scene: model) != nil
+            ? cfg.activeElapsed(since: startedAt)
+            : cfg.targetDurationSec
+        res.durationMs = Int(seconds * 1000)
         var metrics: [String: Double] = [
             "bestStreak": Double(bestCombo),
             "correct": Double(hits),
             "wrong": Double(misses),
             "nearMisses": Double(near),
-            "timeOnTaskMs": cfg.targetDurationSec * 1000
+            "timeOnTaskMs": seconds * 1000
         ]
         metrics.merge(game.resultMetrics(scene: model, hits: hits, misses: misses, nearMisses: near)) { _, new in new }
         res.raw = metrics

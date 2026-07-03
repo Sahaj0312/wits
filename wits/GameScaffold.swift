@@ -346,7 +346,7 @@ extension GameID {
             [
                 "watch the tiles light up in order.",
                 "when the board goes dark, tap them backwards.",
-                "perfect rounds make the path longer."
+                "you get a fixed set of rounds — perfect ones earn the stars."
             ]
         case .spotSpeed:
             [
@@ -406,7 +406,7 @@ extension GameID {
             [
                 "watch the token hop across the board.",
                 "repeat the path in the same order.",
-                "one wrong tap reveals the answer and starts a new path."
+                "you get a fixed set of rounds — perfect ones earn the stars."
             ]
         case .wordConnect:
             [
