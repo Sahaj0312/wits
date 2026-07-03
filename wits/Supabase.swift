@@ -148,6 +148,17 @@ struct SessionRow: Decodable {
     var workout_id: String?
 }
 
+/// Population comparison for one skill score, from the `stat_percentiles` RPC.
+/// `pct` is the share of the age-band population scoring strictly below the
+/// user; `mean`/`sd` describe that population's distribution (nil while norms
+/// are too thin to draw a curve).
+struct StatNorm: Codable, Equatable {
+    var pct: Int
+    var mean: Double?
+    var sd: Double?
+    var n: Int
+}
+
 /// One row of the global per-game leaderboard, as returned by the
 /// `game_leaderboard` RPC.
 struct LeaderboardEntry: Decodable, Equatable {
@@ -589,6 +600,18 @@ final class SupabaseManager {
                                   body: ["p_age": age, "p_scores": accuracies],
                                   authed: true)
         return try JSONDecoder().decode([String: Int].self, from: data)
+    }
+
+    /// Age-banded population comparison for the activity-page skill scores.
+    /// `scores` is keyed by CognitiveDomain rawValue plus "overall" (0...5000
+    /// WPI values); returns percentile + distribution parameters per key, and
+    /// folds the caller's scores into the population norms.
+    func fetchStatPercentiles(age: Int, scores: [String: Double]) async throws -> [String: StatNorm] {
+        let data = try await call("rest/v1/rpc/stat_percentiles",
+                                  method: "POST",
+                                  body: ["p_age": age, "p_scores": scores],
+                                  authed: true)
+        return try JSONDecoder().decode([String: StatNorm].self, from: data)
     }
 
     /// Global leaderboard for one game in a single round trip: top players +

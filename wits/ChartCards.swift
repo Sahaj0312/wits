@@ -54,6 +54,28 @@ struct TrendLine: View {
     }
 }
 
+extension StatNorm {
+    /// "top 38%" only means what it sounds like above the median — below it,
+    /// "top 90%" reads as praise it isn't, so fall back to the plain percentile.
+    var headlineLabel: String {
+        pct >= 50 ? "top \(100 - pct)%" : "\(Self.ordinal(pct)) percentile"
+    }
+    /// Compact framing for the score-bar chip: unambiguous at any percentile.
+    var chipLabel: String { "beats \(pct)%" }
+
+    static func ordinal(_ n: Int) -> String {
+        let suffix: String
+        switch (n % 100, n % 10) {
+        case (11...13, _): suffix = "th"
+        case (_, 1): suffix = "st"
+        case (_, 2): suffix = "nd"
+        case (_, 3): suffix = "rd"
+        default: suffix = "th"
+        }
+        return "\(n)\(suffix)"
+    }
+}
+
 /// A horizontal score bar that opens a full trend page when tapped.
 struct MetricBar: View {
     let label: String
@@ -61,10 +83,11 @@ struct MetricBar: View {
     let series: [SeriesPoint]
     var emphasized = false       // the overall WPI bar
     var tint: Color = .witsAccent
+    var norm: StatNorm? = nil    // population comparison, when the server has it
 
     var body: some View {
         NavigationLink {
-            MetricDetailView(title: label, value: value, series: series, tint: tint)
+            MetricDetailView(title: label, value: value, series: series, tint: tint, norm: norm)
         } label: {
             VStack(alignment: .leading, spacing: 9) {
                 HStack(spacing: 8) {
@@ -76,6 +99,14 @@ struct MetricBar: View {
                     Text(label)
                         .font(.system(size: emphasized ? 15.5 : 14, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.witsInk)
+                    if let norm {
+                        Text(norm.chipLabel)
+                            .font(.witsLabel(11))
+                            .foregroundStyle(tint)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(tint.opacity(0.12), in: Capsule())
+                    }
                     Spacer()
                     Text("\(Int(value))")
                         .font(.witsValue(emphasized ? 17 : 15))
@@ -116,6 +147,7 @@ struct MetricDetailView: View {
     let value: Double
     let series: [SeriesPoint]
     var tint: Color = .witsAccent
+    var norm: StatNorm? = nil
 
     private var best: Double? { series.map(\.value).max() }
     private var avg: Double? {
@@ -145,6 +177,28 @@ struct MetricDetailView: View {
                     Text("/ 5000")
                         .font(.system(size: 18, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.witsMuted)
+                }
+
+                if let norm {
+                    Text("vs other users")
+                        .font(.witsBody(15, weight: .bold))
+                        .foregroundStyle(Color.witsMuted)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            Text(norm.headlineLabel)
+                                .font(.system(size: 22, weight: .heavy, design: .rounded))
+                                .foregroundStyle(tint)
+                            Text("higher than \(norm.pct)% of all users")
+                                .font(.witsBody(13.5))
+                                .foregroundStyle(Color.witsMuted)
+                        }
+                        if let mean = norm.mean, let sd = norm.sd, sd > 0 {
+                            BellCurveChart(value: value, mean: mean, sd: sd, tint: tint)
+                        }
+                    }
+                    .padding(16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .cardSurface()
                 }
 
                 Text("over time")
@@ -194,6 +248,100 @@ struct MetricDetailView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 18)
         .cardSurface()
+    }
+}
+
+/// Population distribution for one skill score: a normal curve from the server
+/// norms (mean/sd across all users) with the user's own score marked on it.
+/// The area left of the marker — the share of users they beat — is shaded.
+/// Drawn with Canvas (like the radar chart) so the fill hugs the curve exactly.
+struct BellCurveChart: View {
+    let value: Double            // the user's score, 0...5000
+    let mean: Double             // population mean
+    let sd: Double               // population standard deviation
+    var tint: Color = .witsAccent
+
+    var body: some View {
+        Canvas { ctx, size in
+            let lo = max(0, mean - 3.2 * sd)
+            let hi = min(ProgressMath.maxScore, mean + 3.2 * sd)
+            guard hi > lo, sd > 0 else { return }
+            let topPad: CGFloat = 34         // room for the "you" pill
+            let bottomPad: CGFloat = 20      // room for the avg label
+            let baseline = size.height - bottomPad
+            let plotH = baseline - topPad
+
+            func xPos(_ v: Double) -> CGFloat { CGFloat((v - lo) / (hi - lo)) * size.width }
+            func pdf(_ v: Double) -> CGFloat {
+                let z = (v - mean) / sd
+                return CGFloat(exp(-0.5 * z * z))     // normalized: peak = 1
+            }
+            func point(_ v: Double) -> CGPoint { CGPoint(x: xPos(v), y: baseline - pdf(v) * plotH) }
+
+            let steps = 96
+            let xs = (0...steps).map { lo + (hi - lo) * Double($0) / Double(steps) }
+            let marker = min(hi, max(lo, value))
+
+            // area under the curve up to `limit` (nil = the whole population)
+            func area(upTo limit: Double?) -> Path {
+                var p = Path()
+                p.move(to: CGPoint(x: xPos(xs[0]), y: baseline))
+                for v in xs where limit.map({ v <= $0 }) ?? true {
+                    p.addLine(to: point(v))
+                }
+                if let limit { p.addLine(to: point(limit)) }
+                p.addLine(to: CGPoint(x: xPos(limit ?? xs[xs.count - 1]), y: baseline))
+                p.closeSubpath()
+                return p
+            }
+
+            ctx.fill(area(upTo: nil), with: .color(tint.opacity(0.10)))
+            ctx.fill(area(upTo: marker), with: .linearGradient(
+                Gradient(colors: [tint.opacity(0.45), tint.opacity(0.10)]),
+                startPoint: CGPoint(x: 0, y: topPad),
+                endPoint: CGPoint(x: 0, y: baseline)
+            ))
+
+            var curve = Path()
+            curve.move(to: point(xs[0]))
+            for v in xs.dropFirst() { curve.addLine(to: point(v)) }
+            ctx.stroke(curve, with: .color(tint.opacity(0.85)), lineWidth: 2.5)
+
+            var base = Path()
+            base.move(to: CGPoint(x: 0, y: baseline))
+            base.addLine(to: CGPoint(x: size.width, y: baseline))
+            ctx.stroke(base, with: .color(.witsLine), lineWidth: 1)
+
+            // population average: faint drop line + label under the baseline
+            var avgLine = Path()
+            avgLine.move(to: point(mean))
+            avgLine.addLine(to: CGPoint(x: xPos(mean), y: baseline))
+            ctx.stroke(avgLine, with: .color(.witsLine), lineWidth: 1)
+            ctx.draw(Text("avg \(Int(mean))")
+                .font(.witsLabel(11))
+                .foregroundStyle(Color.witsFaint),
+                at: CGPoint(x: min(size.width - 30, max(30, xPos(mean))), y: baseline + 10),
+                anchor: .center)
+
+            // the user's marker: dashed rule + "you" pill above it
+            let mx = xPos(marker)
+            var rule = Path()
+            rule.move(to: CGPoint(x: mx, y: topPad - 4))
+            rule.addLine(to: CGPoint(x: mx, y: baseline))
+            ctx.stroke(rule, with: .color(tint),
+                       style: StrokeStyle(lineWidth: 2, dash: [4, 3]))
+
+            let pill = ctx.resolve(Text("you").font(.witsLabel(11)).foregroundStyle(.white))
+            let pillSize = pill.measure(in: CGSize(width: 100, height: 40))
+            let pillW = pillSize.width + 16
+            let pillH = pillSize.height + 6
+            let pillX = min(size.width - pillW / 2, max(pillW / 2, mx))
+            let pillRect = CGRect(x: pillX - pillW / 2, y: topPad - 4 - pillH,
+                                  width: pillW, height: pillH)
+            ctx.fill(Capsule().path(in: pillRect), with: .color(tint))
+            ctx.draw(pill, at: CGPoint(x: pillRect.midX, y: pillRect.midY), anchor: .center)
+        }
+        .frame(height: 170)
     }
 }
 

@@ -59,6 +59,11 @@ final class AppModel {
     /// played — reconstructed from game_sessions so a past day's recap shows the
     /// real lineup and difficulty, not a rotation guess.
     var playedByDay: [String: [PlayedGame]] = [:]
+    /// Age-banded population comparison per skill score (CognitiveDomain
+    /// rawValue + "overall") — the percentile/curve data behind the activity
+    /// page's "vs other users" views. Refreshed on reconcile and after each
+    /// day's rollup.
+    var statNorms: [String: StatNorm] = [:]
     /// Latest global-leaderboard snapshot per game (top players + my rank),
     /// prefetched right after each run persists so post-game UI renders instantly.
     var leaderboards: [GameID: LeaderboardSnapshot] = [:]
@@ -446,6 +451,7 @@ final class AppModel {
                                                 coverageCount: coverageCount,
                                                 migrationOffset: anchored.offset,
                                                 workoutGames: lineup)
+            await refreshStatNorms()
         }
     }
 
@@ -580,6 +586,7 @@ final class AppModel {
             progressDays = rows
             headlineIndex = rows.last?.headline_index ?? headlineIndex
         }
+        await refreshStatNorms()
         if let rows = try? await supa.fetchSessions(since: since) {
             // Bucket workout runs per local day (oldest → newest), carrying the
             // workout_id that ties each run to a specific prescribed workout.
@@ -612,6 +619,30 @@ final class AppModel {
         rebuildTodayIfNeeded()
         saveCache()
         await syncNotificationAuthorizationAndSchedule()
+    }
+
+    /// Age in years from the onboarding birthdate; 30 keeps the norms query
+    /// sane for the rare account with no birthdate on file.
+    private var ageYears: Int {
+        guard let b = profile.birthdate,
+              let y = Calendar.current.dateComponents([.year], from: b, to: Date()).year
+        else { return 30 }
+        return max(13, min(100, y))
+    }
+
+    /// Pull the age-banded population comparison for the current smoothed skill
+    /// scores (the same values the activity page renders), folding this user
+    /// into the norms as a side effect.
+    func refreshStatNorms() async {
+        guard supa.isSignedIn else { return }
+        var scores = Dictionary(uniqueKeysWithValues:
+            ProgressMath.latestDomainScores(progressDays).map { ($0.key.rawValue, $0.value) })
+        if let overall = ProgressMath.headline(progressDays) { scores["overall"] = overall }
+        guard !scores.isEmpty else { return }
+        if let norms = try? await supa.fetchStatPercentiles(age: ageYears, scores: scores) {
+            statNorms = norms
+            saveCache()
+        }
     }
 
     private func recomputeEntitlement() {
@@ -707,6 +738,7 @@ final class AppModel {
         var headlineIndex: Double?
         var progressDays: [DailyProgressRow]
         var playedByDay: [String: [PlayedGame]]?
+        var statNorms: [String: StatNorm]?
     }
 
     private func saveCache() {
@@ -718,7 +750,8 @@ final class AppModel {
             today: today,
             headlineIndex: headlineIndex,
             progressDays: progressDays,
-            playedByDay: playedByDay
+            playedByDay: playedByDay,
+            statNorms: statNorms
         )
         if let data = try? JSONEncoder().encode(state) {
             UserDefaults.standard.set(data, forKey: cacheKey)
@@ -736,6 +769,7 @@ final class AppModel {
         headlineIndex = nil
         progressDays = []
         playedByDay = [:]
+        statNorms = [:]
         leaderboards = [:]
         leaderboardMeta = [:]
         today = WorkoutBuilder.build(for: Date())
@@ -759,6 +793,7 @@ final class AppModel {
         headlineIndex = state.headlineIndex
         progressDays = state.progressDays
         playedByDay = state.playedByDay ?? [:]
+        statNorms = state.statNorms ?? [:]
         // keep cached workout only if it's still today's
         if Calendar.current.isDate(state.today.day, inSameDayAs: Date()) {
             today = state.today

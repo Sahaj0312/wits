@@ -105,12 +105,14 @@ struct ActivityTab: View {
                     section("skill scores")
                     VStack(spacing: 10) {
                         MetricBar(label: "overall", value: heroScore ?? 0,
-                                  series: headlinePoints, emphasized: true)
+                                  series: headlinePoints, emphasized: true,
+                                  norm: app.statNorms["overall"])
                         ForEach(CognitiveDomain.allCases) { domain in
                             if let value = domainScores[domain] {
                                 MetricBar(label: domain.label, value: value,
                                           series: ProgressMath.domainSeries(app.progressDays, domain),
-                                          tint: domain.color)
+                                          tint: domain.color,
+                                          norm: app.statNorms[domain.rawValue])
                             } else {
                                 untrainedDomainRow(domain)
                             }
