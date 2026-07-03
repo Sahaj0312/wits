@@ -73,8 +73,10 @@ enum HeroPattern {
             letters(&ctx, size, wheel: game == .wordConnect, ink: ink, soft: inkSoft, glow: glow)
         case .towerOfHanoi:
             tower(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .slidePuzzle, .blockEscape:
+        case .slidePuzzle:
             slide(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
+        case .blockEscape:
+            escape(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         }
     }
 
@@ -419,6 +421,56 @@ enum HeroPattern {
                 .foregroundStyle(.white.opacity(sliding ? 0.85 : 0.4)),
                      at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
         }
+    }
+
+    /// Block escape mid-solve: a jammed tray, the glowing 2×2 hero lined up
+    /// over the exit notch in the bottom rail.
+    private static func escape(_ ctx: inout GraphicsContext, _ size: CGSize,
+                               ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
+                               glow: GraphicsContext.Shading) {
+        let cell: CGFloat = 26, gap: CGFloat = 5
+        let cols = 4, rows = 5
+        let trayW = CGFloat(cols) * cell + CGFloat(cols - 1) * gap
+        let trayH = CGFloat(rows) * cell + CGFloat(rows - 1) * gap
+        let ox = size.width - trayW - 44
+        let oy = (size.height - trayH) / 2 - 12
+
+        func block(_ c: Int, _ r: Int, _ w: Int, _ h: Int, _ shading: GraphicsContext.Shading) {
+            let rect = CGRect(x: ox + CGFloat(c) * (cell + gap),
+                              y: oy + CGFloat(r) * (cell + gap),
+                              width: CGFloat(w) * cell + CGFloat(w - 1) * gap,
+                              height: CGFloat(h) * cell + CGFloat(h - 1) * gap)
+            ctx.fill(Path(roundedRect: rect, cornerRadius: 9), with: shading)
+        }
+
+        block(0, 0, 1, 2, soft)     // vertical
+        block(1, 0, 2, 1, ink)      // flat
+        block(3, 0, 1, 2, soft)     // vertical
+        block(0, 2, 1, 1, ink)      // single
+        block(3, 2, 1, 1, soft)     // single
+        block(1, 2, 2, 2, glow)     // the hero, two rows above the exit
+        block(0, 4, 1, 1, soft)     // single by the door
+
+        // bottom rail with the exit gap under the hero's columns
+        let railY = oy + trayH + 10
+        let exitL = ox + 1 * (cell + gap)
+        let exitR = exitL + 2 * cell + gap
+        var rail = Path()
+        rail.move(to: CGPoint(x: ox - 8, y: railY))
+        rail.addLine(to: CGPoint(x: exitL - 6, y: railY))
+        rail.move(to: CGPoint(x: exitR + 6, y: railY))
+        rail.addLine(to: CGPoint(x: ox + trayW + 8, y: railY))
+        ctx.stroke(rail, with: ink, style: StrokeStyle(lineWidth: 4, lineCap: .round))
+
+        // escape arrow through the gap
+        var arrow = Path()
+        let ax = (exitL + exitR) / 2
+        arrow.move(to: CGPoint(x: ax, y: railY - 4))
+        arrow.addLine(to: CGPoint(x: ax, y: railY + 12))
+        arrow.move(to: CGPoint(x: ax - 7, y: railY + 6))
+        arrow.addLine(to: CGPoint(x: ax, y: railY + 13))
+        arrow.addLine(to: CGPoint(x: ax + 7, y: railY + 6))
+        ctx.stroke(arrow, with: glow, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
     }
 }
 
