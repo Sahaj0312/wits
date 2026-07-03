@@ -65,7 +65,7 @@ struct LevelMapView: View {
             page = LevelLadder.page(of: min(frontier, levelCount))
         }
         .sheet(item: $selectedLevel) { selected in
-            LevelDetailCard(
+            LevelDetailSheet(
                 game: game,
                 level: selected.level,
                 record: app.levels.record(for: game, level: selected.level),
@@ -75,8 +75,6 @@ struct LevelMapView: View {
                     onPlayLevel(selected.level)
                 }
             )
-            .presentationDetents([.height(300)])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -302,6 +300,37 @@ private struct LevelTile: View {
 
 // MARK: - Level detail card
 
+private struct LevelDetailSheet: View {
+    let game: GameID
+    let level: Int
+    let record: LevelRecord?
+    let unlocked: Bool
+    let onPlay: () -> Void
+
+    @State private var contentHeight: CGFloat = 300
+
+    var body: some View {
+        LevelDetailCard(game: game,
+                        level: level,
+                        record: record,
+                        unlocked: unlocked,
+                        onPlay: onPlay)
+            .background {
+                GeometryReader { proxy in
+                    Color.clear.preference(key: LevelDetailSheetHeightKey.self,
+                                           value: ceil(proxy.size.height))
+                }
+            }
+            .onPreferenceChange(LevelDetailSheetHeightKey.self) { height in
+                contentHeight = max(260, height)
+            }
+            .presentationDetents([.height(contentHeight)])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Color.witsBg)
+            .presentationCornerRadius(WitsMetrics.panelRadius)
+    }
+}
+
 private struct LevelDetailCard: View {
     let game: GameID
     let level: Int
@@ -309,39 +338,119 @@ private struct LevelDetailCard: View {
     let unlocked: Bool
     let onPlay: () -> Void
 
+    private var earnedStars: Int { record?.stars ?? 0 }
+    private var bestPercent: Int? {
+        guard let record, record.bestQuality > 0 else { return nil }
+        return Int((record.bestQuality * 100).rounded())
+    }
+
     var body: some View {
-        VStack(spacing: 16) {
-            Text("level \(level)")
-                .font(.witsDisplay(26))
-                .foregroundStyle(Color.witsInk)
-                .padding(.top, 18)
-
-            HStack(spacing: 6) {
-                ForEach(0..<3, id: \.self) { i in
-                    Image(systemName: i < (record?.stars ?? 0) ? "star.fill" : "star")
-                        .font(.system(size: 26, weight: .heavy))
-                        .foregroundStyle(i < (record?.stars ?? 0) ? Color.witsWarm : Color.witsFaint)
-                }
-            }
-
-            VStack(spacing: 4) {
-                Text("difficulty \(level) of \(LevelLadder.levelCount(for: game))")
-                    .font(.witsBody(14))
-                    .foregroundStyle(Color.witsMuted)
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 14) {
+                Text("\(level)")
+                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
                     .monospacedDigit()
-                if let record, record.bestQuality > 0 {
-                    Text("best run: \(Int((record.bestQuality * 100).rounded()))%")
-                        .font(.witsBody(13))
-                        .foregroundStyle(Color.witsFaint)
+                    .frame(width: 52, height: 52)
+                    .background(
+                        LinearGradient(colors: [game.domain.color, game.domain.heroTopColor],
+                                       startPoint: .topLeading,
+                                       endPoint: .bottomTrailing),
+                        in: RoundedRectangle(cornerRadius: WitsMetrics.chipRadius, style: .continuous)
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("level \(level)")
+                        .font(.witsDisplay(26))
+                        .foregroundStyle(Color.witsInk)
+                    Text("difficulty \(level) of \(LevelLadder.levelCount(for: game))")
+                        .font(.witsBody(13.5))
+                        .foregroundStyle(Color.witsMuted)
                         .monospacedDigit()
                 }
+
+                Spacer(minLength: 0)
             }
 
-            Cta(title: (record?.stars ?? 0) > 0 ? "replay" : "play", action: onPlay)
-                .padding(.horizontal, WitsMetrics.screenPadding)
-                .padding(.bottom, 12)
+            HStack(spacing: 10) {
+                HStack(spacing: 7) {
+                    ForEach(0..<3, id: \.self) { i in
+                        Image(systemName: i < earnedStars ? "star.fill" : "star")
+                            .font(.system(size: 27, weight: .heavy))
+                            .foregroundStyle(i < earnedStars ? Color.witsWarm : Color.witsFaint)
+                    }
+                }
+                Spacer(minLength: 0)
+                Text("\(earnedStars) / 3")
+                    .font(.witsLabel(12.5))
+                    .foregroundStyle(Color.witsMuted)
+                    .monospacedDigit()
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.witsTint, in: Capsule())
+            }
+            .padding(14)
+            .background(Color.witsCard, in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                    .strokeBorder(Color.witsLine, lineWidth: 1)
+            )
+
+            if let bestPercent {
+                Label("best run \(bestPercent)%", systemImage: "chart.line.uptrend.xyaxis")
+                    .font(.witsBody(13.5, weight: .semibold))
+                    .foregroundStyle(Color.witsMuted)
+                    .monospacedDigit()
+            } else {
+                Label("first clear earns a star", systemImage: "sparkle")
+                    .font(.witsBody(13.5, weight: .semibold))
+                    .foregroundStyle(Color.witsMuted)
+            }
+
+            LevelDetailButton(title: earnedStars > 0 ? "replay" : "play",
+                              tint: game.domain.color,
+                              action: onPlay)
+                .padding(.top, 2)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, WitsMetrics.screenPadding)
+        .padding(.top, 32)
+        .padding(.bottom, 20)
         .background(Color.witsBg)
+    }
+}
+
+private struct LevelDetailButton: View {
+    let title: String
+    let tint: Color
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 16.5, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(
+                    LinearGradient(colors: [tint.opacity(0.88), tint],
+                                   startPoint: .top,
+                                   endPoint: .bottom),
+                    in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                        .strokeBorder(.white.opacity(0.16), lineWidth: 1)
+                )
+        }
+        .buttonStyle(PressScale())
+        .shadow(color: tint.opacity(0.22), radius: 7, y: 4)
+    }
+}
+
+private struct LevelDetailSheetHeightKey: PreferenceKey {
+    static var defaultValue: CGFloat = 300
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
