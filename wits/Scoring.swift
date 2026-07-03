@@ -111,6 +111,8 @@ enum ScoringPolicies {
             TowerPolicy()
         case .slidePuzzle:
             SlidePuzzlePolicy()
+        case .blockEscape:
+            BlockEscapePolicy()
         case .dotsConnect:
             DotsPolicy()
         case .oneLine:
@@ -609,6 +611,30 @@ struct SlidePuzzlePolicy: GameScoringPolicy {
             confidence: 1.0,
             // The challenge actually served this run (board size + scramble).
             abilitySignal: result.raw["slideLevel"] ?? prior.level,
+            metrics: ["moveEfficiency": moveEfficiency, "timeEfficiency": timeEfficiency]
+        )
+    }
+}
+
+struct BlockEscapePolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.20 }
+
+    /// A run only completes on a solve (BlockEscape's par is an exact BFS
+    /// minimum), so quality is pure efficiency: moves against par (dominant)
+    /// plus time against par.
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let moves = max(1, result.raw["moves"] ?? Double(result.trials))
+        let par = max(1, result.raw["parMoves"] ?? moves)
+        let seconds = max(1, result.raw["seconds"] ?? Double(result.durationMs) / 1000.0)
+        let parSeconds = max(10, result.raw["parSeconds"] ?? (par * 2.4 + 10))
+        let moveEfficiency = min(1, par / moves)
+        let timeEfficiency = min(1, parSeconds / seconds)
+        let quality = ScoringMath.clamp(0.70 * moveEfficiency + 0.30 * timeEfficiency, 0, 1)
+        return ScoredRun(
+            performance: quality,
+            confidence: 1.0,
+            // The challenge actually served this run (tray + exact par).
+            abilitySignal: result.raw["blockLevel"] ?? prior.level,
             metrics: ["moveEfficiency": moveEfficiency, "timeEfficiency": timeEfficiency]
         )
     }

@@ -73,7 +73,7 @@ enum HeroPattern {
             letters(&ctx, size, wheel: game == .wordConnect, ink: ink, soft: inkSoft, glow: glow)
         case .towerOfHanoi:
             tower(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .slidePuzzle:
+        case .slidePuzzle, .blockEscape:
             slide(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         }
     }

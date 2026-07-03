@@ -30,7 +30,7 @@ enum LevelLadder {
              .numberRush, .estimator:
             50
         case .matchBack, .crowdControl, .echoGrid, .pathKeeper, .lastSeen,
-             .towerOfHanoi, .slidePuzzle, .oneLine, .dotsConnect, .ruleFinder:
+             .towerOfHanoi, .slidePuzzle, .oneLine, .dotsConnect, .ruleFinder, .blockEscape:
             40
         case .split:
             30

@@ -38,6 +38,11 @@ struct GameStageBackground: View {
                                     Color(light: 0x1A465D, dark: 0x102E41)],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
+        case .blockEscape:
+            LinearGradient(colors: [Color(light: 0x3A3357, dark: 0x2A2542),
+                                    Color(light: 0x2C2745, dark: 0x1F1B33)],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
         default:
             Color.witsBg.ignoresSafeArea()
         }
@@ -443,6 +448,12 @@ extension GameID {
                 "tap any tile in the same row or column as the gap to slide it.",
                 "put the numbers back in order, reading left to right.",
                 "fewer moves and a faster solve score higher."
+            ]
+        case .blockEscape:
+            [
+                "drag blocks along rows and columns — they can't jump or turn.",
+                "clear a path for the big red block.",
+                "walk it out the bottom exit in as few moves as you can."
             ]
         case .split:
             [
