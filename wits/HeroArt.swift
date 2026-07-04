@@ -77,6 +77,8 @@ enum HeroPattern {
             slide(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .blockEscape:
             escape(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
+        case .pegSolitaire:
+            pegs(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         }
     }
 
@@ -471,6 +473,38 @@ enum HeroPattern {
         arrow.addLine(to: CGPoint(x: ax, y: railY + 13))
         arrow.addLine(to: CGPoint(x: ax + 7, y: railY + 6))
         ctx.stroke(arrow, with: glow, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+    }
+
+    /// Peg solitaire mid-jump: a diamond of holes, a few pegs, one arcing
+    /// over its neighbour into the empty hole.
+    private static func pegs(_ ctx: inout GraphicsContext, _ size: CGSize,
+                             ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
+                             glow: GraphicsContext.Shading) {
+        let cell: CGFloat = 38
+        let cx = size.width - 118, cy = size.height / 2 + 8
+        // diamond of holes (radius 2 in taxicab distance)
+        for dy in -2...2 {
+            for dx in -2...2 where abs(dx) + abs(dy) <= 2 {
+                let p = CGPoint(x: cx + CGFloat(dx) * cell, y: cy + CGFloat(dy) * cell)
+                ctx.stroke(Path(ellipseIn: CGRect(x: p.x - 9, y: p.y - 9, width: 18, height: 18)),
+                           with: soft, lineWidth: 2.5)
+            }
+        }
+        // resting pegs
+        for (dx, dy) in [(-1, 1), (0, 1), (1, 0), (0, -1)] {
+            let p = CGPoint(x: cx + CGFloat(dx) * cell, y: cy + CGFloat(dy) * cell)
+            ctx.fill(Path(ellipseIn: CGRect(x: p.x - 10, y: p.y - 10, width: 20, height: 20)), with: ink)
+        }
+        // the jumper, mid-arc from (-2,0) over (-1,0) into (0,0)
+        let from = CGPoint(x: cx - 2 * cell, y: cy)
+        let mid = CGPoint(x: cx - cell, y: cy)
+        ctx.fill(Path(ellipseIn: CGRect(x: mid.x - 10, y: mid.y - 10, width: 20, height: 20)), with: soft)
+        var arc = Path()
+        arc.move(to: from)
+        arc.addQuadCurve(to: CGPoint(x: cx, y: cy), control: CGPoint(x: cx - cell, y: cy - cell * 1.5))
+        ctx.stroke(arc, with: glow, style: StrokeStyle(lineWidth: 3.5, lineCap: .round, dash: [1, 7]))
+        let jumper = CGPoint(x: cx - cell, y: cy - cell * 1.1)
+        ctx.fill(Path(ellipseIn: CGRect(x: jumper.x - 11, y: jumper.y - 11, width: 22, height: 22)), with: glow)
     }
 }
 

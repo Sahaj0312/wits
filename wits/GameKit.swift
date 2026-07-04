@@ -19,7 +19,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     case spotSpeed, colorClash, matchBack, ruleFinder
     // expanded library
     case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
-    case wordConnect, memoryLock, dotsConnect, oneLine, towerOfHanoi, slidePuzzle, blockEscape
+    case wordConnect, memoryLock, dotsConnect, oneLine, towerOfHanoi, slidePuzzle, blockEscape, pegSolitaire
     // Standalone survival mode. Playable in the library, not prescribed in daily
     // workouts, and not connected to WPI/mastery scoring.
     case split
@@ -30,7 +30,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder,
          .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect, .dotsConnect,
-         .oneLine, .memoryLock, .towerOfHanoi, .slidePuzzle, .blockEscape]
+         .oneLine, .memoryLock, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire]
     }
     var isLive: Bool { Self.live.contains(self) }
 
@@ -47,7 +47,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     /// their own top/bottom spacing.
     var ownsSafeAreaSurface: Bool {
         switch self {
-        case .echoGrid, .pathKeeper, .wordConnect, .memoryLock, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape: true
+        case .echoGrid, .pathKeeper, .wordConnect, .memoryLock, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire: true
         default: false
         }
     }
@@ -86,7 +86,7 @@ extension GameID {
         case .crowdControl: .multitasking
         case .echoGrid, .matchBack, .lastSeen, .pathKeeper: .memory
         case .colorClash, .tileShift: .flexibility
-        case .ruleFinder, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape: .reasoning
+        case .ruleFinder, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire: .reasoning
         case .numberRush, .estimator: .math
         case .wordConnect, .memoryLock: .language
         case .split: .multitasking
@@ -115,6 +115,7 @@ extension GameID {
         case .towerOfHanoi: "tower of hanoi"
         case .slidePuzzle: "slide puzzle"
         case .blockEscape: "block escape"
+        case .pegSolitaire: "peg solitaire"
         case .split: "split"
         }
     }
@@ -142,6 +143,7 @@ extension GameID {
         case .towerOfHanoi: "rebuild the goal arrangement in as few moves as you can."
         case .slidePuzzle: "slide the tiles back into order."
         case .blockEscape: "free the big block."
+        case .pegSolitaire: "jump pegs. leave just one."
         case .split: "fly and pick at once. one slip ends it."
         }
     }
@@ -153,7 +155,7 @@ extension GameID {
         case .spotSpeed: "speed"
         case .echoGrid, .matchBack, .lastSeen, .pathKeeper: "memory"
         case .colorClash, .tileShift: "flexibility"
-        case .ruleFinder, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape: "problem solving"
+        case .ruleFinder, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire: "problem solving"
         case .numberRush, .estimator: "math"
         case .wordConnect, .memoryLock: "language"
         case .split: "attention"
@@ -183,6 +185,7 @@ extension GameID {
         case .towerOfHanoi: "sequential planning"
         case .slidePuzzle: "spatial planning"
         case .blockEscape: "forward planning"
+        case .pegSolitaire: "strategic planning"
         case .split: "dual-tasking"
         }
     }
@@ -210,6 +213,7 @@ extension GameID {
         case .towerOfHanoi: "clear a 36-level tower campaign. every level deals a scrambled tower and a goal arrangement; plan ahead and rebuild the goal in as few moves as possible."
         case .slidePuzzle: "the numbered tiles are scrambled around one empty square. slide them through the gap until they read in order — in as few moves as you can."
         case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit — in as few moves as you can."
+        case .pegSolitaire: "every jump leaps one peg over a neighbour into an empty hole, and the jumped peg is removed. keep jumping until a single peg remains — on the marked hole at higher levels."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         }
     }
@@ -231,6 +235,7 @@ extension GameID {
         case .towerOfHanoi: "sequential planning is thinking several moves ahead while respecting a changing set of constraints."
         case .slidePuzzle: "spatial planning is seeing moves ahead — how each slide reshapes the board and which tile it frees up next."
         case .blockEscape: "forward planning is simulating moves in your head — seeing how each slide opens or closes the big block's path several steps ahead."
+        case .pegSolitaire: "strategic planning is ordering moves so nothing gets stranded — every jump has to leave the rest of the board still clearable."
         case .numberRush: "arithmetic is performing quick mental calculations accurately under time pressure."
         case .estimator: "mental arithmetic is composing numbers quickly: scanning options, choosing operations, and keeping the result in mind."
         case .wordConnect: "vocabulary is fluent word retrieval: spotting letter patterns, spelling accurately, and finding possibilities quickly."
@@ -262,6 +267,7 @@ extension GameID {
         case .towerOfHanoi: "square.stack.3d.up.fill"
         case .slidePuzzle: "square.grid.3x3.topleft.filled"
         case .blockEscape: "square.split.2x2.fill"
+        case .pegSolitaire: "circle.grid.cross.fill"
         case .split: "rectangle.split.1x2.fill"
         }
     }
@@ -270,7 +276,7 @@ extension GameID {
     var seedLevel: Double {
         switch self {
         case .crowdControl, .echoGrid, .lastSeen, .pathKeeper, .matchBack: 1
-        case .wordConnect, .memoryLock, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape: 1
+        case .wordConnect, .memoryLock, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire: 1
         default: 2
         }
     }
@@ -294,6 +300,7 @@ extension GameID {
         case .towerOfHanoi: "efficiency"
         case .slidePuzzle: "efficiency"
         case .blockEscape: "efficiency"
+        case .pegSolitaire: "clearPct"
         case .split: "maxLevel"
         case .estimator: "exact"
         default: "bestStreak"
@@ -318,6 +325,7 @@ extension GameID {
         case .towerOfHanoi: "\(Int(v))% optimal"
         case .slidePuzzle: "\(Int(v))% of par"
         case .blockEscape: "\(Int(v))% of par"
+        case .pegSolitaire: "\(Int(v))% cleared"
         case .split: "level \(Int(v))"
         case .estimator: "\(Int(v)) exact"
         default: "streak \(Int(v))"

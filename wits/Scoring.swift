@@ -113,6 +113,8 @@ enum ScoringPolicies {
             SlidePuzzlePolicy()
         case .blockEscape:
             BlockEscapePolicy()
+        case .pegSolitaire:
+            PegSolitairePolicy()
         case .dotsConnect:
             DotsPolicy()
         case .oneLine:
@@ -636,6 +638,34 @@ struct BlockEscapePolicy: GameScoringPolicy {
             // The challenge actually served this run (tray + exact par).
             abilitySignal: result.raw["blockLevel"] ?? prior.level,
             metrics: ["moveEfficiency": moveEfficiency, "timeEfficiency": timeEfficiency]
+        )
+    }
+}
+
+struct PegSolitairePolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.20 }
+
+    /// Any solution is exactly startPegs−1 jumps, so there is no move par;
+    /// quality is how far the board was cleared (dominant) plus time against
+    /// a generous planning budget, with the classic finish-on-target bonus
+    /// factor and a small undo penalty.
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let start = max(2, result.raw["startPegs"] ?? Double(result.trials) + 1)
+        let end = max(1, result.raw["endPegs"] ?? 1)
+        let clear = ScoringMath.clamp((start - end) / (start - 1), 0, 1)
+        let seconds = max(1, result.raw["seconds"] ?? Double(result.durationMs) / 1000.0)
+        let parSeconds = max(20, result.raw["parSeconds"] ?? (start * 7 + 20))
+        let timeEfficiency = min(1, parSeconds / seconds)
+        let solvedOffTarget = (result.raw["solved"] ?? 0) >= 1 && (result.raw["onTarget"] ?? 1) < 1
+        let undoPenalty = min(0.25, (result.raw["undos"] ?? 0) * 0.03)
+        let quality = ScoringMath.clamp(
+            (0.80 * clear + 0.20 * timeEfficiency) * (solvedOffTarget ? 0.92 : 1.0) - undoPenalty, 0, 1)
+        return ScoredRun(
+            performance: quality,
+            confidence: 1.0,
+            // The planning depth actually served this run.
+            abilitySignal: result.raw["pegLevel"] ?? prior.level,
+            metrics: ["clearRatio": clear, "timeEfficiency": timeEfficiency]
         )
     }
 }

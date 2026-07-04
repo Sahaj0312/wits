@@ -43,6 +43,11 @@ struct GameStageBackground: View {
                                     Color(light: 0x2C2745, dark: 0x1F1B33)],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
+        case .pegSolitaire:
+            LinearGradient(colors: [Color(light: 0x2C5643, dark: 0x1F3F31),
+                                    Color(light: 0x224536, dark: 0x183227)],
+                           startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
         default:
             Color.witsBg.ignoresSafeArea()
         }
@@ -454,6 +459,12 @@ extension GameID {
                 "drag blocks along rows and columns — they can't jump or turn.",
                 "clear a path for the big red block.",
                 "walk it out the bottom exit in as few moves as you can."
+            ]
+        case .pegSolitaire:
+            [
+                "tap a peg, then the empty hole two spaces away.",
+                "the peg you jumped over is removed.",
+                "clear the board down to a single peg."
             ]
         case .split:
             [

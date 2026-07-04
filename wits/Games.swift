@@ -149,6 +149,13 @@ enum BlockEscape: Game {
     }
 }
 
+enum PegSolitaire: Game {
+    static let id = GameID.pegSolitaire
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(PegSolitaireScreen(cfg: config, onResult: onComplete))
+    }
+}
+
 /// Single dispatch the host uses to launch any game.
 @MainActor
 func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -173,6 +180,7 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .towerOfHanoi: TowerOfHanoi.makeView(config: config, onComplete: onComplete)
     case .slidePuzzle: SlidePuzzle.makeView(config: config, onComplete: onComplete)
     case .blockEscape: BlockEscape.makeView(config: config, onComplete: onComplete)
+    case .pegSolitaire: PegSolitaire.makeView(config: config, onComplete: onComplete)
     case .split:       AnyView(EmptyView())
     }
 }
