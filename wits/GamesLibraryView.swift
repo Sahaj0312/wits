@@ -226,22 +226,29 @@ private struct GameLauncher: View {
     var body: some View {
         switch phase {
         case .map:
-            LevelMapView(
-                game: game,
-                onPlayLevel: { level in
-                    marathonActive = false
-                    playLevel = level
-                    startRun()
-                },
-                onPlayMarathon: {
-                    marathonActive = true
-                    marathonDepth = 0
-                    marathonScore = 0
-                    playLevel = 1
-                    startRun()
-                },
-                onClose: { dismiss() }
-            )
+            if game == .split {
+                // Split is survival-only: no star map to show, and its screen
+                // carries its own intro/game-over chrome — go straight there.
+                Color.witsBg.ignoresSafeArea()
+                    .onAppear { startRun() }
+            } else {
+                LevelMapView(
+                    game: game,
+                    onPlayLevel: { level in
+                        marathonActive = false
+                        playLevel = level
+                        startRun()
+                    },
+                    onPlayMarathon: {
+                        marathonActive = true
+                        marathonDepth = 0
+                        marathonScore = 0
+                        playLevel = 1
+                        startRun()
+                    },
+                    onClose: { dismiss() }
+                )
+            }
         case .tutorial:
             FirstPlayTutorial(
                 game: game,
@@ -252,14 +259,18 @@ private struct GameLauncher: View {
                 },
                 onBack: {
                     pauseController.reset()
-                    withAnimation(.easeOut(duration: 0.2)) { phase = .map }
+                    if game == .split {
+                        dismiss()   // no map page behind split's tutorial
+                    } else {
+                        withAnimation(.easeOut(duration: 0.2)) { phase = .map }
+                    }
                 }
             )
         case .playing:
             if game == .split {
                 SplitSurvivalScreen(
                     best: app.levels.marathonBest(for: .split)?.depth ?? splitBestLevel,
-                    startsImmediately: true,
+                    startsImmediately: false,
                     onRunComplete: { level, depth, trials in
                         let result = splitResult(level: level, depth: depth, trials: trials)
                         app.recordStandaloneGameResult(result)

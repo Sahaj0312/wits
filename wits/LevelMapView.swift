@@ -38,7 +38,6 @@ struct LevelMapView: View {
 
     private var levelCount: Int { LevelLadder.levelCount(for: game) }
     private var frontier: Int { app.levels.frontier(for: game) }
-    private var isMarathonOnly: Bool { game == .split }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -46,19 +45,15 @@ struct LevelMapView: View {
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 14) {
                     marathonCard
-                    if !isMarathonOnly {
-                        pageStrip
-                        levelGrid
-                        gateFooter
-                    }
+                    pageStrip
+                    levelGrid
+                    gateFooter
                 }
                 .padding(.horizontal, WitsMetrics.screenPadding)
                 .padding(.top, 6)
                 .padding(.bottom, 16)
             }
-            if !isMarathonOnly {
-                footer
-            }
+            footer
         }
         .background(Color.witsBg.ignoresSafeArea())
         .onAppear {
@@ -145,9 +140,7 @@ struct LevelMapView: View {
                         .monospacedDigit()
                 }
             }
-            Text(isMarathonOnly
-                 ? "one life. how far can you go?"
-                 : "everyone starts at level 1 — climb until you break.")
+            Text("everyone starts at level 1 — climb until you break.")
                 .font(.witsBody(13.5))
                 .foregroundStyle(.white.opacity(0.8))
 

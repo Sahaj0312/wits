@@ -312,6 +312,9 @@ struct SplitSurvivalScreen: View {
     @State private var newBest = false
     @State private var tick = 0              // forces the playing view to observe model changes
     @State private var pauseController = GamePauseController()
+    /// 3…2…1 pre-launch count (0 = "go!", nil = live). Taps are ignored while
+    /// it runs; at "go!" the flyer auto-launches with a flap kick.
+    @State private var countdown: Int?
 
     private enum Phase { case intro, playing, over }
 
@@ -446,16 +449,22 @@ struct SplitSurvivalScreen: View {
                         .gesture(
                             DragGesture(minimumDistance: 0)
                                 .onEnded { v in
-                                    guard !pauseController.isPaused else { return }
+                                    guard !pauseController.isPaused, countdown == nil else { return }
                                     model.handleTap(v.location, size: geo.size)
                                 }
                         )
 
-                    if !model.started {
-                        SplitStartPrompt()
+                    if let countdown {
+                        Text(countdown == 0 ? "go!" : "\(countdown)")
+                            .font(.system(size: 84, weight: .heavy, design: .rounded))
+                            .foregroundStyle(countdown == 0 ? Color.witsAccent : Color.witsInk)
+                            .shadow(color: .black.opacity(0.25), radius: 10, y: 4)
+                            .id(countdown)
+                            .transition(.scale(scale: 1.5).combined(with: .opacity))
                             .allowsHitTesting(false)
                     }
                 }
+                .animation(.spring(response: 0.28, dampingFraction: 0.7), value: countdown)
                 .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
@@ -467,6 +476,30 @@ struct SplitSurvivalScreen: View {
         .padding(.horizontal, 10)
         .padding(.top, 42)
         .padding(.bottom, 10)
+        .task { await runCountdown() }
+    }
+
+    /// 3…2…1…go — then launch. Pause freezes the count; a rerun (fresh model)
+    /// counts again, while re-appearing mid-run does not.
+    private func runCountdown() async {
+        guard !model.started, countdown == nil else { return }
+        for n in [3, 2, 1] {
+            countdown = n
+            await activeSleep(0.8)
+            guard !Task.isCancelled else { countdown = nil; return }
+        }
+        countdown = 0
+        model.flap()
+        await activeSleep(0.5)
+        countdown = nil
+    }
+
+    private func activeSleep(_ seconds: Double) async {
+        var remaining = seconds
+        while remaining > 0, !Task.isCancelled {
+            try? await Task.sleep(for: .milliseconds(40))
+            if !pauseController.isPaused { remaining -= 0.04 }
+        }
     }
 
     // MARK: Game over
@@ -651,23 +684,6 @@ private struct SplitTargetChip: View {
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
         .background(color.opacity(0.12), in: Capsule())
-    }
-}
-
-private struct SplitStartPrompt: View {
-    var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "hand.tap.fill")
-                .font(.system(size: 17, weight: .heavy))
-                .foregroundStyle(Color.witsAccent)
-            Text("tap left to launch")
-                .font(.witsBody(15, weight: .semibold))
-                .foregroundStyle(Color.witsInk)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 11)
-        .background(.ultraThinMaterial, in: Capsule())
-        .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
     }
 }
 
