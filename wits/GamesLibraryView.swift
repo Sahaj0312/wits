@@ -26,11 +26,15 @@ struct GamesLibraryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                VStack(alignment: .leading, spacing: 2) {
-                    WitsBrandMark()
-                    Text("games")
-                        .font(.witsDisplay(30))
-                        .foregroundStyle(Color.witsInk)
+                HStack(alignment: .bottom) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        WitsBrandMark()
+                        Text("games")
+                            .font(.witsDisplay(30))
+                            .foregroundStyle(Color.witsInk)
+                    }
+                    Spacer()
+                    shuffleButton
                 }
                 .padding(.top, 8)
                 Text("train any skill on its own. your daily workout mixes these for you.")
@@ -55,6 +59,23 @@ struct GamesLibraryView: View {
             GameLauncher(game: g)
         }
         .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
+    }
+
+    /// Opens a random game's level map — a "surprise me" for the library.
+    private var shuffleButton: some View {
+        Button {
+            guard let pick = GameID.allCases.filter(\.isPlayable).randomElement() else { return }
+            if app.entitlement.isExpired { showPaywall = true } else { launch = pick }
+        } label: {
+            Image(systemName: "shuffle")
+                .font(.system(size: 16, weight: .heavy))
+                .foregroundStyle(Color.witsInk)
+                .frame(width: 44, height: 44)
+                .background(Color.witsCard, in: Circle())
+                .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1.5))
+        }
+        .buttonStyle(PressScale())
+        .accessibilityLabel("Open a random game")
     }
 
     private var filterBar: some View {
