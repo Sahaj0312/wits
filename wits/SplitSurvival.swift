@@ -347,7 +347,7 @@ struct SplitSurvivalScreen: View {
         .overlay {
             if phase == .playing, pauseController.isPaused {
                 GamePausedOverlay(game: .split,
-                                  onResume: { pauseController.resume() },
+                                  controller: pauseController,
                                   onQuit: {
                                       pauseController.reset()
                                       onQuit()

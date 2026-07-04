@@ -608,8 +608,13 @@ private struct GamePauseSpan {
 @Observable
 final class GamePauseController {
     var isPaused = false
+    /// 3…2…1 shown over the still-frozen game before a resume lands (nil when
+    /// not counting). The game stays paused — clocks and input included —
+    /// until the count finishes.
+    var resumeCountdown: Int?
     @ObservationIgnored private var pauseStartedAt: Date?
     @ObservationIgnored private var spans: [GamePauseSpan] = []
+    @ObservationIgnored private var resumeTask: Task<Void, Never>?
 
     func pause(now: Date = Date()) {
         guard !isPaused else { return }
@@ -617,8 +622,26 @@ final class GamePauseController {
         pauseStartedAt = now
     }
 
+    /// Count the player back in, then resume for real.
+    func beginResumeCountdown() {
+        guard isPaused, resumeTask == nil else { return }
+        resumeTask = Task { @MainActor in
+            for n in [3, 2, 1] {
+                resumeCountdown = n
+                try? await Task.sleep(for: .milliseconds(700))
+                guard !Task.isCancelled else { return }
+            }
+            resumeCountdown = nil
+            resumeTask = nil
+            resume()
+        }
+    }
+
     func resume(now: Date = Date()) {
         guard isPaused else { return }
+        resumeTask?.cancel()
+        resumeTask = nil
+        resumeCountdown = nil
         if let pauseStartedAt {
             spans.append(GamePauseSpan(start: pauseStartedAt, end: now))
         }
@@ -627,6 +650,9 @@ final class GamePauseController {
     }
 
     func reset() {
+        resumeTask?.cancel()
+        resumeTask = nil
+        resumeCountdown = nil
         isPaused = false
         pauseStartedAt = nil
         spans.removeAll()

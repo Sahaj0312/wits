@@ -83,8 +83,8 @@ struct GameHost: View {
             .overlay {
                 if stage == .playing, pauseController.isPaused {
                     GamePausedOverlay(game: currentGame,
+                                      controller: pauseController,
                                       quitTitle: "quit workout",
-                                      onResume: { pauseController.resume() },
                                       onQuit: {
                                           pauseController.reset()
                                           onQuit()

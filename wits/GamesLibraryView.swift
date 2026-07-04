@@ -317,7 +317,7 @@ private struct GameLauncher: View {
                     .overlay {
                         if pauseController.isPaused {
                             GamePausedOverlay(game: game,
-                                              onResume: { pauseController.resume() },
+                                              controller: pauseController,
                                               onQuit: {
                                                   pauseController.reset()
                                                   if marathonActive, marathonDepth >= 1 {
