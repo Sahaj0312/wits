@@ -9,17 +9,60 @@
 import SwiftUI
 import UIKit
 
+private enum WordConnectStyle {
+    static let tabletopTop = Color(light: 0xDDEBE0, dark: 0x142A25)
+    static let tabletopMid = Color(light: 0xEEF4E9, dark: 0x142139)
+    static let tabletopBottom = Color(light: 0xF8EED9, dark: 0x101827)
+    static let paperTop = Color(light: 0xFFF9EA, dark: 0x28324E)
+    static let paperBottom = Color(light: 0xF4E7C9, dark: 0x1A223B)
+    static let paperEdge = Color(light: 0xBBAF92, dark: 0xEDF0F8, lightAlpha: 0.42, darkAlpha: 0.18)
+    static let blankCell = Color(light: 0xFFFDF3, dark: 0x202945)
+    static let blankCellEdge = Color(light: 0x897E66, dark: 0xEDF0F8, lightAlpha: 0.32, darkAlpha: 0.16)
+    static let ink = Color(light: 0x173F2D, dark: 0xE7F6EC)
+    static let mutedInk = Color(light: 0x173F2D, dark: 0xE7F6EC, lightAlpha: 0.62, darkAlpha: 0.62)
+    static let tileTop = Color(light: 0x2F7A4F, dark: 0x55C97A)
+    static let tile = Color(light: 0x1F5A3B, dark: 0x2FA45C)
+    static let tileDeep = Color(light: 0x143926, dark: 0x1D6B40)
+    static let tileText = Color(light: 0xFFFDF5, dark: 0xF7FFF8)
+    static let sage = Color(light: 0xB9D1BE, dark: 0x26443A)
+    static let amber = Color.witsGold
+
+    static var paperGradient: LinearGradient {
+        LinearGradient(colors: [paperTop, paperBottom], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    static var tileGradient: LinearGradient {
+        LinearGradient(colors: [tileTop, tile], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    static var selectedTileGradient: LinearGradient {
+        LinearGradient(colors: [tileTop, tileDeep], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
 struct WordConnectSafeAreaBackground: View {
     var body: some View {
-        LinearGradient(
-            stops: [
-                .init(color: Color(light: 0xEDF5FF, dark: 0x172B55), location: 0),
-                .init(color: Color(light: 0xEDF5FF, dark: 0x172B55), location: 0.14),
-                .init(color: Color(light: 0xF3F5F9, dark: 0x131A2C), location: 1)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
+        ZStack {
+            LinearGradient(
+                stops: [
+                    .init(color: WordConnectStyle.tabletopTop, location: 0),
+                    .init(color: WordConnectStyle.tabletopMid, location: 0.58),
+                    .init(color: WordConnectStyle.tabletopBottom, location: 1)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            Image(systemName: "leaf.fill")
+                .font(.system(size: 190, weight: .regular))
+                .foregroundStyle(WordConnectStyle.tile.opacity(0.12))
+                .rotationEffect(.degrees(-18))
+                .offset(x: -126, y: 310)
+            Image(systemName: "book.closed.fill")
+                .font(.system(size: 150, weight: .regular))
+                .foregroundStyle(WordConnectStyle.paperEdge.opacity(0.22))
+                .rotationEffect(.degrees(-14))
+                .offset(x: 148, y: 356)
+        }
         .ignoresSafeArea()
     }
 }
@@ -336,11 +379,12 @@ struct WordConnectScreen: View {
     var body: some View {
         GeometryReader { geo in
             let layout = Self.layout(for: geo.size,
-                                     bonusVisible: !foundBonus.isEmpty,
+                                     bonusVisible: false,
                                      hasTopBar: !cfg.isSurvival,
                                      idealBoardHeight: targetBoardIdealHeight,
                                      topSafeInset: 0,
                                      bottomSafeInset: 0)
+            let bonusOverlayHeight: CGFloat = geo.size.height < 760 ? 30 : 34
             ZStack {
                 background.ignoresSafeArea()
                 VStack(spacing: layout.spacing) {
@@ -350,7 +394,10 @@ struct WordConnectScreen: View {
                     Spacer(minLength: 0)
 
                     currentWordPill(height: layout.wordPillHeight)
-                    bonusRow(height: layout.bonusHeight)
+                        .overlay(alignment: .topLeading) {
+                            bonusRow(height: bonusOverlayHeight)
+                                .offset(y: -bonusOverlayHeight - max(6, layout.spacing))
+                        }
                     letterWheel(height: layout.wheelHeight)
                     actionRow(buttonSize: layout.buttonSize)
                 }
@@ -373,9 +420,9 @@ struct WordConnectScreen: View {
         let topPadding: CGFloat = (compact ? 8 : 10) + topSafeInset
         let bottomPadding: CGFloat = (compact ? 8 : 10) + bottomSafeInset
         let wordPillHeight: CGFloat = compact ? 42 : 48
-        let bonusHeight: CGFloat = bonusVisible ? (compact ? 22 : 24) : 0
+        let bonusHeight: CGFloat = bonusVisible ? (compact ? 30 : 34) : 0
         let buttonSize: CGFloat = compact ? 42 : 48
-        let topBarHeight: CGFloat = hasTopBar ? (compact ? 34 : 38) : 0
+        let topBarHeight: CGFloat = hasTopBar ? (compact ? 52 : 56) : 0
         let childCount = 4 + (hasTopBar ? 1 : 0) + (bonusVisible ? 1 : 0) + 1
         let spacingHeight = CGFloat(max(0, childCount - 1)) * spacing
         let reservedHeight = topPadding + bottomPadding + topBarHeight + wordPillHeight + bonusHeight + buttonSize + spacingHeight
@@ -405,59 +452,87 @@ struct WordConnectScreen: View {
     }
 
     private var background: some View {
-        LinearGradient(
-            colors: [
-                Color(light: 0xEDF5FF, dark: 0x172B55),
-                Color(light: 0xF3F5F9, dark: 0x131A2C)
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-        )
-        .overlay(alignment: .topTrailing) {
-            Image(systemName: "textformat.abc")
-                .font(.system(size: 154, weight: .heavy))
-                .foregroundStyle(Color.witsAccent.opacity(0.08))
-                .offset(x: 26, y: 78)
-        }
+        WordConnectSafeAreaBackground()
+            .overlay(alignment: .topTrailing) {
+                Image(systemName: "textformat.abc")
+                    .font(.system(size: 134, weight: .heavy))
+                    .foregroundStyle(WordConnectStyle.tile.opacity(0.07))
+                    .offset(x: 20, y: 82)
+            }
+            .overlay(alignment: .bottomLeading) {
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: 112, weight: .regular))
+                    .foregroundStyle(WordConnectStyle.tile.opacity(0.10))
+                    .rotationEffect(.degrees(28))
+                    .offset(x: -30, y: -12)
+            }
     }
 
     private var topBar: some View {
-        VStack(spacing: 9) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("level \(currentLevel)")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                Spacer()
-                Text("\(score) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsAccent)
-                    .monospacedDigit()
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                statusPill(icon: "book.closed.fill", text: "lvl \(currentLevel)")
+                statusPill(icon: "square.grid.3x3.fill", text: "\(min(boardsSolved + 1, Self.boardsPerRun))/\(Self.boardsPerRun)")
+                statusPill(icon: "star.fill", text: "\(score)", tint: WordConnectStyle.amber)
             }
             .padding(.leading, 34)
-            ProgressTrack(fraction: runProgress, animated: true)
+
+            ProgressTrack(fraction: runProgress, animated: true, tint: WordConnectStyle.tile)
         }
+    }
+
+    private func statusPill(icon: String, text: String, tint: Color = WordConnectStyle.tile) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 12.5, weight: .heavy))
+                .foregroundStyle(tint)
+                .frame(width: 22, height: 22)
+                .background(tint.opacity(0.12), in: Circle())
+            Text(text)
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(WordConnectStyle.ink)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .padding(.horizontal, 9)
+        .frame(maxWidth: .infinity)
+        .frame(height: 38)
+        .background(WordConnectStyle.paperTop.opacity(0.82), in: Capsule())
+        .overlay(Capsule().strokeBorder(WordConnectStyle.paperEdge, lineWidth: 1))
+        .shadow(color: Color.witsShadow.opacity(0.7), radius: 7, y: 4)
     }
 
     private func targetBoard(height: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("word grid")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                    Text("\(foundRequiredCount)/\(puzzle.required.count)")
-                        .font(.system(size: 24, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsInk)
-                        .monospacedDigit()
+            HStack(alignment: .center, spacing: 12) {
+                HStack(spacing: 9) {
+                    Image(systemName: "textformat.abc")
+                        .font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(WordConnectStyle.tile)
+                        .frame(width: 32, height: 32)
+                        .background(WordConnectStyle.sage.opacity(0.55), in: Circle())
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("word grid")
+                            .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                            .foregroundStyle(WordConnectStyle.mutedInk)
+                        Text("\(foundRequiredCount)/\(puzzle.required.count) found")
+                            .font(.system(size: 20, weight: .heavy, design: .rounded))
+                            .foregroundStyle(WordConnectStyle.ink)
+                            .monospacedDigit()
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                    }
                 }
                 Spacer()
                 if !cfg.isSurvival {
                     Text("board \(min(boardsSolved + 1, Self.boardsPerRun))/\(Self.boardsPerRun)")
                         .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsAccent)
+                        .foregroundStyle(WordConnectStyle.ink)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 5)
-                        .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                        .background(WordConnectStyle.sage.opacity(0.72), in: Capsule())
+                        .overlay(Capsule().strokeBorder(WordConnectStyle.paperEdge, lineWidth: 1))
                 }
             }
 
@@ -468,8 +543,17 @@ struct WordConnectScreen: View {
         .padding(16)
         .frame(height: height)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.witsCard.opacity(0.94), in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
-        .shadow(color: .witsShadow, radius: 12, y: 7)
+        .background(WordConnectStyle.paperGradient, in: RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+                .strokeBorder(WordConnectStyle.paperEdge, lineWidth: 1.5)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                .strokeBorder(WordConnectStyle.paperEdge.opacity(0.55), lineWidth: 1)
+                .padding(8)
+        }
+        .shadow(color: .witsShadow, radius: 16, y: 9)
         .id(puzzle.id)
         .transition(.scale(scale: 0.96).combined(with: .opacity))
     }
@@ -492,22 +576,17 @@ struct WordConnectScreen: View {
             let y0 = (geo.size.height - totalHeight) / 2
 
             ZStack(alignment: .topLeading) {
-                ForEach(Array(puzzle.cells.keys), id: \.self) { cellCoord in
+                ForEach(Array(puzzle.cells.keys).sorted {
+                    $0.row == $1.row ? $0.col < $1.col : $0.row < $1.row
+                }, id: \.self) { cellCoord in
                     let solved = puzzle.isSolved(cellCoord, found: found)
                     let active = puzzle.isActive(cellCoord, currentWord: currentWord)
                     let hinted = hintedCells.contains(cellCoord)
-                    Text(solved || hinted ? (puzzle.cells[cellCoord] ?? "") : "")
-                        .font(.system(size: min(20, cell * 0.52), weight: .heavy, design: .rounded))
-                        .foregroundStyle(solved ? Color.witsAccent : hinted ? Color.witsWarm : Color.witsInk)
-                        .frame(width: cell, height: cell)
-                        .background(
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(solved ? Color.witsAccent.opacity(0.18) : hinted ? Color.witsWarm.opacity(0.16) : Color.witsTint)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .strokeBorder(active ? Color.witsAccent : Color.witsLine, lineWidth: active ? 2.5 : 1.5)
-                        )
+                    crosswordCell(letter: puzzle.cells[cellCoord] ?? "",
+                                  solved: solved,
+                                  active: active,
+                                  hinted: hinted,
+                                  size: cell)
                         .position(
                             x: x0 + CGFloat(cellCoord.col) * (cell + gap) + cell / 2,
                             y: y0 + CGFloat(cellCoord.row) * (cell + gap) + cell / 2
@@ -518,41 +597,113 @@ struct WordConnectScreen: View {
         .accessibilityLabel("crossword word grid")
     }
 
-    private func currentWordPill(height: CGFloat) -> some View {
-        Text(currentWord.isEmpty ? "make a word" : currentWord)
-            .font(.system(size: currentWord.count > 6 ? height * 0.44 : height * 0.52, weight: .heavy, design: .rounded))
-            .foregroundStyle(currentWord.isEmpty ? Color.witsFaint : Color.witsAccent)
-            .monospaced()
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .frame(maxWidth: .infinity)
-            .frame(height: height)
-            .background(Color.witsCard.opacity(0.95), in: Capsule())
-            .overlay(
-                Capsule()
-                    .strokeBorder(feedback == true ? Color.witsAccent : feedback == false ? Color.witsWarm : Color.witsLine, lineWidth: 2)
-            )
-            .animation(.easeOut(duration: 0.14), value: feedback)
+    private func crosswordCell(letter: String, solved: Bool, active: Bool, hinted: Bool, size: CGFloat) -> some View {
+        let corner = max(8, size * 0.23)
+        let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
+        let border = active ? WordConnectStyle.amber : hinted ? WordConnectStyle.amber : WordConnectStyle.blankCellEdge
+        let lineWidth: CGFloat = active ? 2.8 : 1.2
+
+        return ZStack {
+            if solved {
+                shape.fill(WordConnectStyle.tileGradient)
+            } else if hinted {
+                shape.fill(WordConnectStyle.amber.opacity(0.18))
+            } else {
+                shape.fill(WordConnectStyle.blankCell)
+            }
+
+            Text(solved || hinted ? letter : "")
+                .font(.system(size: min(21, size * 0.55), weight: .heavy, design: .rounded))
+                .foregroundStyle(solved ? WordConnectStyle.tileText : hinted ? WordConnectStyle.amber : WordConnectStyle.ink)
+                .monospaced()
+                .minimumScaleFactor(0.78)
+        }
+        .frame(width: size, height: size)
+        .overlay(shape.strokeBorder(border, lineWidth: lineWidth))
+        .shadow(color: solved ? WordConnectStyle.tileDeep.opacity(0.20) : Color.witsShadow.opacity(0.45),
+                radius: solved ? 4 : 2,
+                y: solved ? 2 : 1)
+        .animation(.easeOut(duration: 0.16), value: solved)
+        .animation(.easeOut(duration: 0.16), value: active)
     }
 
-    @ViewBuilder
-    private func bonusRow(height: CGFloat) -> some View {
-        if !foundBonus.isEmpty {
-            HStack(spacing: 7) {
-                Text("bonus")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                Text("\(foundBonus.count)")
-                    .font(.system(size: 11.5, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsAccent)
-                    .monospacedDigit()
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.witsAccent.opacity(0.13), in: Capsule())
-                Spacer(minLength: 0)
+    private func currentWordPill(height: CGFloat) -> some View {
+        ZStack {
+            if currentWord.isEmpty {
+                Capsule().fill(WordConnectStyle.paperGradient)
+            } else {
+                Capsule().fill(WordConnectStyle.selectedTileGradient)
             }
-            .frame(height: height)
+
+            if currentWord.isEmpty {
+                Text("make a word")
+                    .font(.system(size: height * 0.42, weight: .heavy, design: .rounded))
+                    .foregroundStyle(WordConnectStyle.mutedInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .padding(.horizontal, 22)
+            } else {
+                Text(currentWord)
+                    .font(.system(size: currentWord.count > 6 ? height * 0.43 : height * 0.52, weight: .heavy, design: .rounded))
+                    .foregroundStyle(WordConnectStyle.tileText)
+                    .monospaced()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+                    .padding(.horizontal, 22)
+            }
         }
+        .frame(maxWidth: .infinity)
+        .frame(height: height)
+        .overlay(
+            Capsule()
+                .strokeBorder(feedback == true ? WordConnectStyle.tile : feedback == false ? Color.witsWarm : WordConnectStyle.paperEdge,
+                              lineWidth: feedback == nil ? 1.5 : 2.5)
+        )
+        .shadow(color: currentWord.isEmpty ? Color.witsShadow.opacity(0.35) : WordConnectStyle.tileDeep.opacity(0.24),
+                radius: currentWord.isEmpty ? 6 : 10,
+                y: currentWord.isEmpty ? 3 : 5)
+        .animation(.easeOut(duration: 0.14), value: feedback)
+        .animation(.easeOut(duration: 0.14), value: currentWord)
+    }
+
+    private func bonusRow(height: CGFloat) -> some View {
+        HStack(spacing: 8) {
+            HStack(spacing: 5) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 10.5, weight: .heavy))
+                Text("+\(foundBonus.count)")
+                    .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+                Text("bonus")
+                    .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(WordConnectStyle.mutedInk)
+            }
+            .foregroundStyle(WordConnectStyle.amber)
+
+            if let latest = foundBonus.last {
+                Text(latest)
+                    .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(WordConnectStyle.tileText)
+                    .monospaced()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.74)
+                    .padding(.horizontal, 8)
+                    .frame(height: height - 8)
+                    .background(WordConnectStyle.tileGradient, in: Capsule())
+                    .overlay(Capsule().strokeBorder(WordConnectStyle.paperTop.opacity(0.42), lineWidth: 1))
+            }
+        }
+        .padding(.leading, 10)
+        .padding(.trailing, 6)
+        .frame(height: height)
+        .background(WordConnectStyle.paperTop.opacity(0.72), in: Capsule())
+        .overlay(Capsule().strokeBorder(WordConnectStyle.paperEdge, lineWidth: 1.2))
+        .shadow(color: .witsShadow.opacity(0.45), radius: 5, y: 3)
+        .opacity(foundBonus.isEmpty ? 0 : 1)
+        .allowsHitTesting(false)
+        .accessibilityHidden(foundBonus.isEmpty)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .animation(.easeOut(duration: 0.16), value: foundBonus.count)
     }
 
     private func letterWheel(height: CGFloat) -> some View {
@@ -564,9 +715,22 @@ struct WordConnectScreen: View {
 
             ZStack {
                 Circle()
-                    .fill(Color.witsCard.opacity(0.76))
-                    .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 2))
-                    .shadow(color: .witsShadow, radius: 16, y: 10)
+                    .fill(WordConnectStyle.paperGradient)
+                    .overlay(Circle().strokeBorder(WordConnectStyle.paperEdge, lineWidth: 2))
+                    .shadow(color: .witsShadow, radius: 18, y: 10)
+                    .frame(width: size, height: size)
+                    .position(center)
+
+                Circle()
+                    .strokeBorder(WordConnectStyle.sage.opacity(0.85), lineWidth: 1.2)
+                    .frame(width: size * 0.85, height: size * 0.85)
+                    .position(center)
+
+                Image(systemName: "leaf.fill")
+                    .font(.system(size: size * 0.17, weight: .regular))
+                    .foregroundStyle(WordConnectStyle.tile.opacity(0.13))
+                    .rotationEffect(.degrees(-8))
+                    .position(center)
 
                 Canvas { ctx, _ in
                     guard selectedIndices.count > 1 else { return }
@@ -577,8 +741,13 @@ struct WordConnectScreen: View {
                     }
                     ctx.stroke(
                         path,
-                        with: .color(.witsAccent.opacity(0.82)),
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round, lineJoin: .round)
+                        with: .color(WordConnectStyle.tileDeep.opacity(0.20)),
+                        style: StrokeStyle(lineWidth: 15, lineCap: .round, lineJoin: .round)
+                    )
+                    ctx.stroke(
+                        path,
+                        with: .color(WordConnectStyle.tile.opacity(0.90)),
+                        style: StrokeStyle(lineWidth: 7, lineCap: .round, lineJoin: .round)
                     )
                 }
 
@@ -587,7 +756,8 @@ struct WordConnectScreen: View {
                         .position(Self.wheelPoint(index: index, count: letters.count, radius: radius, center: center))
                 }
             }
-            .contentShape(Circle())
+            .frame(width: geo.size.width, height: geo.size.height)
+            .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0, coordinateSpace: .local)
                     .onChanged { value in
@@ -614,11 +784,26 @@ struct WordConnectScreen: View {
     private func letterNode(_ letter: String, selected: Bool, size: CGFloat) -> some View {
         Text(letter)
             .font(.system(size: min(31, size * 0.43), weight: .heavy, design: .rounded))
-            .foregroundStyle(selected ? .white : Color.witsInk)
+            .foregroundStyle(WordConnectStyle.tileText)
+            .monospaced()
             .frame(width: size, height: size)
-            .background(selected ? Color.witsAccent : Color.witsTint, in: Circle())
-            .overlay(Circle().strokeBorder(selected ? Color.witsAccent.opacity(0.3) : Color.witsLine, lineWidth: 2))
-            .shadow(color: selected ? Color.witsAccent.opacity(0.25) : Color.witsShadow, radius: selected ? 10 : 4, y: 3)
+            .background {
+                if selected {
+                    Circle().fill(WordConnectStyle.selectedTileGradient)
+                } else {
+                    Circle().fill(WordConnectStyle.tileGradient)
+                }
+            }
+            .overlay(
+                Circle()
+                    .strokeBorder(selected ? WordConnectStyle.amber : WordConnectStyle.paperTop.opacity(0.62),
+                                  lineWidth: selected ? 3 : 1.2)
+            )
+            .shadow(color: selected ? WordConnectStyle.amber.opacity(0.28) : WordConnectStyle.tileDeep.opacity(0.22),
+                    radius: selected ? 12 : 6,
+                    y: selected ? 5 : 3)
+            .scaleEffect(selected ? 1.07 : 1)
+            .animation(.spring(response: 0.24, dampingFraction: 0.72), value: selected)
             .accessibilityLabel(letter)
     }
 
@@ -639,12 +824,24 @@ struct WordConnectScreen: View {
 
     private func hintButton(size: CGFloat) -> some View {
         Button(action: useHint) {
-            Image(systemName: "lightbulb.fill")
-                .font(.system(size: size * 0.34, weight: .heavy))
-                .foregroundStyle(hintCandidateCells.isEmpty || hintsRemaining == 0 ? Color.witsFaint : Color.witsWarm)
-                .frame(width: size, height: size)
-                .background(Color.witsCard.opacity(0.95), in: Circle())
-                .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1.5))
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: "lightbulb.fill")
+                    .font(.system(size: size * 0.34, weight: .heavy))
+                    .foregroundStyle(hintCandidateCells.isEmpty || hintsRemaining == 0 ? WordConnectStyle.mutedInk.opacity(0.45) : WordConnectStyle.amber)
+                    .frame(width: size, height: size)
+                if hintsRemaining > 0 {
+                    Text("\(hintsRemaining)")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundStyle(WordConnectStyle.tileText)
+                        .monospacedDigit()
+                        .frame(width: 18, height: 18)
+                        .background(WordConnectStyle.amber, in: Circle())
+                        .offset(x: 2, y: -2)
+                }
+            }
+            .background(WordConnectStyle.paperGradient, in: Circle())
+            .overlay(Circle().strokeBorder(WordConnectStyle.paperEdge, lineWidth: 1.4))
+            .shadow(color: .witsShadow, radius: 7, y: 4)
         }
         .buttonStyle(.plain)
         .disabled(hintCandidateCells.isEmpty || hintsRemaining == 0)
@@ -655,10 +852,11 @@ struct WordConnectScreen: View {
         Button(action: action) {
             Image(systemName: systemName)
                 .font(.system(size: size * 0.34, weight: .heavy))
-                .foregroundStyle(Color.witsInk)
+                .foregroundStyle(WordConnectStyle.ink)
                 .frame(width: size, height: size)
-                .background(Color.witsCard.opacity(0.95), in: Circle())
-                .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1.5))
+                .background(WordConnectStyle.paperGradient, in: Circle())
+                .overlay(Circle().strokeBorder(WordConnectStyle.paperEdge, lineWidth: 1.4))
+                .shadow(color: .witsShadow, radius: 7, y: 4)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
