@@ -645,10 +645,23 @@ struct BlockEscapePolicy: GameScoringPolicy {
 struct PegSolitairePolicy: GameScoringPolicy {
     var abilitySignalWeight: Double { 0.20 }
 
-    /// Any solution is exactly startPegs−1 jumps, so there is no move par;
-    /// quality is how far the board was cleared (dominant) plus time against
-    /// a generous planning budget, with the classic finish-on-target bonus
-    /// factor and a small undo penalty.
+    /// Any solution is exactly startPegs−1 jumps, so there is no move par.
+    /// Solving IS the exam: a stranded board never reaches the 1★ pass line
+    /// (its clear ratio maps into 0...0.55 as partial mastery signal), an
+    /// off-target solve caps below 2★, and a true solve always passes — time
+    /// against a generous budget and undo count decide 1–3★.
+    static func quality(clear: Double, timeEfficiency: Double,
+                        solved: Bool, onTarget: Bool, undos: Double) -> Double {
+        let undoPenalty = min(0.25, undos * 0.03)
+        if !solved {
+            return ScoringMath.clamp(0.55 * clear, 0, 0.55)
+        }
+        if !onTarget {
+            return ScoringMath.clamp(0.58 + 0.12 * timeEfficiency - undoPenalty, 0, 0.72)
+        }
+        return max(0.60, ScoringMath.clamp(0.62 + 0.38 * timeEfficiency - undoPenalty, 0, 1))
+    }
+
     func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
         let start = max(2, result.raw["startPegs"] ?? Double(result.trials) + 1)
         let end = max(1, result.raw["endPegs"] ?? 1)
@@ -656,10 +669,11 @@ struct PegSolitairePolicy: GameScoringPolicy {
         let seconds = max(1, result.raw["seconds"] ?? Double(result.durationMs) / 1000.0)
         let parSeconds = max(20, result.raw["parSeconds"] ?? (start * 7 + 20))
         let timeEfficiency = min(1, parSeconds / seconds)
-        let solvedOffTarget = (result.raw["solved"] ?? 0) >= 1 && (result.raw["onTarget"] ?? 1) < 1
-        let undoPenalty = min(0.25, (result.raw["undos"] ?? 0) * 0.03)
-        let quality = ScoringMath.clamp(
-            (0.80 * clear + 0.20 * timeEfficiency) * (solvedOffTarget ? 0.92 : 1.0) - undoPenalty, 0, 1)
+        let quality = Self.quality(clear: clear,
+                                   timeEfficiency: timeEfficiency,
+                                   solved: (result.raw["solved"] ?? 0) >= 1,
+                                   onTarget: (result.raw["onTarget"] ?? 1) >= 1,
+                                   undos: result.raw["undos"] ?? 0)
         return ScoredRun(
             performance: quality,
             confidence: 1.0,

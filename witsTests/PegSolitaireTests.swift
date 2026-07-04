@@ -80,6 +80,32 @@ final class PegSolitaireTests: XCTestCase {
         }
     }
 
+    // Solving gates the stars: a stranded board must NEVER pass, no matter
+    // how much of it was cleared (regression: stuck runs earned 2★).
+    func testStuckRunsNeverPass() {
+        for clear in [0.5, 0.85, 0.93, 1.0] {
+            let q = PegSolitairePolicy.quality(clear: clear, timeEfficiency: 1.0,
+                                               solved: false, onTarget: false, undos: 0)
+            XCTAssertLessThan(q, StarGrader.passQuality,
+                              "stuck at clear=\(clear) must earn 0 stars")
+        }
+    }
+
+    func testSolveStarBands() {
+        // clean fast solve → 3★
+        XCTAssertGreaterThanOrEqual(
+            PegSolitairePolicy.quality(clear: 1, timeEfficiency: 0.9, solved: true, onTarget: true, undos: 0),
+            StarGrader.threeStarQuality)
+        // slow undo-heavy solve still passes with 1★
+        let scrappy = PegSolitairePolicy.quality(clear: 1, timeEfficiency: 0.1, solved: true, onTarget: true, undos: 10)
+        XCTAssertGreaterThanOrEqual(scrappy, StarGrader.passQuality)
+        XCTAssertLessThan(scrappy, StarGrader.twoStarQuality)
+        // solving but missing the required target hole caps below 2★
+        let offTarget = PegSolitairePolicy.quality(clear: 1, timeEfficiency: 1, solved: true, onTarget: false, undos: 0)
+        XCTAssertLessThan(offTarget, StarGrader.twoStarQuality)
+        XCTAssertGreaterThanOrEqual(offTarget, StarGrader.passQuality)
+    }
+
     func testSpecLadderIsSaneAndMonotonicPerBand() {
         var lastPegs = 0
         for level in 1...40 {

@@ -577,9 +577,11 @@ struct PegSolitaireScreen: View {
         let seconds = max(1, elapsed)
         let clear = Double(cleared) / Double(max(1, startPegs - 1))
         let timeEfficiency = min(1, parSeconds / seconds)
-        let targetFactor = puzzle.isCleared && !puzzle.isOnTarget ? 0.92 : 1.0
-        let undoPenalty = min(0.25, Double(undos) * 0.03)
-        let accuracy = max(0, min(1, (0.80 * clear + 0.20 * timeEfficiency) * targetFactor - undoPenalty))
+        let accuracy = PegSolitairePolicy.quality(clear: clear,
+                                                  timeEfficiency: timeEfficiency,
+                                                  solved: puzzle.isCleared,
+                                                  onTarget: puzzle.isOnTarget,
+                                                  undos: Double(undos))
         let score = max(0, Int((Double(cleared) * 45
             + (puzzle.isCleared ? 400 : 0)
             + timeEfficiency * 300).rounded()))
