@@ -23,7 +23,7 @@ struct RootShell: View {
                 .tabItem { Label("activity", systemImage: "chart.line.uptrend.xyaxis") }
                 .tag(2)
             ProfileView()
-                .tabItem { Label("you", systemImage: "person.fill") }
+                .tabItem { Label("profile", systemImage: "person.fill") }
                 .tag(3)
         }
         .tint(.witsAccent)
