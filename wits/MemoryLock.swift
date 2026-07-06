@@ -9,6 +9,110 @@
 
 import SwiftUI
 
+private enum MemoryLockStyle {
+    static let stageTop = Color(light: 0x123140, dark: 0x07131F)
+    static let stageMid = Color(light: 0x111D32, dark: 0x091123)
+    static let stageBottom = Color(light: 0x21143F, dark: 0x10091F)
+    static let boardTop = Color(light: 0x172B3B, dark: 0x101C2C)
+    static let boardBottom = Color(light: 0x0E1726, dark: 0x080E1B)
+    static let boardStroke = Color.white.opacity(0.16)
+    static let tileEmpty = Color.white.opacity(0.07)
+    static let tileInputTop = Color(light: 0x26394A, dark: 0x1C2A3E)
+    static let tileInputBottom = Color(light: 0x192637, dark: 0x111A2A)
+    static let tileLockedTop = Color(light: 0x1C2736, dark: 0x151D2B)
+    static let tileLockedBottom = Color(light: 0x111926, dark: 0x0D1420)
+    static let keyTop = Color(light: 0x2B3C52, dark: 0x26344B)
+    static let keyBottom = Color(light: 0x1B283A, dark: 0x171F31)
+    static let ink = Color(light: 0xF3FAFF, dark: 0xF6FBFF)
+    static let mutedInk = Color.white.opacity(0.62)
+    static let faintInk = Color.white.opacity(0.38)
+    static let accent = Color(light: 0x20C8AE, dark: 0x25D8BD)
+    static let accentDeep = Color(light: 0x098978, dark: 0x0E9E8B)
+    static let present = Color(light: 0xE9B949, dark: 0xF4C95A)
+    static let presentDeep = Color(light: 0xB07B13, dark: 0xC4891D)
+    static let absent = Color(light: 0x657184, dark: 0x4C586A)
+    static let violet = Color(light: 0x8D71F2, dark: 0xA58BFF)
+
+    static var stageGradient: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: stageTop, location: 0),
+                .init(color: stageMid, location: 0.56),
+                .init(color: stageBottom, location: 1)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    static var boardGradient: LinearGradient {
+        LinearGradient(colors: [boardTop, boardBottom], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    static var inputTileGradient: LinearGradient {
+        LinearGradient(colors: [tileInputTop, tileInputBottom], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    static var lockedTileGradient: LinearGradient {
+        LinearGradient(colors: [tileLockedTop, tileLockedBottom], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+
+    static var keyGradient: LinearGradient {
+        LinearGradient(colors: [keyTop, keyBottom], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
+struct MemoryLockSafeAreaBackground: View {
+    var body: some View {
+        ZStack {
+            MemoryLockStyle.stageGradient
+            RadialGradient(
+                colors: [MemoryLockStyle.accent.opacity(0.30), .clear],
+                center: .topTrailing,
+                startRadius: 0,
+                endRadius: 330
+            )
+            RadialGradient(
+                colors: [MemoryLockStyle.violet.opacity(0.24), .clear],
+                center: .bottomLeading,
+                startRadius: 12,
+                endRadius: 360
+            )
+            Canvas { ctx, size in
+                let line = GraphicsContext.Shading.color(.white.opacity(0.055))
+                let glow = GraphicsContext.Shading.color(MemoryLockStyle.accent.opacity(0.10))
+
+                for i in 0..<7 {
+                    let y = size.height * (0.10 + CGFloat(i) * 0.13)
+                    var p = Path()
+                    p.move(to: CGPoint(x: -24, y: y))
+                    p.addLine(to: CGPoint(x: size.width * 0.22, y: y))
+                    p.addLine(to: CGPoint(x: size.width * 0.32, y: y + 28))
+                    p.addLine(to: CGPoint(x: size.width + 24, y: y + 28))
+                    ctx.stroke(p, with: line, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round, dash: [7, 14]))
+                }
+
+                for i in 0..<5 {
+                    let x = size.width * (0.14 + CGFloat(i) * 0.19)
+                    let rect = CGRect(x: x, y: size.height * 0.18 + CGFloat(i % 2) * 92, width: 7, height: 7)
+                    ctx.fill(Path(ellipseIn: rect), with: glow)
+                }
+            }
+            Image(systemName: "lock.fill")
+                .font(.system(size: 92, weight: .regular))
+                .foregroundStyle(.white.opacity(0.035))
+                .rotationEffect(.degrees(-11))
+                .offset(x: -132, y: 318)
+            Image(systemName: "key.fill")
+                .font(.system(size: 78, weight: .regular))
+                .foregroundStyle(MemoryLockStyle.present.opacity(0.06))
+                .rotationEffect(.degrees(18))
+                .offset(x: 142, y: -260)
+        }
+        .ignoresSafeArea()
+    }
+}
+
 struct MemoryLockScreen: View {
     var cfg: GameConfig
     var onResult: (GameResult) -> Void
@@ -81,34 +185,38 @@ struct MemoryLockScreen: View {
             let availableHeight = geo.size.height
             let cramped = availableHeight < 620
             let compact = availableHeight < 790
-            VStack(spacing: 0) {
-                if !cfg.isSurvival {
-                    topBar
-                }
+            ZStack {
+                MemoryLockSafeAreaBackground()
 
-                wordleGrid(width: geo.size.width - (compact ? 28 : 24),
-                           availableHeight: availableHeight,
-                           compact: compact,
-                           cramped: cramped)
-                    .witsShake(trigger: missShakeTrigger, intensity: cramped ? 7 : 11)
-                    .padding(.top, cramped ? 6 : compact ? 22 : 28)
-                    .overlay(alignment: .top) {
-                        statusOverlay(compact: compact)
+                VStack(spacing: 0) {
+                    if !cfg.isSurvival {
+                        topBar(compact: compact)
                     }
-                    .animation(.spring(response: 0.3, dampingFraction: 0.82), value: answerReveal)
-                    .animation(.easeOut(duration: 0.16), value: message)
 
-                Spacer(minLength: 0)
+                    Spacer(minLength: cramped ? 4 : 10)
 
-                keyboard(compact: compact, cramped: cramped)
-                    .padding(.horizontal, compact ? 8 : 10)
-                    .frame(maxWidth: 720)
+                    wordleGrid(width: geo.size.width - (compact ? 28 : 24),
+                               availableHeight: availableHeight,
+                               compact: compact,
+                               cramped: cramped)
+                        .witsShake(trigger: missShakeTrigger, intensity: cramped ? 7 : 11)
+                        .overlay(alignment: .top) {
+                            statusOverlay(compact: compact)
+                        }
+                        .animation(.spring(response: 0.3, dampingFraction: 0.82), value: answerReveal)
+                        .animation(.easeOut(duration: 0.16), value: message)
+
+                    Spacer(minLength: cramped ? 6 : 12)
+
+                    keyboard(compact: compact, cramped: cramped)
+                        .padding(.horizontal, compact ? 8 : 10)
+                        .frame(maxWidth: 720)
+                }
+                .padding(.top, cfg.isSurvival ? 8 : 6)
+                .padding(.bottom, compact ? 8 : 10)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
-            .padding(.top, cfg.isSurvival ? 6 : 4)
-            .padding(.bottom, compact ? 8 : 10)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
-        .background(Color.witsBg.ignoresSafeArea())
     }
 
     @ViewBuilder
@@ -120,60 +228,91 @@ struct MemoryLockScreen: View {
         } else if !message.isEmpty {
             Text(message)
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsInk)
+                .foregroundStyle(.white)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 7)
-                .background(Color.witsTint, in: Capsule())
-                .offset(y: compact ? -18 : -22)
+                .background(MemoryLockStyle.accent, in: Capsule())
+                .overlay(Capsule().strokeBorder(.white.opacity(0.22), lineWidth: 1))
+                .offset(y: compact ? -10 : -12)
                 .transition(.opacity)
         }
     }
 
-    private var topBar: some View {
-        VStack(spacing: 7) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .monospacedDigit()
-                Spacer()
-                Text(progressText)
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
+    private func topBar(compact: Bool) -> some View {
+        VStack(spacing: compact ? 8 : 10) {
+            HStack(spacing: compact ? 8 : 10) {
+                MemoryLockHudPill(icon: "bolt.fill",
+                                  title: "score",
+                                  value: "\(score)",
+                                  tint: MemoryLockStyle.accent)
+                MemoryLockRoundPill(text: progressText)
+                MemoryLockHudPill(icon: "timer",
+                                  title: "clue",
+                                  value: clueWindowText,
+                                  tint: MemoryLockStyle.present)
             }
-            ProgressTrack(fraction: Double(roundsPlayed) / Double(Self.roundsPerRun), animated: true)
+            ProgressTrack(fraction: Double(roundsPlayed) / Double(Self.roundsPerRun),
+                          animated: true,
+                          tint: MemoryLockStyle.accent)
+                .background(.white.opacity(0.10), in: Capsule())
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.leading, cfg.isSurvival ? 0 : 42)
     }
 
+    private var clueWindowText: String {
+        let tenths = Int((clueSeconds * 10).rounded())
+        return "\(tenths / 10).\(tenths % 10)s"
+    }
+
     private func wordleGrid(width: CGFloat, availableHeight: CGFloat, compact: Bool, cramped: Bool) -> some View {
         let rowSpacing: CGFloat = cramped ? 4 : compact ? 5 : 7
         let cellSpacing: CGFloat = cramped ? 4 : compact ? 5 : 7
-        let widthAvailable = width - CGFloat(wordLength - 1) * cellSpacing
-        let heightBudget = availableHeight * (cramped ? 0.42 : compact ? 0.56 : 0.58)
-        let heightAvailable = heightBudget - CGFloat(maxGuesses - 1) * rowSpacing
+        let outerWidth = min(width, 560)
+        let horizontalPadding: CGFloat = cramped ? 10 : compact ? 12 : 14
+        let verticalPadding: CGFloat = cramped ? 10 : compact ? 12 : 14
+        let traceHeight: CGFloat = cramped ? 22 : 28
+        let innerGap: CGFloat = cramped ? 7 : 10
+        let widthAvailable = outerWidth - horizontalPadding * 2 - CGFloat(wordLength - 1) * cellSpacing
+        let heightBudget = availableHeight * (cramped ? 0.44 : compact ? 0.54 : 0.56)
+        let heightAvailable = heightBudget - traceHeight - innerGap - verticalPadding * 2 - CGFloat(maxGuesses - 1) * rowSpacing
         let minTile: CGFloat = cramped ? 22 : 36
         let maxTile: CGFloat = cramped ? 42 : compact ? 70 : 76
         let tile = min(maxTile,
                        max(minTile, floor(widthAvailable / CGFloat(wordLength))),
                        max(minTile, floor(heightAvailable / CGFloat(maxGuesses))))
-        let height = tile * CGFloat(maxGuesses) + rowSpacing * CGFloat(maxGuesses - 1)
+        let height = tile * CGFloat(maxGuesses) + rowSpacing * CGFloat(maxGuesses - 1) + traceHeight + innerGap + verticalPadding * 2
+        let visibleRows = (0..<maxGuesses).map { showClues(for: $0) }
 
-        return VStack(spacing: rowSpacing) {
-            ForEach(0..<maxGuesses, id: \.self) { row in
-                MemoryLockGuessRow(
-                    letters: letters(for: row),
-                    marks: marks(for: row),
-                    showClues: showClues(for: row),
-                    length: wordLength,
-                    tileSize: tile,
-                    spacing: cellSpacing
-                )
+        return VStack(spacing: innerGap) {
+            MemoryLockTraceStrip(guesses: guesses.count,
+                                 visibleRows: visibleRows,
+                                 maxGuesses: maxGuesses,
+                                 compact: compact)
+                .frame(height: traceHeight)
+
+            VStack(spacing: rowSpacing) {
+                ForEach(0..<maxGuesses, id: \.self) { row in
+                    MemoryLockGuessRow(
+                        letters: letters(for: row),
+                        marks: marks(for: row),
+                        showClues: showClues(for: row),
+                        length: wordLength,
+                        tileSize: tile,
+                        spacing: cellSpacing
+                    )
+                }
             }
         }
-        .frame(maxWidth: .infinity)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
+        .background(MemoryLockStyle.boardGradient, in: RoundedRectangle(cornerRadius: cramped ? 14 : 18, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: cramped ? 14 : 18, style: .continuous)
+                .strokeBorder(MemoryLockStyle.boardStroke, lineWidth: 1.2)
+        )
+        .shadow(color: .black.opacity(0.24), radius: 18, y: 10)
+        .frame(maxWidth: outerWidth)
         .frame(height: height)
     }
 
@@ -226,8 +365,8 @@ struct MemoryLockScreen: View {
             Group {
                 switch value {
                 case "enter":
-                    Text("enter")
-                        .font(.system(size: cramped ? 8 : compact ? 10 : 11, weight: .heavy, design: .rounded))
+                    Image(systemName: "arrow.turn.down.left")
+                        .font(.system(size: cramped ? 12 : compact ? 14 : 15, weight: .heavy))
                 case "delete":
                     Image(systemName: "delete.left.fill")
                         .font(.system(size: cramped ? 12 : compact ? 14 : 15, weight: .heavy))
@@ -236,15 +375,29 @@ struct MemoryLockScreen: View {
                         .font(.system(size: cramped ? 13 : compact ? 15 : 16, weight: .heavy, design: .rounded))
                 }
             }
-            .foregroundStyle(Color.white)
+            .foregroundStyle(value == "enter" ? Color.white : MemoryLockStyle.ink)
             .frame(width: width)
             .frame(maxWidth: width == nil ? .infinity : nil)
             .frame(height: cramped ? 34 : compact ? 58 : 64)
-            .background(value == "enter" ? Color.witsAccent : Color.witsFaint.opacity(0.58),
-                        in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .background {
+                let shape = RoundedRectangle(cornerRadius: cramped ? 5 : 7, style: .continuous)
+                if value == "enter" {
+                    shape.fill(MemoryLockStyle.accent)
+                } else {
+                    shape.fill(MemoryLockStyle.keyGradient)
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: cramped ? 5 : 7, style: .continuous)
+                    .strokeBorder(value == "enter" ? .white.opacity(0.25) : .white.opacity(0.12), lineWidth: 1)
+            )
+            .shadow(color: value == "enter" ? MemoryLockStyle.accent.opacity(0.24) : .black.opacity(0.18),
+                    radius: value == "enter" ? 8 : 5,
+                    y: 3)
         }
         .buttonStyle(.plain)
         .disabled(locked || finished)
+        .accessibilityLabel(value == "delete" ? "delete" : value == "enter" ? "enter" : value)
     }
 
     private func press(_ value: String) {
@@ -456,29 +609,133 @@ private struct MemoryLockAnswerReveal: View {
         VStack(spacing: compact ? 6 : 8) {
             Text("word was")
                 .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsBg.opacity(0.72))
+                .foregroundStyle(.white.opacity(0.66))
 
             HStack(spacing: 5) {
                 ForEach(Array(letters.enumerated()), id: \.offset) { _, letter in
                     Text(letter)
                         .font(.system(size: compact ? 16 : 18, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsBg)
+                        .foregroundStyle(.white)
                         .frame(width: tileSize, height: tileSize)
-                        .background(Color.witsBg.opacity(0.14),
+                        .background(.white.opacity(0.12),
                                     in: RoundedRectangle(cornerRadius: 5, style: .continuous))
                         .overlay(
                             RoundedRectangle(cornerRadius: 5, style: .continuous)
-                                .strokeBorder(Color.witsAccent.opacity(0.38), lineWidth: 1)
+                                .strokeBorder(MemoryLockStyle.accent.opacity(0.46), lineWidth: 1)
                         )
                 }
             }
         }
         .padding(.horizontal, compact ? 14 : 16)
         .padding(.vertical, compact ? 10 : 12)
-        .background(Color.witsInk, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .shadow(color: Color.witsShadow, radius: 14, y: 8)
+        .background(MemoryLockStyle.boardBottom, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(.white.opacity(0.18), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.32), radius: 14, y: 8)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("word was \(word)")
+    }
+}
+
+private struct MemoryLockHudPill: View {
+    let icon: String
+    let title: String
+    let value: String
+    let tint: Color
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(tint)
+                .frame(width: 24, height: 24)
+                .background(tint.opacity(0.15), in: Circle())
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MemoryLockStyle.faintInk)
+                Text(value)
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MemoryLockStyle.ink)
+                    .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity)
+        .frame(height: 46)
+        .background(.white.opacity(0.10), in: Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.13), lineWidth: 1))
+    }
+}
+
+private struct MemoryLockRoundPill: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 12, weight: .heavy))
+                .foregroundStyle(MemoryLockStyle.accent)
+            Text(text)
+                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .foregroundStyle(MemoryLockStyle.ink)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .padding(.horizontal, 12)
+        .frame(minWidth: 96)
+        .frame(height: 46)
+        .background(
+            LinearGradient(
+                colors: [MemoryLockStyle.violet.opacity(0.28), MemoryLockStyle.accent.opacity(0.16)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: Capsule()
+        )
+        .overlay(Capsule().strokeBorder(.white.opacity(0.14), lineWidth: 1))
+    }
+}
+
+private struct MemoryLockTraceStrip: View {
+    let guesses: Int
+    let visibleRows: [Bool]
+    let maxGuesses: Int
+    let compact: Bool
+
+    var body: some View {
+        HStack(spacing: compact ? 8 : 10) {
+            Image(systemName: visibleRows.contains(true) ? "lock.open.fill" : "lock.fill")
+                .font(.system(size: compact ? 11 : 12, weight: .heavy))
+                .foregroundStyle(visibleRows.contains(true) ? MemoryLockStyle.accent : MemoryLockStyle.faintInk)
+                .frame(width: compact ? 22 : 26, height: compact ? 22 : 26)
+                .background(.white.opacity(0.08), in: Circle())
+
+            HStack(spacing: compact ? 4 : 5) {
+                ForEach(0..<maxGuesses, id: \.self) { index in
+                    let visible = index < visibleRows.count && visibleRows[index]
+                    let submitted = index < guesses
+                    Capsule()
+                        .fill(visible ? MemoryLockStyle.accent : submitted ? MemoryLockStyle.violet.opacity(0.42) : .white.opacity(0.12))
+                        .frame(width: visible ? (compact ? 22 : 28) : (compact ? 13 : 16), height: compact ? 5 : 6)
+                        .shadow(color: visible ? MemoryLockStyle.accent.opacity(0.42) : .clear, radius: 5)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            Text("\(guesses)/\(maxGuesses)")
+                .font(.system(size: compact ? 11 : 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(MemoryLockStyle.mutedInk)
+                .monospacedDigit()
+        }
     }
 }
 
@@ -493,46 +750,100 @@ private struct MemoryLockGuessRow: View {
     var body: some View {
         HStack(spacing: spacing) {
             ForEach(0..<length, id: \.self) { index in
-                Text(index < letters.count ? letters[index].uppercased() : "")
-                    .font(.system(size: 24, weight: .heavy, design: .rounded))
-                    .foregroundStyle(foreground(for: index))
-                    .frame(width: tileSize, height: tileSize)
-                    .background(background(for: index),
-                        in: RoundedRectangle(cornerRadius: 4, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .strokeBorder(border(for: index), lineWidth: 1.5)
-                    )
+                MemoryLockTile(letter: index < letters.count ? letters[index].uppercased() : "",
+                               mark: mark(for: index),
+                               showClue: showClues,
+                               size: tileSize)
             }
         }
         .animation(.easeOut(duration: 0.18), value: showClues)
     }
 
-    private func foreground(for index: Int) -> Color {
-        guard marks != nil, showClues else { return Color.witsInk }
-        return .white
+    private func mark(for index: Int) -> MemoryLockScreen.Mark? {
+        guard let marks, index < marks.count else { return nil }
+        return marks[index]
+    }
+}
+
+private struct MemoryLockTile: View {
+    let letter: String
+    let mark: MemoryLockScreen.Mark?
+    let showClue: Bool
+    let size: CGFloat
+
+    private var radius: CGFloat { max(5, min(10, size * 0.14)) }
+    private var isSubmitted: Bool { mark != nil }
+
+    var body: some View {
+        Text(letter)
+            .font(.system(size: max(14, min(28, size * 0.43)), weight: .heavy, design: .rounded))
+            .foregroundStyle(foreground)
+            .frame(width: size, height: size)
+            .background { fill }
+            .overlay(
+                RoundedRectangle(cornerRadius: radius, style: .continuous)
+                    .strokeBorder(border, lineWidth: showClue ? 1.5 : 1.1)
+            )
+            .overlay(alignment: .topTrailing) {
+                if isSubmitted && !showClue && size >= 34 {
+                    Image(systemName: "lock.fill")
+                        .font(.system(size: max(7, size * 0.13), weight: .bold))
+                        .foregroundStyle(MemoryLockStyle.faintInk)
+                        .padding(max(4, size * 0.08))
+                }
+            }
+            .shadow(color: shadow, radius: showClue ? 8 : 3, y: showClue ? 4 : 2)
     }
 
-    private func background(for index: Int) -> Color {
-        guard let marks, index < marks.count else {
-            return letters.indices.contains(index) && !letters[index].isEmpty ? Color.witsCard : Color.witsTint
-        }
-        guard showClues else { return Color.witsCard }
-        switch marks[index] {
-        case .correct: return Color.witsAccent
-        case .present: return Color.witsMustard
-        case .absent: return Color.witsFaint.opacity(0.55)
+    private var foreground: Color {
+        if showClue { return .white }
+        if isSubmitted { return MemoryLockStyle.mutedInk }
+        return letter.isEmpty ? .clear : MemoryLockStyle.ink
+    }
+
+    @ViewBuilder
+    private var fill: some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        if let mark, showClue {
+            switch mark {
+            case .correct:
+                shape.fill(LinearGradient(colors: [MemoryLockStyle.accent, MemoryLockStyle.accentDeep],
+                                          startPoint: .topLeading,
+                                          endPoint: .bottomTrailing))
+            case .present:
+                shape.fill(LinearGradient(colors: [MemoryLockStyle.present, MemoryLockStyle.presentDeep],
+                                          startPoint: .topLeading,
+                                          endPoint: .bottomTrailing))
+            case .absent:
+                shape.fill(MemoryLockStyle.absent)
+            }
+        } else if isSubmitted {
+            shape.fill(MemoryLockStyle.lockedTileGradient)
+        } else if !letter.isEmpty {
+            shape.fill(MemoryLockStyle.inputTileGradient)
+        } else {
+            shape.fill(MemoryLockStyle.tileEmpty)
         }
     }
 
-    private func border(for index: Int) -> Color {
-        if let marks, showClues, index < marks.count {
-            switch marks[index] {
-            case .correct: return Color.witsAccent.opacity(0.3)
-            case .present: return Color.witsMustard.opacity(0.3)
-            case .absent: return Color.clear
+    private var border: Color {
+        if let mark, showClue {
+            switch mark {
+            case .correct: return .white.opacity(0.30)
+            case .present: return .white.opacity(0.25)
+            case .absent: return .white.opacity(0.10)
             }
         }
-        return Color.witsLine
+        if isSubmitted { return MemoryLockStyle.violet.opacity(0.22) }
+        return letter.isEmpty ? .white.opacity(0.10) : MemoryLockStyle.accent.opacity(0.36)
+    }
+
+    private var shadow: Color {
+        guard let mark, showClue else { return .black.opacity(0.18) }
+        switch mark {
+        case .correct: return MemoryLockStyle.accent.opacity(0.34)
+        case .present: return MemoryLockStyle.present.opacity(0.28)
+        case .absent: return .black.opacity(0.20)
+        }
     }
 }

@@ -24,6 +24,8 @@ struct GameStageBackground: View {
         switch game {
         case .wordConnect:
             WordConnectSafeAreaBackground()
+        case .memoryLock:
+            MemoryLockSafeAreaBackground()
         case .dotsConnect:
             DotsConnectSafeAreaBackground()
         case .oneLine:
