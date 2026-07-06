@@ -122,13 +122,19 @@ struct DotsConnectScreen: View {
                 DotsConnectSafeAreaBackground()
                 VStack(spacing: 12) {
                     topBar
+                        .padding(.horizontal, WitsMetrics.screenPadding)
                     Spacer(minLength: 0)
+                    // The board is square, so on tall screens its width is the
+                    // binding constraint — hug the screen edges to maximize it.
+                    // 184 = top bar + hint row + stack gaps and paddings, so the
+                    // height branch keeps the board from overflowing on short
+                    // layouts (landscape, iPad splits).
                     board
-                        .frame(width: min(geo.size.width - WitsMetrics.screenPadding * 2, geo.size.height * 0.58))
+                        .frame(width: min(geo.size.width - 20, geo.size.height - 184))
                     Spacer(minLength: 0)
                     hintRow
+                        .padding(.horizontal, WitsMetrics.screenPadding)
                 }
-                .padding(.horizontal, WitsMetrics.screenPadding)
                 .padding(.top, 8)
                 .padding(.bottom, 12)
             }
