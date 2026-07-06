@@ -170,10 +170,10 @@ struct MemoryLockScreen: View {
         level >= 6 ? 6 : 5
     }
 
-    /// Adaptive challenge: clues stay up ~1.4s at level 1 and fade in ~0.55s
+    /// Adaptive challenge: clues stay up ~1.0s at level 1 and fade to ~0.55s
     /// by level 10, so higher levels lean harder on lexical memory.
     static func clueSeconds(for level: Double) -> Double {
-        max(0.55, 1.45 - 0.09 * DifficultyState.clamp(level))
+        max(0.55, 1.05 - 0.05 * DifficultyState.clamp(level))
     }
 
     private var progressText: String {
@@ -185,6 +185,17 @@ struct MemoryLockScreen: View {
             let availableHeight = geo.size.height
             let cramped = availableHeight < 620
             let compact = availableHeight < 790
+            let topPadding: CGFloat = cfg.isSurvival ? 8 : 6
+            let bottomPadding: CGFloat = compact ? 8 : 10
+            let boardGap = boardTopGap(compact: compact, cramped: cramped)
+            let keyGap = keyboardGap(compact: compact, cramped: cramped)
+            let boardHeight = boardHeightBudget(totalHeight: availableHeight,
+                                                compact: compact,
+                                                cramped: cramped,
+                                                topPadding: topPadding,
+                                                bottomPadding: bottomPadding,
+                                                boardGap: boardGap,
+                                                keyboardGap: keyGap)
             ZStack {
                 MemoryLockSafeAreaBackground()
 
@@ -193,12 +204,11 @@ struct MemoryLockScreen: View {
                         topBar(compact: compact)
                     }
 
-                    Spacer(minLength: cramped ? 4 : 10)
-
                     wordleGrid(width: geo.size.width - (compact ? 28 : 24),
-                               availableHeight: availableHeight,
+                               availableHeight: boardHeight,
                                compact: compact,
                                cramped: cramped)
+                        .padding(.top, boardGap)
                         .witsShake(trigger: missShakeTrigger, intensity: cramped ? 7 : 11)
                         .overlay(alignment: .top) {
                             statusOverlay(compact: compact)
@@ -206,14 +216,13 @@ struct MemoryLockScreen: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.82), value: answerReveal)
                         .animation(.easeOut(duration: 0.16), value: message)
 
-                    Spacer(minLength: cramped ? 6 : 12)
-
                     keyboard(compact: compact, cramped: cramped)
+                        .padding(.top, keyGap)
                         .padding(.horizontal, compact ? 8 : 10)
                         .frame(maxWidth: 720)
                 }
-                .padding(.top, cfg.isSurvival ? 8 : 6)
-                .padding(.bottom, compact ? 8 : 10)
+                .padding(.top, topPadding)
+                .padding(.bottom, bottomPadding)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
         }
@@ -246,10 +255,6 @@ struct MemoryLockScreen: View {
                                   value: "\(score)",
                                   tint: MemoryLockStyle.accent)
                 MemoryLockRoundPill(text: progressText)
-                MemoryLockHudPill(icon: "timer",
-                                  title: "clue",
-                                  value: clueWindowText,
-                                  tint: MemoryLockStyle.present)
             }
             ProgressTrack(fraction: Double(roundsPlayed) / Double(Self.roundsPerRun),
                           animated: true,
@@ -260,9 +265,38 @@ struct MemoryLockScreen: View {
         .padding(.leading, cfg.isSurvival ? 0 : 42)
     }
 
-    private var clueWindowText: String {
-        let tenths = Int((clueSeconds * 10).rounded())
-        return "\(tenths / 10).\(tenths % 10)s"
+    private func boardTopGap(compact: Bool, cramped: Bool) -> CGFloat {
+        cramped ? 8 : compact ? 14 : 18
+    }
+
+    private func keyboardGap(compact: Bool, cramped: Bool) -> CGFloat {
+        cramped ? 8 : compact ? 12 : 16
+    }
+
+    private func keyboardHeight(compact: Bool, cramped: Bool) -> CGFloat {
+        let keyHeight: CGFloat = cramped ? 34 : compact ? 58 : 64
+        let rowSpacing: CGFloat = cramped ? 4 : compact ? 6 : 8
+        return keyHeight * 3 + rowSpacing * 2
+    }
+
+    private func topBarHeight(compact: Bool) -> CGFloat {
+        cfg.isSurvival ? 0 : 46 + (compact ? 8 : 10) + 6
+    }
+
+    private func boardHeightBudget(totalHeight: CGFloat,
+                                   compact: Bool,
+                                   cramped: Bool,
+                                   topPadding: CGFloat,
+                                   bottomPadding: CGFloat,
+                                   boardGap: CGFloat,
+                                   keyboardGap: CGFloat) -> CGFloat {
+        let chrome = topPadding
+            + bottomPadding
+            + topBarHeight(compact: compact)
+            + boardGap
+            + keyboardGap
+            + keyboardHeight(compact: compact, cramped: cramped)
+        return max(cramped ? 240 : 360, totalHeight - chrome)
     }
 
     private func wordleGrid(width: CGFloat, availableHeight: CGFloat, compact: Bool, cramped: Bool) -> some View {
@@ -274,14 +308,13 @@ struct MemoryLockScreen: View {
         let traceHeight: CGFloat = cramped ? 22 : 28
         let innerGap: CGFloat = cramped ? 7 : 10
         let widthAvailable = outerWidth - horizontalPadding * 2 - CGFloat(wordLength - 1) * cellSpacing
-        let heightBudget = availableHeight * (cramped ? 0.44 : compact ? 0.54 : 0.56)
+        let heightBudget = availableHeight
         let heightAvailable = heightBudget - traceHeight - innerGap - verticalPadding * 2 - CGFloat(maxGuesses - 1) * rowSpacing
         let minTile: CGFloat = cramped ? 22 : 36
         let maxTile: CGFloat = cramped ? 42 : compact ? 70 : 76
         let tile = min(maxTile,
                        max(minTile, floor(widthAvailable / CGFloat(wordLength))),
                        max(minTile, floor(heightAvailable / CGFloat(maxGuesses))))
-        let height = tile * CGFloat(maxGuesses) + rowSpacing * CGFloat(maxGuesses - 1) + traceHeight + innerGap + verticalPadding * 2
         let visibleRows = (0..<maxGuesses).map { showClues(for: $0) }
 
         return VStack(spacing: innerGap) {
@@ -306,14 +339,13 @@ struct MemoryLockScreen: View {
         }
         .padding(.horizontal, horizontalPadding)
         .padding(.vertical, verticalPadding)
+        .frame(width: outerWidth, height: availableHeight, alignment: .center)
         .background(MemoryLockStyle.boardGradient, in: RoundedRectangle(cornerRadius: cramped ? 14 : 18, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: cramped ? 14 : 18, style: .continuous)
                 .strokeBorder(MemoryLockStyle.boardStroke, lineWidth: 1.2)
         )
         .shadow(color: .black.opacity(0.24), radius: 18, y: 10)
-        .frame(maxWidth: outerWidth)
-        .frame(height: height)
     }
 
     private func letters(for row: Int) -> [String] {
