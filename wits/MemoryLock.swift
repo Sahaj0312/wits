@@ -520,7 +520,7 @@ private struct MemoryLockGuessRow: View {
         guard showClues else { return Color.witsCard }
         switch marks[index] {
         case .correct: return Color.witsAccent
-        case .present: return Color.witsWarm
+        case .present: return Color.witsMustard
         case .absent: return Color.witsFaint.opacity(0.55)
         }
     }
@@ -529,7 +529,7 @@ private struct MemoryLockGuessRow: View {
         if let marks, showClues, index < marks.count {
             switch marks[index] {
             case .correct: return Color.witsAccent.opacity(0.3)
-            case .present: return Color.witsWarm.opacity(0.3)
+            case .present: return Color.witsMustard.opacity(0.3)
             case .absent: return Color.clear
             }
         }

@@ -47,6 +47,7 @@ extension Color {
     static let witsViolet = Color(light: 0x7C5CF0, dark: 0xA78BFA)
     static let witsPink = Color(light: 0xE0489A, dark: 0xF472B6)
     static let witsGold = Color(light: 0xE8930C, dark: 0xFFB03B)
+    static let witsMustard = Color(light: 0xC9B458, dark: 0xB59F3B)
 }
 
 // MARK: - Domain colors
