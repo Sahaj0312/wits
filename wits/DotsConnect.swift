@@ -3,8 +3,9 @@
 //  wits
 //
 //  Flow-style reasoning puzzle: connect matching dot pairs, fill every square,
-//  and never let paths cross. Hand-authored solutions keep every board solvable
-//  and make hints deterministic.
+//  and never let paths cross. Boards come from DotsConnectEngine: a random
+//  space-filling route sliced into color segments, so every board is fresh and
+//  the slicing itself is the solution hints replay.
 //
 
 import SwiftUI
@@ -32,10 +33,7 @@ struct DotsConnectScreen: View {
     private static let hintPenalty = 150
     private static let maxHintsPerRun = 2
 
-    private struct Cell: Hashable {
-        let row: Int
-        let col: Int
-    }
+    private typealias Cell = DotsConnectEngine.Cell
 
     private struct Puzzle: Identifiable {
         let id = UUID()
@@ -48,23 +46,6 @@ struct DotsConnectScreen: View {
                 (index, Set([path.first!, path.last!]))
             })
         }
-    }
-
-    private enum RouteKind: CaseIterable {
-        case rowSnake, columnSnake, spiral
-    }
-
-    private enum BoardTransform: CaseIterable {
-        case identity, mirrorX, mirrorY, rotate180
-    }
-
-    private struct PuzzleRecipe {
-        let size: Int
-        let difficulty: Int
-        let pathCount: Int
-        let route: RouteKind
-        let transform: BoardTransform
-        let seed: Int
     }
 
     @State private var puzzle: Puzzle
@@ -99,7 +80,7 @@ struct DotsConnectScreen: View {
         self.cfg = cfg
         self.onResult = onResult
         self.level = max(1, min(10, Int(floor(cfg.difficulty.level))))
-        let first = Self.pickPuzzle(level: cfg.difficulty.level, excluding: [])
+        let first = Self.generatePuzzle(level: cfg.difficulty.level)
         _puzzle = State(initialValue: first)
     }
 
@@ -344,6 +325,12 @@ struct DotsConnectScreen: View {
             return
         }
 
+        // A path whose last cell is the far endpoint is complete: it can be
+        // backtracked (above) or restarted, but never extended through the dot.
+        if path.count > 1, (puzzle.endpoints[color] ?? []).contains(last) {
+            return
+        }
+
         if let owner = owner(of: cellCoord), owner != color {
             mistakes += 1
             flashFeedback(false)
@@ -404,7 +391,7 @@ struct DotsConnectScreen: View {
                 finish()
             } else {
                 boardIndex += 1
-                puzzle = Self.pickPuzzle(level: Double(level), excluding: [puzzle.id])
+                puzzle = Self.generatePuzzle(level: Double(level))
                 resetPaths()
             }
         }
@@ -465,140 +452,135 @@ struct DotsConnectScreen: View {
         onResult(result)
     }
 
-    private static func pickPuzzle(level: Double, excluding excludedIDs: [Puzzle.ID]) -> Puzzle {
+    private static func generatePuzzle(level: Double) -> Puzzle {
         let levelNumber = min(10, max(1, Int(floor(level))))
-        let lowerBound = max(1, levelNumber - 2)
-        let nearLevelPool = puzzles.filter { lowerBound...levelNumber ~= $0.difficulty }
-        let fallbackPool = puzzles.filter { $0.difficulty <= levelNumber }
-        let pool = nearLevelPool.isEmpty ? fallbackPool : nearLevelPool
-        return pool.filter { !excludedIDs.contains($0.id) }.randomElement() ?? pool.randomElement() ?? puzzles[0]
+        let size = levelNumber <= 3 ? 5 : levelNumber <= 6 ? 6 : 7
+        let pathCount = min(maxPathCount, max(4, 3 + Int(ceil(Double(levelNumber) / 2.0))))
+        let board = DotsConnectEngine.generate(size: size, pathCount: pathCount)
+        return Puzzle(size: board.size, paths: board.paths, difficulty: levelNumber)
+    }
+}
+
+// MARK: - Board generation
+
+/// Procedural Flow-board generator: a random space-filling route (self-avoiding
+/// path visiting every cell) sliced into color segments. The slicing is itself
+/// a solution, so every board is solvable by construction, and randomizing the
+/// route means there is no fixed catalog of snakes and spirals to memorize.
+enum DotsConnectEngine {
+    struct Cell: Hashable {
+        let row: Int
+        let col: Int
     }
 
-    nonisolated private static let puzzles: [Puzzle] = makePuzzles()
-
-    nonisolated private static func makePuzzles() -> [Puzzle] {
-        makeRecipes().map(makePuzzle)
+    struct Board {
+        let size: Int
+        let paths: [[Cell]]
     }
 
-    nonisolated private static func makeRecipes() -> [PuzzleRecipe] {
-        var recipes: [PuzzleRecipe] = []
-        for level in 1...10 {
-            let size = level <= 3 ? 5 : level <= 6 ? 6 : 7
-            let pathCount = min(maxPathCount, max(4, 3 + Int(ceil(Double(level) / 2.0))))
-            let variants = 8
-            for variant in 0..<variants {
-                recipes.append(
-                    PuzzleRecipe(
-                        size: size,
-                        difficulty: level,
-                        pathCount: pathCount,
-                        route: RouteKind.allCases[variant % RouteKind.allCases.count],
-                        transform: BoardTransform.allCases[(variant / RouteKind.allCases.count + level) % BoardTransform.allCases.count],
-                        seed: level * 31 + variant * 17
-                    )
-                )
+    static let minPathLength = 3
+
+    static func generate(size: Int, pathCount: Int) -> Board {
+        for _ in 0..<40 {
+            guard let route = randomFillingRoute(size: size) else { continue }
+            for _ in 0..<30 {
+                if let paths = slicedPaths(route: route, count: pathCount) {
+                    return Board(size: size, paths: paths)
+                }
             }
         }
-        return recipes
-    }
 
-    nonisolated private static func makePuzzle(_ recipe: PuzzleRecipe) -> Puzzle {
-        let route = transformedRoute(kind: recipe.route, size: recipe.size, transform: recipe.transform)
-        let lengths = segmentLengths(total: route.count, count: recipe.pathCount, seed: recipe.seed)
+        // Backstop so the screen always gets a board (practically unreachable):
+        // a plain row snake split into equal runs, no quality checks.
+        let route = rowSnake(size: size)
+        let base = route.count / pathCount
+        var lengths = Array(repeating: base, count: pathCount)
+        for index in 0..<(route.count - base * pathCount) { lengths[index] += 1 }
         var paths: [[Cell]] = []
         var start = 0
         for length in lengths {
             paths.append(Array(route[start..<(start + length)]))
             start += length
         }
-        return Puzzle(size: recipe.size, paths: paths, difficulty: recipe.difficulty)
+        return Board(size: size, paths: paths)
     }
 
-    nonisolated private static func segmentLengths(total: Int, count: Int, seed: Int) -> [Int] {
-        let minimum = 2
-        let baseTotal = minimum * count
-        guard count > 0, total >= baseTotal else { return [total] }
-        let remaining = total - baseTotal
-        let weights = (0..<count).map { 3 + abs((seed + $0 * 7) % 6) }
-        let weightTotal = weights.reduce(0, +)
-        var lengths = weights.map { minimum + remaining * $0 / weightTotal }
-        var used = lengths.reduce(0, +)
-        var index = abs(seed) % count
-        while used < total {
-            lengths[index] += 1
-            used += 1
-            index = (index + 2) % count
+    /// Random self-avoiding route through every cell: backtracking DFS from a
+    /// random start that visits tight cells first (Warnsdorff's heuristic), so
+    /// dead ends stay rare even at 7×7. The step budget abandons the rare
+    /// hopeless start instead of grinding; callers just retry.
+    static func randomFillingRoute(size: Int) -> [Cell]? {
+        let total = size * size
+        var visited = Array(repeating: false, count: total)
+        var route: [Cell] = []
+        var steps = 0
+
+        func neighbors(_ c: Cell) -> [Cell] {
+            var out: [Cell] = []
+            if c.row > 0 { out.append(Cell(row: c.row - 1, col: c.col)) }
+            if c.row < size - 1 { out.append(Cell(row: c.row + 1, col: c.col)) }
+            if c.col > 0 { out.append(Cell(row: c.row, col: c.col - 1)) }
+            if c.col < size - 1 { out.append(Cell(row: c.row, col: c.col + 1)) }
+            return out
         }
-        return lengths
-    }
-
-    nonisolated private static func transformedRoute(kind: RouteKind, size: Int, transform: BoardTransform) -> [Cell] {
-        route(kind: kind, size: size).map { transformCell($0, size: size, transform: transform) }
-    }
-
-    nonisolated private static func transformCell(_ cell: Cell, size: Int, transform: BoardTransform) -> Cell {
-        switch transform {
-        case .identity:
-            cell
-        case .mirrorX:
-            Cell(row: cell.row, col: size - 1 - cell.col)
-        case .mirrorY:
-            Cell(row: size - 1 - cell.row, col: cell.col)
-        case .rotate180:
-            Cell(row: size - 1 - cell.row, col: size - 1 - cell.col)
+        func exits(_ c: Cell) -> Int {
+            neighbors(c).filter { !visited[$0.row * size + $0.col] }.count
         }
-    }
-
-    nonisolated private static func route(kind: RouteKind, size: Int) -> [Cell] {
-        switch kind {
-        case .rowSnake:
-            rowSnake(size: size)
-        case .columnSnake:
-            columnSnake(size: size)
-        case .spiral:
-            spiral(size: size)
+        func extend() -> Bool {
+            if route.count == total { return true }
+            steps += 1
+            if steps > 3_000 { return false }
+            let options = neighbors(route.last!)
+                .filter { !visited[$0.row * size + $0.col] }
+                .shuffled()
+                .sorted { exits($0) < exits($1) }
+            for next in options {
+                visited[next.row * size + next.col] = true
+                route.append(next)
+                if extend() { return true }
+                route.removeLast()
+                visited[next.row * size + next.col] = false
+            }
+            return false
         }
+
+        let start = Cell(row: Int.random(in: 0..<size), col: Int.random(in: 0..<size))
+        visited[start.row * size + start.col] = true
+        route.append(start)
+        return extend() ? route : nil
     }
 
-    nonisolated private static func rowSnake(size: Int) -> [Cell] {
+    /// Cut the route into `count` segments of random lengths. Returns nil —
+    /// caller retries with fresh cuts — when a segment would be shorter than
+    /// `minPathLength`, hog the board, or end orthogonally adjacent to its own
+    /// start (touching endpoints solve with a single flick and read as noise).
+    static func slicedPaths(route: [Cell], count: Int) -> [[Cell]]? {
+        guard count > 0 else { return nil }
+        let extra = route.count - minPathLength * count
+        guard extra >= 0 else { return nil }
+        let maxLength = max(minPathLength, route.count * 2 / count)
+
+        var lengths = Array(repeating: minPathLength, count: count)
+        for _ in 0..<extra { lengths[Int.random(in: 0..<count)] += 1 }
+
+        var paths: [[Cell]] = []
+        var start = 0
+        for length in lengths {
+            guard length <= maxLength else { return nil }
+            let segment = Array(route[start..<(start + length)])
+            guard let first = segment.first, let last = segment.last,
+                  abs(first.row - last.row) + abs(first.col - last.col) > 1 else { return nil }
+            paths.append(segment)
+            start += length
+        }
+        return paths
+    }
+
+    static func rowSnake(size: Int) -> [Cell] {
         var cells: [Cell] = []
         for row in 0..<size {
             let columns = row.isMultiple(of: 2) ? Array(0..<size) : Array((0..<size).reversed())
             for col in columns { cells.append(Cell(row: row, col: col)) }
-        }
-        return cells
-    }
-
-    nonisolated private static func columnSnake(size: Int) -> [Cell] {
-        var cells: [Cell] = []
-        for col in 0..<size {
-            let rows = col.isMultiple(of: 2) ? Array(0..<size) : Array((0..<size).reversed())
-            for row in rows { cells.append(Cell(row: row, col: col)) }
-        }
-        return cells
-    }
-
-    nonisolated private static func spiral(size: Int) -> [Cell] {
-        var cells: [Cell] = []
-        var top = 0
-        var bottom = size - 1
-        var left = 0
-        var right = size - 1
-        while top <= bottom && left <= right {
-            for col in left...right { cells.append(Cell(row: top, col: col)) }
-            if top < bottom {
-                for row in (top + 1)...bottom { cells.append(Cell(row: row, col: right)) }
-            }
-            if top < bottom && left < right {
-                for col in stride(from: right - 1, through: left, by: -1) { cells.append(Cell(row: bottom, col: col)) }
-            }
-            if top + 1 < bottom && left < right {
-                for row in stride(from: bottom - 1, through: top + 1, by: -1) { cells.append(Cell(row: row, col: left)) }
-            }
-            top += 1
-            bottom -= 1
-            left += 1
-            right -= 1
         }
         return cells
     }
