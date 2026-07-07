@@ -22,8 +22,7 @@ struct SelfTestListView: View {
                 pageHeader
 
                 LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 12),
-                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.adaptive(minimum: 150, maximum: 240), spacing: 12),
                 ], spacing: 18) {
                     ForEach(SelfTestCatalog.all) { test in
                         Button {
@@ -130,7 +129,7 @@ struct SelfTestListView: View {
         let assetName = "selftest-\(test.id)"
 
         return Color.clear
-            .frame(height: 116)
+            .aspectRatio(1.12, contentMode: .fit)
             .frame(maxWidth: .infinity)
             .overlay {
                 if UIImage(named: assetName) != nil {
