@@ -987,40 +987,188 @@ struct SelfTestFlowView: View {
     private func questionView(_ index: Int) -> some View {
         let question = test.questions[index]
         return ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                ProgressTrack(fraction: Double(index) / Double(test.questions.count), tint: test.tint)
-                Text("\(index + 1)/\(test.questions.count)")
-                    .font(.witsLabel(12.5))
-                    .foregroundStyle(Color.witsFaint)
-                if let context = question.context {
-                    Text(context)
-                        .font(.witsBody(14, weight: .semibold))
-                        .foregroundStyle(test.tint)
-                }
-                Text(question.text)
-                    .font(.witsBody(20, weight: .bold))
-                    .foregroundStyle(Color.witsInk)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.bottom, 6)
-                VStack(spacing: 10) {
-                    ForEach(Array(test.options(for: question).enumerated()), id: \.offset) { optionIndex, option in
-                        AnswerRow(label: option.label, picked: picked == optionIndex) {
-                            guard picked == nil else { return }
-                            picked = optionIndex
-                            let value = option.value
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                                advance(with: value, from: index)
-                            }
-                        }
-                    }
-                }
-                Spacer(minLength: 12)
+            VStack(alignment: .leading, spacing: 20) {
+                questionProgressHeader(index)
+                questionPrompt(question)
+                answerGroup(question, index: index)
+                answerFooter
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.top, 10)
-            .padding(.bottom, 24)
+            .padding(.bottom, 28)
         }
         .id(index)   // reset scroll per question
+    }
+
+    private func questionProgressHeader(_ index: Int) -> some View {
+        VStack(spacing: 14) {
+            HStack(spacing: 10) {
+                Image(systemName: test.icon)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(test.tint)
+                    .frame(width: 38, height: 38)
+                    .background(test.tint.opacity(0.14), in: RoundedRectangle(cornerRadius: 11, style: .continuous))
+
+                Text(test.name)
+                    .font(.witsHeading(18))
+                    .foregroundStyle(Color.witsInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+
+                Spacer(minLength: 10)
+
+                Text("\(index + 1) of \(test.questions.count)")
+                    .font(.witsValue(15))
+                    .foregroundStyle(test.tint)
+                    .monospacedDigit()
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.witsTint, in: Capsule())
+            }
+
+            ProgressTrack(fraction: Double(index + 1) / Double(test.questions.count), tint: test.tint)
+        }
+        .padding(.top, 2)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func questionPrompt(_ question: SelfTestQuestion) -> some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let context = question.context {
+                Label(context, systemImage: "eye.fill")
+                    .font(.witsBody(14, weight: .bold))
+                    .foregroundStyle(test.tint)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text(question.text)
+                .font(.witsHeading(24))
+                .foregroundStyle(Color.witsInk)
+                .lineSpacing(3)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("choose the closest answer")
+                .font(.witsLabel(12))
+                .foregroundStyle(Color.witsFaint)
+                .textCase(.uppercase)
+                .kerning(0.7)
+        }
+        .padding(.top, 2)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func answerGroup(_ question: SelfTestQuestion, index: Int) -> some View {
+        let options = Array(test.options(for: question).enumerated())
+        let shape = RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+
+        return VStack(spacing: 0) {
+            ForEach(options, id: \.offset) { optionIndex, option in
+                if optionIndex > 0 {
+                    Rectangle()
+                        .fill(Color.witsLine)
+                        .frame(height: 1)
+                        .padding(.leading, 64)
+                }
+
+                selfTestAnswerRow(option.label,
+                                  number: optionIndex + 1,
+                                  picked: picked == optionIndex) {
+                    guard picked == nil else { return }
+                    picked = optionIndex
+                    let value = option.value
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                        advance(with: value, from: index)
+                    }
+                }
+            }
+        }
+        .background(Color.witsCard.opacity(0.78), in: shape)
+        .overlay(shape.strokeBorder(Color.witsLine, lineWidth: 1))
+        .clipShape(shape)
+    }
+
+    private func selfTestAnswerRow(_ label: String,
+                                   number: Int,
+                                   picked: Bool,
+                                   action: @escaping () -> Void) -> some View {
+        let parts = answerLabelParts(label)
+
+        return Button(action: action) {
+            HStack(alignment: .center, spacing: 13) {
+                Text("\(number)")
+                    .font(.witsValue(13))
+                    .foregroundStyle(picked ? .white : test.tint)
+                    .monospacedDigit()
+                    .frame(width: 30, height: 30)
+                    .background(picked ? test.tint : test.tint.opacity(0.13), in: Circle())
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(parts.title)
+                        .font(.witsBody(17, weight: .bold))
+                        .foregroundStyle(Color.witsInk)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    if let detail = parts.detail {
+                        Text(detail)
+                            .font(.witsBody(13.5))
+                            .foregroundStyle(Color.witsMuted)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .layoutPriority(1)
+
+                Spacer(minLength: 8)
+
+                ZStack {
+                    Circle()
+                        .strokeBorder(picked ? test.tint : Color.witsFaint.opacity(0.32), lineWidth: 2)
+                        .frame(width: 26, height: 26)
+                    if picked {
+                        Circle()
+                            .fill(test.tint)
+                            .frame(width: 13, height: 13)
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 15)
+            .frame(minHeight: 70)
+            .background(picked ? test.tint.opacity(0.12) : Color.clear)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PressScale())
+        .animation(.easeOut(duration: 0.12), value: picked)
+        .accessibilityLabel("\(number). \(label)")
+    }
+
+    private var answerFooter: some View {
+        Label("no right answer; pick what feels closest", systemImage: "hand.tap.fill")
+            .font(.witsBody(12.8, weight: .semibold))
+            .foregroundStyle(Color.witsFaint)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 4)
+    }
+
+    private func answerLabelParts(_ label: String) -> (title: String, detail: String?) {
+        let separators = [" — ", " - "]
+        for separator in separators {
+            let pieces = label.components(separatedBy: separator)
+            if pieces.count > 1, let first = pieces.first {
+                let detail = pieces.dropFirst().joined(separator: separator)
+                return (first, detail)
+            }
+        }
+
+        if let comma = label.firstIndex(of: ","), label.distance(from: label.startIndex, to: comma) <= 22 {
+            let title = String(label[..<comma])
+            let detailStart = label.index(after: comma)
+            let detail = label[detailStart...].trimmingCharacters(in: .whitespacesAndNewlines)
+            return (title, detail.isEmpty ? nil : detail)
+        }
+
+        return (label, nil)
     }
 
     private func advance(with value: Int, from index: Int) {
