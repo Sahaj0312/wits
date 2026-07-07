@@ -67,6 +67,9 @@ final class AppModel {
     /// Latest global-leaderboard snapshot per game (top players + my rank),
     /// prefetched right after each run persists so post-game UI renders instantly.
     var leaderboards: [GameID: LeaderboardSnapshot] = [:]
+    /// Latest self-report test result per SelfTest.id (retakes overwrite; full
+    /// attempt history lives server-side in self_test_results).
+    var selfTests: [String: SelfTestRecord] = [:]
     @ObservationIgnored private var leaderboardMeta: [GameID: (at: Date, best: Int)] = [:]
 
     let supa: SupabaseManager
@@ -581,6 +584,22 @@ final class AppModel {
                                  lastActiveDay: Self.parseDate(s.last_active_day))
         }
 
+        if let rows = try? await supa.fetchSelfTestResults() {
+            var latest: [String: SelfTestRecord] = [:]
+            for row in rows where latest[row.test_id] == nil {
+                guard let taken = Self.parseServerTimestamp(row.taken_at) else { continue }
+                latest[row.test_id] = SelfTestRecord(score: row.score,
+                                                     maxScore: row.max_score ?? 0,
+                                                     label: row.result_label,
+                                                     takenAt: taken)
+            }
+            // Local can be ahead of the server (offline attempt that failed to
+            // upload) — keep whichever attempt is newer per test.
+            selfTests.merge(latest) { local, server in
+                server.takenAt >= local.takenAt ? server : local
+            }
+        }
+
         let since = SupabaseManager.dayString(Calendar.current.date(byAdding: .day, value: -60, to: Date()) ?? Date())
         if let rows = try? await supa.fetchDailyProgress(since: since) {
             progressDays = rows
@@ -727,6 +746,27 @@ final class AppModel {
             ?? (domainScores.values.reduce(0, +) / Double(domainScores.count) * 10).rounded() / 10
     }
 
+    // MARK: Self-report tests
+
+    /// Record a completed self-test attempt: latest result shown locally right
+    /// away, full attempt appended server-side (retakes just add rows).
+    func recordSelfTest(_ test: SelfTest, outcome: SelfTestOutcome) {
+        let takenAt = Date()
+        selfTests[test.id] = SelfTestRecord(score: outcome.score,
+                                            maxScore: outcome.maxScore,
+                                            label: outcome.label,
+                                            takenAt: takenAt)
+        saveCache()
+        Task {
+            try? await supa.saveSelfTestResult(testID: test.id,
+                                               score: outcome.score,
+                                               maxScore: outcome.maxScore,
+                                               label: outcome.label,
+                                               subscales: outcome.subscales,
+                                               takenAt: takenAt)
+        }
+    }
+
     // MARK: Local cache
 
     private struct CacheState: Codable {
@@ -739,6 +779,7 @@ final class AppModel {
         var progressDays: [DailyProgressRow]
         var playedByDay: [String: [PlayedGame]]?
         var statNorms: [String: StatNorm]?
+        var selfTests: [String: SelfTestRecord]?
     }
 
     private func saveCache() {
@@ -751,7 +792,8 @@ final class AppModel {
             headlineIndex: headlineIndex,
             progressDays: progressDays,
             playedByDay: playedByDay,
-            statNorms: statNorms
+            statNorms: statNorms,
+            selfTests: selfTests
         )
         if let data = try? JSONEncoder().encode(state) {
             UserDefaults.standard.set(data, forKey: cacheKey)
@@ -772,6 +814,7 @@ final class AppModel {
         statNorms = [:]
         leaderboards = [:]
         leaderboardMeta = [:]
+        selfTests = [:]
         today = WorkoutBuilder.build(for: Date())
         notificationsNeedSettings = false
         load = .idle
@@ -794,6 +837,7 @@ final class AppModel {
         progressDays = state.progressDays
         playedByDay = state.playedByDay ?? [:]
         statNorms = state.statNorms ?? [:]
+        selfTests = state.selfTests ?? [:]
         // keep cached workout only if it's still today's
         if Calendar.current.isDate(state.today.day, inSameDayAs: Date()) {
             today = state.today

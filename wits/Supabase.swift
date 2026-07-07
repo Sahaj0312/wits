@@ -161,6 +161,14 @@ struct StatNorm: Codable, Equatable {
 
 /// One row of the global per-game leaderboard, as returned by the
 /// `game_leaderboard` RPC.
+struct SelfTestRow: Decodable {
+    let test_id: String
+    let score: Double
+    let max_score: Double?
+    let result_label: String
+    let taken_at: String
+}
+
 struct LeaderboardEntry: Decodable, Equatable {
     var name: String
     var score: Int
@@ -579,6 +587,32 @@ final class SupabaseManager {
             URLQueryItem(name: "order", value: "started_at.asc"),
         ])
         return try JSONDecoder().decode([SessionRow].self, from: data)
+    }
+
+    /// One row per attempt; retakes just append. The profile shows the latest.
+    func saveSelfTestResult(testID: String, score: Double, maxScore: Double,
+                            label: String, subscales: [String: Double]?, takenAt: Date) async throws {
+        guard let id = userID else { throw SupabaseError.notSignedIn }
+        var row: [String: Any] = [
+            "user_id": id,
+            "test_id": testID,
+            "score": score,
+            "max_score": maxScore,
+            "result_label": label,
+            "taken_at": Self.iso.string(from: takenAt),
+        ]
+        if let subscales { row["subscales"] = subscales }
+        try await restWrite(table: "self_test_results", body: [row], prefer: "return=minimal")
+    }
+
+    /// All attempts newest-first; callers keep the first row per test_id.
+    func fetchSelfTestResults() async throws -> [SelfTestRow] {
+        let data = try await restRead(table: "self_test_results", query: [
+            URLQueryItem(name: "select", value: "test_id,score,max_score,result_label,taken_at"),
+            URLQueryItem(name: "order", value: "taken_at.desc"),
+            URLQueryItem(name: "limit", value: "400"),
+        ])
+        return try JSONDecoder().decode([SelfTestRow].self, from: data)
     }
 
     func fetchStreak() async throws -> StreakRow? {

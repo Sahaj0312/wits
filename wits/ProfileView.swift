@@ -14,6 +14,7 @@ struct ProfileView: View {
     @AppStorage("wits.soundEffectsEnabled") private var soundEffectsEnabled = true
     @AppStorage("wits.hapticsEnabled") private var hapticsEnabled = true
     @State private var showReminder = false
+    @State private var activeTest: SelfTest?
 
     private var displayName: String {
         app.profile.displayName?.isEmpty == false ? app.profile.displayName! : "you"
@@ -46,6 +47,11 @@ struct ProfileView: View {
 
     private var reminderStatusLabel: String {
         reminderEnabled ? "on · \(reminderLabel)" : "off"
+    }
+
+    private func testResultLabel(_ test: SelfTest) -> String {
+        guard let record = app.selfTests[test.id] else { return "take it" }
+        return "\(record.label) · \(SelfTestFlowView.shortDate(record.takenAt))"
     }
 
     private var goalsLabel: String {
@@ -120,6 +126,26 @@ struct ProfileView: View {
                                      value: routineLabel)
                 }
 
+                settingsSection("tests") {
+                    ForEach(Array(SelfTestCatalog.all.enumerated()), id: \.element.id) { index, test in
+                        if index > 0 { settingsDivider }
+                        Button { activeTest = test } label: {
+                            settingsValueRow(icon: test.icon,
+                                             tint: test.tint,
+                                             title: test.name,
+                                             value: testResultLabel(test),
+                                             showsChevron: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                Text("self-report tests are reflections, not diagnoses. retake them any time — your latest result is kept.")
+                    .font(.witsBody(12.5))
+                    .foregroundStyle(Color.witsFaint)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, WitsMetrics.screenPadding + 16)
+                    .padding(.top, 10)
+
                 settingsSection("wits") {
                     settingsValueRow(icon: "person.fill",
                                      tint: .witsAccent,
@@ -168,6 +194,11 @@ struct ProfileView: View {
         .background(Color.witsBg.ignoresSafeArea())
         .sheet(isPresented: $showReminder) {
             ReminderSettingsSheet(app: app)
+        }
+        .sheet(item: $activeTest) { test in
+            SelfTestFlowView(test: test, lastRecord: app.selfTests[test.id]) { outcome in
+                app.recordSelfTest(test, outcome: outcome)
+            }
         }
         .onAppear {
             syncGameFeelSettings()
