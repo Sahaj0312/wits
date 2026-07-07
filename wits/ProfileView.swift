@@ -49,25 +49,6 @@ struct ProfileView: View {
         reminderEnabled ? "on · \(reminderLabel)" : "off"
     }
 
-    private var goalsLabel: String {
-        guard !app.profile.goals.isEmpty else { return "not set" }
-        return app.profile.goals.prefix(2).joined(separator: ", ")
-    }
-
-    private var difficultyLabel: String {
-        app.profile.difficultyPreference?.isEmpty == false ? app.profile.difficultyPreference! : "adaptive"
-    }
-
-    private var encouragementLabel: String {
-        app.profile.encouragementStyle?.isEmpty == false ? app.profile.encouragementStyle! : "standard"
-    }
-
-    private var routineLabel: String {
-        let exercise = app.profile.exerciseFrequency?.isEmpty == false ? app.profile.exerciseFrequency! : "exercise not set"
-        let sleep = app.profile.sleepHours?.isEmpty == false ? app.profile.sleepHours! : "sleep not set"
-        return "\(exercise) · \(sleep)"
-    }
-
     private var completedSelfTestCount: Int {
         SelfTestCatalog.all.filter { app.selfTests[$0.id] != nil }.count
     }
@@ -121,33 +102,6 @@ struct ProfileView: View {
                                       tint: .witsWarm,
                                       title: "haptics",
                                       isOn: $hapticsEnabled)
-                }
-
-                settingsSection("training") {
-                    settingsValueRow(icon: "calendar.badge.clock",
-                                     tint: .witsAccent,
-                                     title: "weekly target",
-                                     value: "\(app.profile.trainingDays) days")
-                    settingsDivider
-                    settingsValueRow(icon: "target",
-                                     tint: .witsSky,
-                                     title: "goals",
-                                     value: goalsLabel)
-                    settingsDivider
-                    settingsValueRow(icon: "slider.horizontal.3",
-                                     tint: .witsViolet,
-                                     title: "difficulty",
-                                     value: difficultyLabel)
-                    settingsDivider
-                    settingsValueRow(icon: "quote.bubble.fill",
-                                     tint: .witsPink,
-                                     title: "encouragement",
-                                     value: encouragementLabel)
-                    settingsDivider
-                    settingsValueRow(icon: "figure.run",
-                                     tint: .witsWarm,
-                                     title: "routine",
-                                     value: routineLabel)
                 }
 
                 testsSection
