@@ -637,6 +637,13 @@ struct SelfTestFlowView: View {
     @State private var answers: [Int] = []
     @State private var picked: Int?
 
+    private var sourceParts: (instrument: String, origin: String) {
+        let parts = test.source.components(separatedBy: " — ")
+        let instrument = parts.first?.trimmingCharacters(in: .whitespacesAndNewlines) ?? test.source
+        let origin = parts.dropFirst().joined(separator: " — ").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (instrument, origin.isEmpty ? "self-report" : origin)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             header
@@ -650,91 +657,329 @@ struct SelfTestFlowView: View {
     }
 
     private var header: some View {
-        HStack {
-            if case .question(let index) = stage {
-                Button {
-                    if index == 0 {
-                        stage = .intro
-                    } else {
-                        answers.removeLast()
-                        stage = .question(index - 1)
+        ZStack(alignment: .top) {
+            Capsule()
+                .fill(Color.witsFaint.opacity(0.34))
+                .frame(width: 44, height: 5)
+                .padding(.top, 8)
+
+            HStack {
+                if case .question(let index) = stage {
+                    Button {
+                        if index == 0 {
+                            stage = .intro
+                        } else {
+                            answers.removeLast()
+                            stage = .question(index - 1)
+                        }
+                        picked = nil
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 15, weight: .heavy))
+                            .foregroundStyle(Color.witsMuted)
+                            .frame(width: 42, height: 42)
+                            .background(Color.witsTint, in: Circle())
                     }
-                    picked = nil
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("previous question")
+                }
+                Spacer()
+                Button {
+                    dismiss()
                 } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 15, weight: .heavy))
+                    Image(systemName: "xmark")
+                        .font(.system(size: 14, weight: .heavy))
                         .foregroundStyle(Color.witsMuted)
-                        .frame(width: 38, height: 38)
+                        .frame(width: 42, height: 42)
                         .background(Color.witsTint, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("previous question")
+                .accessibilityLabel("close")
             }
-            Spacer()
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .heavy))
-                    .foregroundStyle(Color.witsMuted)
-                    .frame(width: 38, height: 38)
-                    .background(Color.witsTint, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("close")
+            .padding(.horizontal, WitsMetrics.screenPadding)
         }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.top, 14)
+        .frame(height: 60)
+        .padding(.top, 4)
     }
 
     // MARK: Intro
 
     private var intro: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Image(systemName: test.icon)
-                    .font(.system(size: 34, weight: .bold))
-                    .foregroundStyle(test.tint)
-                    .padding(.top, 10)
-                Text(test.name)
-                    .font(.witsDisplay(30))
-                    .foregroundStyle(Color.witsInk)
-                Text(test.intro)
-                    .font(.witsBody(16))
-                    .foregroundStyle(Color.witsMuted)
-                Text("\(test.questions.count) questions · \(test.source)")
-                    .font(.witsBody(13))
-                    .foregroundStyle(Color.witsFaint)
+            VStack(alignment: .leading, spacing: 16) {
+                introHero
+                introMetadata
+
                 if let lastRecord {
-                    Text("last taken \(Self.shortDate(lastRecord.takenAt)) — \(lastRecord.label)")
-                        .font(.witsBody(14, weight: .semibold))
-                        .foregroundStyle(test.tint)
+                    lastResultCard(lastRecord)
+                } else {
+                    firstRunCard
                 }
+
                 if test.isScreener {
-                    Text(SelfTestCatalog.screenerDisclaimer)
-                        .font(.witsBody(13))
-                        .foregroundStyle(Color.witsMuted)
-                        .padding(14)
-                        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    screenerDisclaimerCard
                 }
-                Spacer(minLength: 20)
-                Button {
-                    answers = []
-                    picked = nil
-                    stage = .question(0)
-                } label: {
-                    Text(lastRecord == nil ? "start" : "take it again")
-                        .font(.witsBody(17, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(test.tint, in: Capsule())
-                }
-                .buttonStyle(.plain)
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
-            .padding(.bottom, 24)
+            .padding(.top, 10)
+            .padding(.bottom, 112)
         }
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                answers = []
+                picked = nil
+                stage = .question(0)
+            } label: {
+                Text(lastRecord == nil ? "start" : "take it again")
+                    .font(.witsBody(17, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(test.tint, in: Capsule())
+                    .shadow(color: test.tint.opacity(0.28), radius: 16, y: 8)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, WitsMetrics.screenPadding)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
+            .background(
+                LinearGradient(colors: [
+                    Color.witsBg.opacity(0),
+                    Color.witsBg,
+                    Color.witsBg,
+                ], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            )
+        }
+    }
+
+    private var introHero: some View {
+        HStack(alignment: .center, spacing: 16) {
+            Image(systemName: test.icon)
+                .font(.system(size: 38, weight: .heavy))
+                .foregroundStyle(test.tint)
+                .frame(width: 88, height: 88)
+                .background(
+                    LinearGradient(colors: [test.tint.opacity(0.22), Color.witsCard.opacity(0.96)],
+                                   startPoint: .topLeading,
+                                   endPoint: .bottomTrailing),
+                    in: RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+                        .strokeBorder(test.tint.opacity(0.42), lineWidth: 1)
+                )
+
+            VStack(alignment: .leading, spacing: 9) {
+                Text(test.name)
+                    .font(.witsDisplay(31))
+                    .foregroundStyle(Color.witsInk)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.78)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(test.intro)
+                    .font(.witsBody(15.5))
+                    .foregroundStyle(Color.witsMuted)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .layoutPriority(1)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var introMetadata: some View {
+        HStack(spacing: 0) {
+            metadataItem(icon: "doc.text.fill", title: "\(test.questions.count) questions")
+            metadataDivider
+            metadataItem(icon: "checkmark.shield.fill", title: sourceParts.instrument)
+            metadataDivider
+            metadataItem(icon: "person.text.rectangle.fill", title: compactOriginLabel(sourceParts.origin))
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 13)
+        .background(Color.witsCard.opacity(0.78), in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                .strokeBorder(Color.witsLine, lineWidth: 1)
+        )
+    }
+
+    private func metadataItem(icon: String, title: String) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(test.tint)
+            Text(title)
+                .font(.witsBody(12.5, weight: .semibold))
+                .foregroundStyle(Color.witsMuted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var metadataDivider: some View {
+        Rectangle()
+            .fill(Color.witsLine)
+            .frame(width: 1, height: 24)
+            .padding(.horizontal, 10)
+    }
+
+    private func lastResultCard(_ record: SelfTestRecord) -> some View {
+        let shape = RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+
+        return VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text("last result")
+                        .font(.witsLabel(13))
+                        .foregroundStyle(test.tint)
+                        .textCase(.uppercase)
+                        .kerning(0.7)
+
+                    Text(record.label)
+                        .font(.witsHeading(26))
+                        .foregroundStyle(Color.witsInk)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.74)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Label("last taken \(Self.shortDate(record.takenAt))", systemImage: "calendar")
+                        .font(.witsBody(14, weight: .semibold))
+                        .foregroundStyle(Color.witsMuted)
+                }
+                .layoutPriority(1)
+
+                scoreRing(record)
+            }
+
+            segmentedScore(record)
+
+            Text("your latest saved result for this test. retakes replace what appears on your profile.")
+                .font(.witsBody(14))
+                .foregroundStyle(Color.witsMuted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .background(
+            LinearGradient(colors: [Color.witsCard, test.tint.opacity(0.08)],
+                           startPoint: .topLeading,
+                           endPoint: .bottomTrailing),
+            in: shape
+        )
+        .overlay(shape.strokeBorder(Color.witsLine, lineWidth: 1))
+        .shadow(color: Color.witsShadow, radius: 10, y: 5)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var firstRunCard: some View {
+        HStack(alignment: .top, spacing: 13) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(test.tint)
+                .frame(width: 38, height: 38)
+                .background(test.tint.opacity(0.14), in: Circle())
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("quick check-in")
+                    .font(.witsHeading(16))
+                    .foregroundStyle(Color.witsInk)
+                Text("answer honestly. this takes about a minute and only your latest result is shown on your profile.")
+                    .font(.witsBody(14))
+                    .foregroundStyle(Color.witsMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(16)
+        .background(Color.witsCard, in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                .strokeBorder(Color.witsLine, lineWidth: 1)
+        )
+    }
+
+    private var screenerDisclaimerCard: some View {
+        HStack(alignment: .top, spacing: 13) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundStyle(test.tint)
+                .frame(width: 42, height: 42)
+                .background(test.tint.opacity(0.13), in: Circle())
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text("screening signal, not a diagnosis")
+                    .font(.witsHeading(15.5))
+                    .foregroundStyle(Color.witsInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(SelfTestCatalog.screenerDisclaimer)
+                    .font(.witsBody(13.5))
+                    .foregroundStyle(Color.witsMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .layoutPriority(1)
+        }
+        .padding(16)
+        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                .strokeBorder(Color.witsLine, lineWidth: 1)
+        )
+    }
+
+    private func scoreRing(_ record: SelfTestRecord) -> some View {
+        let fraction = scoreFraction(record)
+
+        return ZStack {
+            Circle()
+                .stroke(Color.witsLine, lineWidth: 6)
+            Circle()
+                .trim(from: 0, to: fraction)
+                .stroke(test.tint, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text(scoreLabel(record))
+                .font(.witsValue(17))
+                .foregroundStyle(test.tint)
+                .monospacedDigit()
+                .minimumScaleFactor(0.72)
+        }
+        .frame(width: 74, height: 74)
+        .accessibilityLabel("score \(scoreLabel(record))")
+    }
+
+    private func segmentedScore(_ record: SelfTestRecord) -> some View {
+        let filled = max(0, min(Int(round(scoreFraction(record) * 6)), 6))
+
+        return HStack(spacing: 8) {
+            ForEach(0..<6, id: \.self) { index in
+                Capsule()
+                    .fill(index < filled ? test.tint : Color.witsLine)
+                    .frame(height: 7)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private func scoreFraction(_ record: SelfTestRecord) -> Double {
+        guard record.maxScore > 0 else { return 0 }
+        return min(max(record.score / record.maxScore, 0), 1)
+    }
+
+    private func scoreLabel(_ record: SelfTestRecord) -> String {
+        "\(formatScore(record.score))/\(formatScore(record.maxScore))"
+    }
+
+    private func formatScore(_ value: Double) -> String {
+        value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
+    }
+
+    private func compactOriginLabel(_ origin: String) -> String {
+        let lowered = origin.lowercased()
+        if lowered.contains("self-report") { return "self-report" }
+        if lowered.contains("questionnaire") { return "questionnaire" }
+        return origin
     }
 
     // MARK: Questions
