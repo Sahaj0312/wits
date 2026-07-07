@@ -21,12 +21,15 @@ struct SelfTestListView: View {
             VStack(alignment: .leading, spacing: 12) {
                 pageHeader
 
-                VStack(spacing: 10) {
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 12),
+                    GridItem(.flexible(), spacing: 12),
+                ], spacing: 18) {
                     ForEach(SelfTestCatalog.all) { test in
                         Button {
                             activeTest = test
                         } label: {
-                            selfTestCard(test)
+                            testGridCard(test)
                         }
                         .buttonStyle(.plain)
                     }
@@ -89,80 +92,74 @@ struct SelfTestListView: View {
         .padding(.bottom, 4)
     }
 
-    private func selfTestCard(_ test: SelfTest) -> some View {
-        let record = app.selfTests[test.id]
-        let shape = RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-
-        return HStack(alignment: .center, spacing: 13) {
-            Image(systemName: test.icon)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(test.tint)
-                .frame(width: 38, height: 38)
-                .background(test.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 7) {
-                    Text(test.name)
-                        .font(.witsHeading(16))
-                        .foregroundStyle(Color.witsInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                        .layoutPriority(1)
-
-                    if test.isScreener && !test.name.localizedCaseInsensitiveContains("screener") {
-                        Text("screener")
-                            .font(.witsLabel(10.5))
-                            .foregroundStyle(Color.witsFaint)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(Color.witsTint, in: Capsule())
-                            .lineLimit(1)
-                    }
-                }
-
-                Text(record?.label ?? test.tagline)
-                    .font(.witsBody(12.8))
-                    .foregroundStyle(Color.witsMuted)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .layoutPriority(1)
-
-            Spacer(minLength: 6)
-
-            VStack(alignment: .trailing, spacing: 5) {
-                testStatusChip(title: record == nil ? "take it" : "latest",
-                               tint: test.tint,
-                               filled: record != nil)
-
-                Text(record.map { SelfTestFlowView.shortDate($0.takenAt) } ?? "\(test.questions.count) q")
-                    .font(.witsLabel(11.5))
-                    .foregroundStyle(Color.witsFaint)
-                    .lineLimit(1)
-                    .monospacedDigit()
-            }
-            .frame(width: 58, alignment: .trailing)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12.5, weight: .semibold))
-                .foregroundStyle(Color.witsFaint)
-        }
-        .padding(14)
-        .background(Color.witsCard, in: shape)
-        .overlay(shape.strokeBorder(Color.witsLine, lineWidth: 1))
-        .contentShape(shape)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(record.map { "\(test.name), latest result \($0.label)" } ?? "\(test.name), not taken")
+    private func estimatedMinutes(_ test: SelfTest) -> Int {
+        max(1, Int(ceil(Double(test.questions.count) / 6.0)))
     }
 
-    private func testStatusChip(title: String, tint: Color, filled: Bool) -> some View {
-        Text(title)
-            .font(.witsLabel(11))
-            .foregroundStyle(filled ? Color.white : tint)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(filled ? tint : tint.opacity(0.12), in: Capsule())
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
+    private func testGridCard(_ test: SelfTest) -> some View {
+        let record = app.selfTests[test.id]
+
+        return VStack(alignment: .leading, spacing: 9) {
+            testIllustration(test, taken: record != nil)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(test.name)
+                    .font(.witsHeading(15.5))
+                    .foregroundStyle(Color.witsInk)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(record?.label ?? "\(test.questions.count) questions · \(estimatedMinutes(test)) min")
+                    .font(.witsLabel(11))
+                    .foregroundStyle(record == nil ? Color.witsFaint : test.tint)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .monospacedDigit()
+            }
+            .padding(.horizontal, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(record.map { "\(test.name), latest result \($0.label)" } ?? "\(test.name), not taken, \(test.questions.count) questions")
+    }
+
+    private func testIllustration(_ test: SelfTest, taken: Bool) -> some View {
+        let shape = RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+        let assetName = "selftest-\(test.id)"
+
+        return Color.clear
+            .frame(height: 116)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                if UIImage(named: assetName) != nil {
+                    Image(assetName)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    ZStack {
+                        LinearGradient(colors: [test.tint.opacity(0.22), test.tint.opacity(0.07)],
+                                       startPoint: .topLeading,
+                                       endPoint: .bottomTrailing)
+                        Image(systemName: test.icon)
+                            .font(.system(size: 34, weight: .bold))
+                            .foregroundStyle(test.tint)
+                    }
+                    .background(Color.witsCard)
+                }
+            }
+            .clipShape(shape)
+            .overlay(shape.strokeBorder(Color.witsLine, lineWidth: 1))
+            .overlay(alignment: .topTrailing) {
+                if taken {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
+                        .background(test.tint, in: Circle())
+                        .padding(7)
+                }
+            }
     }
 }

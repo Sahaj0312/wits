@@ -69,7 +69,11 @@ enum SelfTestCatalog {
     static let screenerDisclaimer =
         "this is a screening signal, not a diagnosis. only a qualified professional can assess you — if the result resonates, consider talking to one."
 
-    static let all: [SelfTest] = [asrs6, aq10, vviq16, rmeq, miniIPIP, dirtyDozen, ncs6, who5, rosenberg]
+    static let all: [SelfTest] = [
+        asrs6, gad7, phq8, aq10,
+        who5, stress10, burnout10, overthink10, impostor10, procrast9, rosenberg,
+        miniIPIP, beis10, dirtyDozen, ncs6, vviq16, rmeq,
+    ]
 
     static func test(withID id: String) -> SelfTest? {
         all.first { $0.id == id }
@@ -83,6 +87,13 @@ enum SelfTestCatalog {
         .init(label: "sometimes", value: 2),
         .init(label: "often", value: 3),
         .init(label: "very often", value: 4),
+    ]
+
+    private static let bothered4: [SelfTestOption] = [
+        .init(label: "not at all", value: 0),
+        .init(label: "several days", value: 1),
+        .init(label: "more than half the days", value: 2),
+        .init(label: "nearly every day", value: 3),
     ]
 
     private static let agreement4: [SelfTestOption] = [
@@ -615,6 +626,396 @@ enum SelfTestCatalog {
             summary = "high, stable self-regard. the top of this scale is quiet confidence, and you're there."
         }
         return SelfTestOutcome(score: Double(total), maxScore: 30, label: label, summary: summary)
+    }
+
+    // MARK: GAD-7 (anxiety)
+
+    static let gad7 = SelfTest(
+        id: "gad7",
+        name: "anxiety check",
+        tagline: "the 7-question screener clinics use worldwide",
+        icon: "wind",
+        tint: .witsSky,
+        source: "GAD-7 — generalized anxiety scale, Spitzer et al. (public domain)",
+        isScreener: true,
+        intro: "seven questions about the last two weeks. over the last 2 weeks, how often have you been bothered by each of these?",
+        scale: bothered4,
+        questions: [
+            .init(text: "feeling nervous, anxious, or on edge."),
+            .init(text: "not being able to stop or control worrying."),
+            .init(text: "worrying too much about different things."),
+            .init(text: "trouble relaxing."),
+            .init(text: "being so restless that it's hard to sit still."),
+            .init(text: "becoming easily annoyed or irritable."),
+            .init(text: "feeling afraid, as if something awful might happen."),
+        ],
+        score: scoreGAD7
+    )
+
+    static func scoreGAD7(_ values: [Int]) -> SelfTestOutcome {
+        let total = values.reduce(0, +)   // 0...21
+        let label: String
+        let summary: String
+        switch total {
+        case ...4:
+            label = "minimal (\(total)/21)"
+            summary = "anxiety hasn't been running the show these two weeks. everyone visits this scale sometimes — nice to be at the quiet end."
+        case 5...9:
+            label = "mild (\(total)/21)"
+            summary = "some anxiety in the mix, at a level most people move through. worth watching, not worth alarm."
+        case 10...14:
+            label = "moderate (\(total)/21)"
+            summary = "a score of 10+ is the line where this screener suggests talking to a professional. it's a signal worth taking seriously, not a diagnosis."
+        default:
+            label = "severe range (\(total)/21)"
+            summary = "the last two weeks have been genuinely hard. this is exactly the score range where talking to a professional helps most — please consider it."
+        }
+        return SelfTestOutcome(score: Double(total), maxScore: 21, label: label, summary: summary)
+    }
+
+    // MARK: PHQ-8 (low mood)
+
+    static let phq8 = SelfTest(
+        id: "phq8",
+        name: "low mood",
+        tagline: "the 8-question PHQ mood screener",
+        icon: "cloud.rain.fill",
+        tint: .witsViolet,
+        source: "PHQ-8 — patient health questionnaire, Kroenke et al. (public domain)",
+        isScreener: true,
+        intro: "eight questions about the last two weeks. over the last 2 weeks, how often have you been bothered by each of these?",
+        scale: bothered4,
+        questions: [
+            .init(text: "little interest or pleasure in doing things."),
+            .init(text: "feeling down, depressed, or hopeless."),
+            .init(text: "trouble falling or staying asleep, or sleeping too much."),
+            .init(text: "feeling tired or having little energy."),
+            .init(text: "poor appetite or overeating."),
+            .init(text: "feeling bad about yourself — or that you are a failure or have let yourself or your family down."),
+            .init(text: "trouble concentrating on things, such as reading or watching tv."),
+            .init(text: "moving or speaking so slowly that other people noticed — or the opposite, being fidgety or restless."),
+        ],
+        score: scorePHQ8
+    )
+
+    static func scorePHQ8(_ values: [Int]) -> SelfTestOutcome {
+        let total = values.reduce(0, +)   // 0...24
+        let label: String
+        let summary: String
+        switch total {
+        case ...4:
+            label = "minimal (\(total)/24)"
+            summary = "mood has held steady these two weeks. this scale moves — retaking it monthly makes it a useful weather report."
+        case 5...9:
+            label = "mild (\(total)/24)"
+            summary = "a dip, at a level lots of people pass through. sleep, movement and daylight move this score more than willpower does."
+        case 10...14:
+            label = "moderate (\(total)/24)"
+            summary = "10+ is where this screener recommends checking in with a professional. that's a signal worth acting on, not a diagnosis."
+        default:
+            label = "significant (\(total)/24)"
+            summary = "these two weeks have been heavy. a score here is the strongest cue this screener gives to talk to someone — a professional, or someone you trust as a first step."
+        }
+        return SelfTestOutcome(score: Double(total), maxScore: 24, label: label, summary: summary)
+    }
+
+    // MARK: Stress load (wits original)
+
+    static let stress10 = SelfTest(
+        id: "stress10",
+        name: "stress load",
+        tagline: "how much are you actually carrying right now?",
+        icon: "flame.fill",
+        tint: .witsWarm,
+        source: "wits reflection — 10 items written for wits, not a clinical scale",
+        isScreener: false,
+        intro: "ten questions about the last month. in the last month, how often have you…",
+        scale: frequency5,
+        questions: [
+            .init(text: "felt there was more to do than you could realistically handle?"),
+            .init(text: "felt tension in your body — jaw, shoulders, stomach — with no obvious cause?"),
+            .init(text: "kept thinking about work or obligations during your downtime?"),
+            .init(text: "snapped at someone over something small?"),
+            .init(text: "felt like events were happening to you, out of your control?"),
+            .init(text: "had trouble winding down enough to fall asleep?"),
+            .init(text: "skipped meals, movement or breaks because there was \"no time\"?"),
+            .init(text: "felt a background hum of urgency even when nothing was due?"),
+            .init(text: "found small setbacks hitting harder than they should?"),
+            .init(text: "ended the day feeling wrung out rather than tired-but-satisfied?"),
+        ],
+        score: scoreStress10
+    )
+
+    static func scoreStress10(_ values: [Int]) -> SelfTestOutcome {
+        let total = values.reduce(0, +)   // 0...40
+        let label: String
+        let summary: String
+        switch total {
+        case ...10:
+            label = "light load (\(total)/40)"
+            summary = "you're carrying a normal amount. whatever your recovery routine is, it's working — keep it."
+        case 11...20:
+            label = "carrying some (\(total)/40)"
+            summary = "a real load, still within range. the items you marked \"often\" are the ones worth designing around."
+        case 21...30:
+            label = "heavy load (\(total)/40)"
+            summary = "stress is leaking into your body and sleep. subtracting one commitment usually beats adding one coping trick."
+        default:
+            label = "red zone (\(total)/40)"
+            summary = "this level of sustained load is the kind that compounds. treat recovery as a task with a deadline, not a reward."
+        }
+        return SelfTestOutcome(score: Double(total), maxScore: 40, label: label, summary: summary)
+    }
+
+    // MARK: Burnout (wits original)
+
+    static let burnout10 = SelfTest(
+        id: "burnout10",
+        name: "burnout",
+        tagline: "tired-tired, or something deeper?",
+        icon: "battery.25",
+        tint: .witsGold,
+        source: "wits reflection — 10 items written for wits, not a clinical scale",
+        isScreener: false,
+        intro: "ten statements about how work — paid, study, or care — has felt lately. how often is each one true?",
+        scale: frequency5,
+        questions: [
+            .init(text: "you wake up tired even after a full night's sleep."),
+            .init(text: "by mid-afternoon you're running on fumes."),
+            .init(text: "small tasks feel like they need a run-up."),
+            .init(text: "rest days don't seem to recharge you anymore."),
+            .init(text: "your body feels heavier than your schedule looks."),
+            .init(text: "things you used to care about feel like chores."),
+            .init(text: "you catch yourself doing the minimum and feeling nothing about it."),
+            .init(text: "you feel detached from the point of what you do."),
+            .init(text: "your cynical jokes about it feel less like jokes lately."),
+            .init(text: "you can't remember the last time you felt proud of the work."),
+        ],
+        score: scoreBurnout10
+    )
+
+    static func scoreBurnout10(_ values: [Int]) -> SelfTestOutcome {
+        func sum(_ range: Range<Int>) -> Double { Double(values[range].reduce(0, +)) }
+        let subscales: [String: Double] = [
+            "drain (energy)": sum(0..<5),
+            "distance (caring)": sum(5..<10),
+        ]
+        let total = values.reduce(0, +)   // 0...40
+        let label: String
+        let summary: String
+        switch total {
+        case ...10:
+            label = "charged (\(total)/40)"
+            summary = "energy and caring are both intact. this is the baseline worth protecting."
+        case 11...20:
+            label = "running warm (\(total)/40)"
+            summary = "early signs, still recoverable with ordinary rest. check which subscale is higher — losing energy and losing caring need different fixes."
+        case 21...30:
+            label = "smoldering (\(total)/40)"
+            summary = "this is the range where \"push through\" stops working. if distance outweighs drain, it's about meaning, not sleep."
+        default:
+            label = "burnout range (\(total)/40)"
+            summary = "sustained scores here usually don't resolve on their own. something structural about the load needs to change — and that's worth help to figure out."
+        }
+        return SelfTestOutcome(score: Double(total), maxScore: 40, label: label, summary: summary, subscales: subscales)
+    }
+
+    // MARK: Overthinking (wits original)
+
+    static let overthink10 = SelfTest(
+        id: "overthink10",
+        name: "overthinking",
+        tagline: "is your mind solving, or just spinning?",
+        icon: "arrow.triangle.2.circlepath",
+        tint: .witsAccent,
+        source: "wits reflection — 10 items written for wits, not a clinical scale",
+        isScreener: false,
+        intro: "ten habits of a looping mind. how often do you catch yourself doing each one?",
+        scale: frequency5,
+        questions: [
+            .init(text: "replaying conversations, editing what you should have said?"),
+            .init(text: "rehearsing future conversations that may never happen?"),
+            .init(text: "reopening decisions you already made, hunting for the mistake?"),
+            .init(text: "losing sleep to a thought loop you can't put down?"),
+            .init(text: "reading a neutral message several times for hidden meaning?"),
+            .init(text: "comparing options long after they became roughly equal?"),
+            .init(text: "building worst-case scenarios in vivid detail?"),
+            .init(text: "asking for reassurance on something you already know?"),
+            .init(text: "mistaking more thinking for more progress?"),
+            .init(text: "feeling exhausted by decisions that never left your head?"),
+        ],
+        score: scoreOverthink10
+    )
+
+    static func scoreOverthink10(_ values: [Int]) -> SelfTestOutcome {
+        let total = values.reduce(0, +)   // 0...40
+        let label: String
+        let summary: String
+        switch total {
+        case ...10:
+            label = "settled mind (\(total)/40)"
+            summary = "your thoughts mostly finish and file themselves. rarer than it sounds."
+        case 11...20:
+            label = "occasional loops (\(total)/40)"
+            summary = "normal amounts of replay and rehearsal. loops that resolve into decisions are just called thinking."
+        case 21...30:
+            label = "busy loops (\(total)/40)"
+            summary = "a lot of cycles are going to thoughts that don't cash out. writing the loop down is the cheapest known exit."
+        default:
+            label = "spin cycle (\(total)/40)"
+            summary = "the machine is running hot on idle. deadlines for decisions — even tiny ones — break loops better than \"just stop thinking about it\" ever has."
+        }
+        return SelfTestOutcome(score: Double(total), maxScore: 40, label: label, summary: summary)
+    }
+
+    // MARK: Impostor feelings (wits original)
+
+    static let impostor10 = SelfTest(
+        id: "impostor10",
+        name: "impostor feelings",
+        tagline: "do you believe your own track record?",
+        icon: "person.fill.questionmark",
+        tint: .witsPink,
+        source: "wits reflection — 10 items written for wits, not a clinical scale",
+        isScreener: false,
+        intro: "ten statements about how you explain your own successes. rate how much each one sounds like you.",
+        scale: agreement5,
+        questions: [
+            .init(text: "when something goes well, my first explanation is luck or timing."),
+            .init(text: "i worry people will eventually find out i'm less capable than they think."),
+            .init(text: "compliments about my ability are hard to actually believe."),
+            .init(text: "i remember my failures far more vividly than my wins."),
+            .init(text: "i feel like i've fooled people into rating me too highly."),
+            .init(text: "when i succeed, i quietly discount it — anyone could have done it."),
+            .init(text: "i over-prepare because \"good enough\" never feels safe."),
+            .init(text: "i compare my behind-the-scenes to everyone else's highlight reel."),
+            .init(text: "new challenges feel like the moment i finally get exposed."),
+            .init(text: "i credit others' success to skill, but mine to effort or luck."),
+        ],
+        score: scoreImpostor10
+    )
+
+    static func scoreImpostor10(_ values: [Int]) -> SelfTestOutcome {
+        let total = values.reduce(0, +)   // 10...50
+        let label: String
+        let summary: String
+        switch total {
+        case ...20:
+            label = "credits earned (\(total)/50)"
+            summary = "you mostly believe your own track record. that's the healthy calibration everyone else is aiming for."
+        case 21...30:
+            label = "occasional visitor (\(total)/50)"
+            summary = "impostor feelings drop by, especially around new challenges — which is where they visit almost everyone."
+        case 31...40:
+            label = "frequent guest (\(total)/50)"
+            summary = "the discounting habit is doing real work against you. evidence beats affirmations: keep a plain list of things you objectively did."
+        default:
+            label = "moved in (\(total)/50)"
+            summary = "the feeling of being found out is running the narration. worth remembering: actual impostors don't worry about being impostors."
+        }
+        return SelfTestOutcome(score: Double(total), maxScore: 50, label: label, summary: summary)
+    }
+
+    // MARK: Procrastination (wits original)
+
+    static let procrast9 = SelfTest(
+        id: "procrast9",
+        name: "procrastination",
+        tagline: "starter, delayer, or deadline gambler?",
+        icon: "hourglass",
+        tint: .witsMustard,
+        source: "wits reflection — 9 items written for wits, not a clinical scale",
+        isScreener: false,
+        intro: "nine statements about how you and deadlines get along. answer for how you actually behave, not this week's intentions.",
+        scale: agreement5,
+        questions: [
+            .init(text: "i delay starting tasks even when i know the delay will cost me."),
+            .init(text: "\"i work better under pressure\" is my cover story for starting late."),
+            .init(text: "i do easy, unimportant tasks to avoid the important one."),
+            .init(text: "deadlines sneak up on me even when i saw them coming for weeks."),
+            .init(text: "i start tasks soon after i get them."),
+            .init(text: "\"five more minutes\" of scrolling regularly becomes an hour."),
+            .init(text: "i wait for the right mood to start hard things."),
+            .init(text: "i finish what i plan for the day."),
+            .init(text: "the guilt of not starting often feels worse than the task itself."),
+        ],
+        score: scoreProcrast9
+    )
+
+    static func scoreProcrast9(_ values: [Int]) -> SelfTestOutcome {
+        let reversed: Set<Int> = [4, 7]
+        let total = values.enumerated().reduce(0) { $0 + (reversed.contains($1.offset) ? 6 - $1.element : $1.element) }
+        // 9...45
+        let label: String
+        let summary: String
+        switch total {
+        case ...18:
+            label = "starter (\(total)/45)"
+            summary = "you mostly begin when you decide to. the rarest skill on this page."
+        case 19...27:
+            label = "mild delayer (\(total)/45)"
+            summary = "ordinary friction between intention and action. shrinking the first step usually clears it."
+        case 28...36:
+            label = "practiced procrastinator (\(total)/45)"
+            summary = "delay is a habit with a system behind it. the fix isn't discipline — it's making starting cheaper than avoiding."
+        default:
+            label = "deadline gambler (\(total)/45)"
+            summary = "you're running a casino where the house is future-you. the pressure rush works until the one time it doesn't."
+        }
+        return SelfTestOutcome(score: Double(total), maxScore: 45, label: label, summary: summary)
+    }
+
+    // MARK: BEIS-10 (emotional intelligence)
+
+    static let beis10 = SelfTest(
+        id: "beis10",
+        name: "emotional intelligence",
+        tagline: "reading feelings — yours and everyone else's",
+        icon: "face.smiling.inverse",
+        tint: .witsSky,
+        source: "BEIS-10 — brief emotional intelligence scale, Davies et al.",
+        isScreener: false,
+        intro: "ten statements about noticing and steering emotions. rate how much you agree with each.",
+        scale: agreement5,
+        questions: [
+            .init(text: "i know why my emotions change."),
+            .init(text: "i easily recognize my emotions as i experience them."),
+            .init(text: "i can tell how people are feeling by listening to the tone of their voice."),
+            .init(text: "by looking at their facial expressions, i recognize the emotions people are experiencing."),
+            .init(text: "i seek out activities that make me happy."),
+            .init(text: "i have control over my emotions."),
+            .init(text: "i arrange events others enjoy."),
+            .init(text: "i help other people feel better when they are down."),
+            .init(text: "when i am in a positive mood, i am able to come up with new ideas."),
+            .init(text: "i use good moods to help myself keep trying in the face of obstacles."),
+        ],
+        score: scoreBEIS10
+    )
+
+    static func scoreBEIS10(_ values: [Int]) -> SelfTestOutcome {
+        func sum(_ indices: [Int]) -> Double { Double(indices.reduce(0) { $0 + values[$1] }) }
+        let subscales: [String: Double] = [
+            "reading yourself": sum([0, 1]) * 2,
+            "reading others": sum([2, 3]) * 2,
+            "steering yourself": sum([4, 5]) * 2,
+            "lifting others": sum([6, 7]) * 2,
+            "using moods": sum([8, 9]) * 2,
+        ]
+        let total = values.reduce(0, +)   // 10...50
+        let label: String
+        let summary: String
+        switch total {
+        case ...25:
+            label = "still tuning (\(total)/50)"
+            summary = "emotional signal comes through patchy. the subscales below show which channel to practice — noticing usually comes before steering."
+        case 26...37:
+            label = "tuned in (\(total)/50)"
+            summary = "a solid, typical read on yourself and others, with room in whichever subscale runs lowest."
+        default:
+            label = "finely tuned (\(total)/50)"
+            summary = "you read the room and yourself with high fidelity. the balance across subscales below matters more than the total."
+        }
+        return SelfTestOutcome(score: Double(total), maxScore: 50, label: label, summary: summary, subscales: subscales)
     }
 }
 
