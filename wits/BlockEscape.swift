@@ -14,14 +14,14 @@ import SwiftUI
 
 // MARK: - Engine
 
-struct KlotskiBlock: Equatable, Hashable {
+nonisolated struct KlotskiBlock: Equatable, Hashable {
     var x: Int
     var y: Int
     let w: Int
     let h: Int
 }
 
-struct KlotskiBoard: Equatable {
+nonisolated struct KlotskiBoard: Equatable {
     let width: Int
     let height: Int
     /// blocks[0] is always the 2×2 hero.
@@ -31,7 +31,7 @@ struct KlotskiBoard: Equatable {
     var isSolved: Bool { blocks[0].x == exitX && blocks[0].y == height - 2 }
 }
 
-struct KlotskiSpec: Equatable {
+nonisolated struct KlotskiSpec: Equatable {
     let width: Int
     let height: Int
     let verticals: Int    // 1×2 upright blocks
@@ -40,7 +40,8 @@ struct KlotskiSpec: Equatable {
     let targetPar: Int
 }
 
-enum KlotskiEngine {
+// Pure computation, generated off-main behind the tray spinner.
+nonisolated enum KlotskiEngine {
     /// States are canonical by cell shape-class (same-shaped blocks are
     /// interchangeable), packed 3 bits per cell into two UInt64s (≤ 30 cells).
     struct Key: Hashable {

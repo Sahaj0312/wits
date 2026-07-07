@@ -409,7 +409,7 @@ struct DifficultyState: Codable, Equatable {
 
     var masteryOrLevel: Double { mastery.isFinite ? mastery : level }
 
-    static func clamp(_ value: Double) -> Double {
+    nonisolated static func clamp(_ value: Double) -> Double {
         min(10, max(1, value.isFinite ? value : 1))
     }
 

@@ -15,13 +15,13 @@ import SwiftUI
 
 // MARK: - Engine
 
-struct PegMove: Equatable {
+nonisolated struct PegMove: Equatable {
     let from: Int
     let over: Int
     let to: Int
 }
 
-struct PegPuzzle: Equatable {
+nonisolated struct PegPuzzle: Equatable {
     let cols: Int
     let rows: Int
     let holes: Set<Int>
@@ -36,13 +36,14 @@ struct PegPuzzle: Equatable {
     var isOnTarget: Bool { target.map { pegs == [$0] } ?? isCleared }
 }
 
-struct PegSpec: Equatable {
+nonisolated struct PegSpec: Equatable {
     let shape: PegSolitaireEngine.Shape
     let pegs: Int
     let targetRequired: Bool
 }
 
-enum PegSolitaireEngine {
+// Pure computation, generated off-main behind the board spinner.
+nonisolated enum PegSolitaireEngine {
     enum Shape: CaseIterable {
         // square lattice (4 jump directions)
         case diamond13, square25, english33, european37, wiegleb45

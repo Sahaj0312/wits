@@ -154,11 +154,7 @@ struct MetricDetailView: View {
                         .font(.witsBody(15, weight: .bold))
                         .foregroundStyle(Color.witsMuted)
                     VStack(alignment: .leading, spacing: 12) {
-                        (Text("higher than ")
-                            + Text("\(norm.pct)%")
-                                .font(.system(size: 17, weight: .heavy, design: .rounded))
-                                .foregroundStyle(tint)
-                            + Text(" of all users"))
+                        Text("higher than \(Text("\(norm.pct)%").font(.system(size: 17, weight: .heavy, design: .rounded)).foregroundStyle(tint)) of all users")
                             .font(.witsBody(15))
                             .foregroundStyle(Color.witsMuted)
                         if let mean = norm.mean, let sd = norm.sd, sd > 0 {

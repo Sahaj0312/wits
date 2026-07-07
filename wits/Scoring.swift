@@ -561,7 +561,7 @@ struct TowerPolicy: GameScoringPolicy {
 
     /// Workout Tower is a fixed 36-level campaign the game persists itself;
     /// map campaign progress (1...36) onto the shared 1...10 level scale.
-    static func level(forCampaignLevel campaign: Double) -> Double {
+    nonisolated static func level(forCampaignLevel campaign: Double) -> Double {
         DifficultyState.clamp(1 + (campaign - 1) * 9.0 / 35.0)
     }
 
