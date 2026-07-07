@@ -666,13 +666,15 @@ struct SelfTestFlowView: View {
             HStack {
                 if case .question(let index) = stage {
                     Button {
-                        if index == 0 {
-                            stage = .intro
-                        } else {
-                            answers.removeLast()
-                            stage = .question(index - 1)
+                        withQuestionAnimation {
+                            if index == 0 {
+                                stage = .intro
+                            } else {
+                                if !answers.isEmpty { answers.removeLast() }
+                                stage = .question(index - 1)
+                            }
+                            picked = nil
                         }
-                        picked = nil
                     } label: {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 15, weight: .heavy))
@@ -702,6 +704,12 @@ struct SelfTestFlowView: View {
         .padding(.top, 4)
     }
 
+    private func withQuestionAnimation(_ changes: () -> Void) {
+        withAnimation(.timingCurve(0.2, 0.8, 0.25, 1, duration: 0.32)) {
+            changes()
+        }
+    }
+
     // MARK: Intro
 
     private var intro: some View {
@@ -728,7 +736,9 @@ struct SelfTestFlowView: View {
             Button {
                 answers = []
                 picked = nil
-                stage = .question(0)
+                withQuestionAnimation {
+                    stage = .question(0)
+                }
             } label: {
                 Text(lastRecord == nil ? "start" : "take it again")
                     .font(.witsBody(17, weight: .heavy))
@@ -997,6 +1007,12 @@ struct SelfTestFlowView: View {
             .padding(.top, 10)
             .padding(.bottom, 28)
         }
+        .safeAreaInset(edge: .bottom) {
+            questionNextButton(index, question: question)
+        }
+        .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity),
+                                removal: .move(edge: .leading).combined(with: .opacity)))
+        .animation(.timingCurve(0.2, 0.8, 0.25, 1, duration: 0.28), value: index)
         .id(index)   // reset scroll per question
     }
 
@@ -1073,12 +1089,7 @@ struct SelfTestFlowView: View {
                 selfTestAnswerRow(option.label,
                                   number: optionIndex + 1,
                                   picked: picked == optionIndex) {
-                    guard picked == nil else { return }
-                    picked = optionIndex
-                    let value = option.value
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
-                        advance(with: value, from: index)
-                    }
+                    selectAnswer(optionIndex)
                 }
             }
         }
@@ -1135,7 +1146,15 @@ struct SelfTestFlowView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
             .frame(minHeight: 70)
-            .background(picked ? test.tint.opacity(0.12) : Color.clear)
+            .background(picked ? test.tint.opacity(0.045) : Color.clear)
+            .overlay(alignment: .leading) {
+                if picked {
+                    Capsule()
+                        .fill(test.tint)
+                        .frame(width: 4, height: 38)
+                        .padding(.leading, 1)
+                }
+            }
             .contentShape(Rectangle())
         }
         .buttonStyle(PressScale())
@@ -1144,11 +1163,13 @@ struct SelfTestFlowView: View {
     }
 
     private var answerFooter: some View {
-        Label("no right answer; pick what feels closest", systemImage: "hand.tap.fill")
+        Label(picked == nil ? "select one answer to continue" : "tap next to confirm",
+              systemImage: picked == nil ? "hand.tap.fill" : "checkmark.circle.fill")
             .font(.witsBody(12.8, weight: .semibold))
             .foregroundStyle(Color.witsFaint)
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.top, 4)
+            .animation(.easeOut(duration: 0.16), value: picked)
     }
 
     private func answerLabelParts(_ label: String) -> (title: String, detail: String?) {
@@ -1169,6 +1190,52 @@ struct SelfTestFlowView: View {
         }
 
         return (label, nil)
+    }
+
+    @ViewBuilder
+    private func questionNextButton(_ index: Int, question: SelfTestQuestion) -> some View {
+        if picked != nil {
+            Button {
+                confirmAnswer(from: index, question: question)
+            } label: {
+                Text(index + 1 == test.questions.count ? "finish" : "next")
+                    .font(.witsBody(17, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(test.tint, in: Capsule())
+                    .shadow(color: test.tint.opacity(0.24), radius: 14, y: 7)
+            }
+            .buttonStyle(.plain)
+            .padding(.horizontal, WitsMetrics.screenPadding)
+            .padding(.top, 12)
+            .padding(.bottom, 12)
+            .background(
+                LinearGradient(colors: [
+                    Color.witsBg.opacity(0),
+                    Color.witsBg,
+                    Color.witsBg,
+                ], startPoint: .top, endPoint: .bottom)
+                .ignoresSafeArea()
+            )
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
+    }
+
+    private func selectAnswer(_ index: Int) {
+        GameFeel.shared.uiTick(0.55)
+        withAnimation(.easeOut(duration: 0.16)) {
+            picked = index
+        }
+    }
+
+    private func confirmAnswer(from index: Int, question: SelfTestQuestion) {
+        let options = test.options(for: question)
+        guard let picked, options.indices.contains(picked) else { return }
+        let value = options[picked].value
+        withQuestionAnimation {
+            advance(with: value, from: index)
+        }
     }
 
     private func advance(with value: Int, from index: Int) {
