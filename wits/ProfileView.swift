@@ -14,7 +14,6 @@ struct ProfileView: View {
     @AppStorage("wits.soundEffectsEnabled") private var soundEffectsEnabled = true
     @AppStorage("wits.hapticsEnabled") private var hapticsEnabled = true
     @State private var showReminder = false
-    @State private var activeTest: SelfTest?
 
     private var displayName: String {
         app.profile.displayName?.isEmpty == false ? app.profile.displayName! : "you"
@@ -53,10 +52,6 @@ struct ProfileView: View {
         SelfTestCatalog.all.filter { app.selfTests[$0.id] != nil }.count
     }
 
-    private var remainingSelfTestCount: Int {
-        max(SelfTestCatalog.all.count - completedSelfTestCount, 0)
-    }
-
     private var selfTestProgress: Double {
         guard !SelfTestCatalog.all.isEmpty else { return 0 }
         return Double(completedSelfTestCount) / Double(SelfTestCatalog.all.count)
@@ -79,6 +74,12 @@ struct ProfileView: View {
     }
 
     var body: some View {
+        NavigationStack {
+            profileContent
+        }
+    }
+
+    private var profileContent: some View {
         ScrollView {
             VStack(spacing: 0) {
                 pageHeader
@@ -152,13 +153,9 @@ struct ProfileView: View {
             }
         }
         .background(Color.witsBg.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showReminder) {
             ReminderSettingsSheet(app: app)
-        }
-        .sheet(item: $activeTest) { test in
-            SelfTestFlowView(test: test, lastRecord: app.selfTests[test.id]) { outcome in
-                app.recordSelfTest(test, outcome: outcome)
-            }
         }
         .onAppear {
             syncGameFeelSettings()
@@ -190,27 +187,13 @@ struct ProfileView: View {
         VStack(alignment: .leading, spacing: 12) {
             testsHeader
 
-            testsSummaryCard
-                .padding(.horizontal, WitsMetrics.screenPadding)
-
-            VStack(spacing: 10) {
-                ForEach(SelfTestCatalog.all) { test in
-                    Button {
-                        activeTest = test
-                    } label: {
-                        selfTestCard(test)
-                    }
-                    .buttonStyle(.plain)
-                }
+            NavigationLink {
+                SelfTestListView()
+            } label: {
+                testsSummaryCard
             }
+            .buttonStyle(.plain)
             .padding(.horizontal, WitsMetrics.screenPadding)
-
-            Text("self-report tests are reflections, not diagnoses. retake them any time; your latest result is kept.")
-                .font(.witsBody(12.5))
-                .foregroundStyle(Color.witsFaint)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, WitsMetrics.screenPadding + 4)
-                .padding(.top, 2)
         }
         .padding(.top, 24)
     }
@@ -271,6 +254,10 @@ struct ProfileView: View {
                     .foregroundStyle(Color.witsFaint)
             }
             .accessibilityLabel("\(completedSelfTestCount) tests done")
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 12.5, weight: .semibold))
+                .foregroundStyle(Color.witsFaint)
         }
         .padding(16)
         .background(
@@ -305,83 +292,6 @@ struct ProfileView: View {
         }
         .frame(width: 48, height: 48)
         .accessibilityLabel("\(completedSelfTestCount) tests complete")
-    }
-
-    private func selfTestCard(_ test: SelfTest) -> some View {
-        let record = app.selfTests[test.id]
-        let shape = RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-
-        return HStack(alignment: .center, spacing: 13) {
-            Image(systemName: test.icon)
-                .font(.system(size: 16, weight: .bold))
-                .foregroundStyle(test.tint)
-                .frame(width: 38, height: 38)
-                .background(test.tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 7) {
-                    Text(test.name)
-                        .font(.witsHeading(16))
-                        .foregroundStyle(Color.witsInk)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                        .layoutPriority(1)
-
-                    if test.isScreener && !test.name.localizedCaseInsensitiveContains("screener") {
-                        Text("screener")
-                            .font(.witsLabel(10.5))
-                            .foregroundStyle(Color.witsFaint)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(Color.witsTint, in: Capsule())
-                            .lineLimit(1)
-                    }
-                }
-
-                Text(record?.label ?? test.tagline)
-                    .font(.witsBody(12.8))
-                    .foregroundStyle(Color.witsMuted)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .layoutPriority(1)
-
-            Spacer(minLength: 6)
-
-            VStack(alignment: .trailing, spacing: 5) {
-                testStatusChip(title: record == nil ? "take it" : "latest",
-                               tint: test.tint,
-                               filled: record != nil)
-
-                Text(record.map { SelfTestFlowView.shortDate($0.takenAt) } ?? "\(test.questions.count) q")
-                    .font(.witsLabel(11.5))
-                    .foregroundStyle(Color.witsFaint)
-                    .lineLimit(1)
-                    .monospacedDigit()
-            }
-            .frame(width: 58, alignment: .trailing)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 12.5, weight: .semibold))
-                .foregroundStyle(Color.witsFaint)
-        }
-        .padding(14)
-        .background(Color.witsCard, in: shape)
-        .overlay(shape.strokeBorder(Color.witsLine, lineWidth: 1))
-        .contentShape(shape)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(record.map { "\(test.name), latest result \($0.label)" } ?? "\(test.name), not taken")
-    }
-
-    private func testStatusChip(title: String, tint: Color, filled: Bool) -> some View {
-        Text(title)
-            .font(.witsLabel(11))
-            .foregroundStyle(filled ? Color.white : tint)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 5)
-            .background(filled ? tint : tint.opacity(0.12), in: Capsule())
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
     }
 
     private func settingsSection<Content: View>(_ title: String,
