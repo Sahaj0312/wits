@@ -377,7 +377,13 @@ struct BlockEscapeScreen: View {
         self.mapLevel = cfg.mapLevel ?? LevelLadder.nearestLevel(for: .blockEscape, legacyDifficulty: cfg.difficulty.level)
     }
 
-    private var parSeconds: Double { Double(par) * 2.4 + 10 }
+    /// Time budget prices in planning, not just execution — deep thought on a
+    /// hard tray shouldn't tank the grade.
+    private var parSeconds: Double { Double(par) * 5.0 + 30 }
+
+    /// Full move credit within ~20% of par: par is BFS-optimal, and matching a
+    /// computer within a fifth is mastery for a human.
+    private var graceMoves: Int { Int(ceil(Double(par) * 1.2)) + 1 }
 
     var body: some View {
         GeometryReader { geo in
@@ -474,8 +480,8 @@ struct BlockEscapeScreen: View {
             .font(.system(size: 13, weight: .heavy, design: .rounded))
             .foregroundStyle(.white.opacity(0.78))
 
-            ProgressView(value: min(1, Double(moves) / Double(max(1, par))))
-                .tint(moves <= par ? Color(red: 0.24, green: 0.82, blue: 0.20) : Color.witsWarm)
+            ProgressView(value: min(1, Double(moves) / Double(max(1, graceMoves))))
+                .tint(moves <= graceMoves ? Color(red: 0.24, green: 0.82, blue: 0.20) : Color.witsWarm)
                 .background(.white.opacity(0.16), in: Capsule())
         }
     }
@@ -603,10 +609,13 @@ struct BlockEscapeScreen: View {
 
     private func finish() {
         let seconds = max(1, elapsed)
-        let moveEfficiency = min(1, Double(par) / Double(max(1, moves)))
+        let moveEfficiency = min(1, Double(graceMoves) / Double(max(1, moves)))
         let timeEfficiency = min(1, parSeconds / seconds)
-        let accuracy = max(0, min(1, moveEfficiency * 0.70 + timeEfficiency * 0.30))
-        let score = max(0, Int((Double(par) * 24 + moveEfficiency * 1100 + timeEfficiency * 700).rounded()))
+        // Escaping at all earns the floor, and move quality dominates the rest,
+        // so a slow, deliberate near-optimal solve still grades to 3 stars.
+        // Time keeps a small weight to reward decisiveness at the margins.
+        let accuracy = max(0, min(1, 0.30 + moveEfficiency * 0.60 + timeEfficiency * 0.10))
+        let score = max(0, Int((Double(par) * 24 + moveEfficiency * 1300 + timeEfficiency * 500).rounded()))
 
         var result = GameResult(game: .blockEscape, score: score, accuracy: accuracy)
         result.trials = moves
@@ -616,6 +625,7 @@ struct BlockEscapeScreen: View {
             "efficiency": (moveEfficiency * 100).rounded(),
             "moves": Double(moves),
             "parMoves": Double(par),
+            "graceMoves": Double(graceMoves),
             "parSeconds": parSeconds.rounded(),
             "seconds": seconds.rounded(),
             "trayWidth": Double(board?.width ?? 0),
