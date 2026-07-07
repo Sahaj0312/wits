@@ -1001,7 +1001,6 @@ struct SelfTestFlowView: View {
                 questionProgressHeader(index)
                 questionPrompt(question)
                 answerGroup(question, index: index)
-                answerFooter
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.top, 10)
@@ -1146,30 +1145,11 @@ struct SelfTestFlowView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 15)
             .frame(minHeight: 70)
-            .background(picked ? test.tint.opacity(0.045) : Color.clear)
-            .overlay(alignment: .leading) {
-                if picked {
-                    Capsule()
-                        .fill(test.tint)
-                        .frame(width: 4, height: 38)
-                        .padding(.leading, 1)
-                }
-            }
             .contentShape(Rectangle())
         }
         .buttonStyle(PressScale())
         .animation(.easeOut(duration: 0.12), value: picked)
         .accessibilityLabel("\(number). \(label)")
-    }
-
-    private var answerFooter: some View {
-        Label(picked == nil ? "select one answer to continue" : "tap next to confirm",
-              systemImage: picked == nil ? "hand.tap.fill" : "checkmark.circle.fill")
-            .font(.witsBody(12.8, weight: .semibold))
-            .foregroundStyle(Color.witsFaint)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.top, 4)
-            .animation(.easeOut(duration: 0.16), value: picked)
     }
 
     private func answerLabelParts(_ label: String) -> (title: String, detail: String?) {
