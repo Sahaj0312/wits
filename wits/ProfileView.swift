@@ -57,11 +57,6 @@ struct ProfileView: View {
             .max { $0.record.takenAt < $1.record.takenAt }
     }
 
-    private var latestSelfTestLabel: String {
-        guard let latestSelfTest else { return "take your first test" }
-        return "\(latestSelfTest.test.name) · \(SelfTestFlowView.shortDate(latestSelfTest.record.takenAt))"
-    }
-
     var body: some View {
         NavigationStack {
             profileContent
@@ -185,42 +180,60 @@ struct ProfileView: View {
 
     private var testsSummaryCard: some View {
         let shape = RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+        let hasArt = UIImage(named: "selftest-profile-card") != nil
+        // The illustration's own background color, used to scrim the text side.
+        let artBg = Color(red: 0x0C / 255.0, green: 0x15 / 255.0, blue: 0x35 / 255.0)
 
         return HStack(alignment: .center, spacing: 14) {
-            Image(systemName: latestSelfTest?.test.icon ?? "list.clipboard.fill")
-                .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(Color.witsAccent)
-                .frame(width: 44, height: 44)
-                .background(Color.witsAccent.opacity(0.15), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 3) {
-                Text("tests")
-                    .font(.witsHeading(16.5))
-                    .foregroundStyle(Color.witsInk)
-                Text(latestSelfTestLabel)
-                    .font(.witsBody(13.5))
-                    .foregroundStyle(Color.witsMuted)
-                    .lineLimit(1)
+            if !hasArt {
+                Image(systemName: latestSelfTest?.test.icon ?? "list.clipboard.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(Color.witsAccent)
+                    .frame(width: 44, height: 44)
+                    .background(Color.witsAccent.opacity(0.15), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
             }
-            .layoutPriority(1)
+
+            Text("self-assessments")
+                .font(.witsHeading(hasArt ? 18 : 16.5))
+                .foregroundStyle(hasArt ? .white : Color.witsInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .layoutPriority(1)
 
             Spacer(minLength: 8)
 
             Image(systemName: "chevron.right")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.witsAccent)
+                .foregroundStyle(hasArt ? .white.opacity(0.85) : Color.witsAccent)
         }
         .padding(16)
-        .background(
-            LinearGradient(colors: [
-                Color.witsAccent.opacity(0.16),
-                Color.witsSky.opacity(0.08),
-                Color.witsCard,
-            ], startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: shape
-        )
+        .frame(height: hasArt ? 118 : nil)
+        .background {
+            if hasArt {
+                Color.clear
+                    .overlay {
+                        Image("selftest-profile-card")
+                            .resizable()
+                            .scaledToFill()
+                    }
+                    .overlay {
+                        LinearGradient(stops: [
+                            .init(color: artBg.opacity(0.94), location: 0),
+                            .init(color: artBg.opacity(0.55), location: 0.42),
+                            .init(color: artBg.opacity(0), location: 0.72),
+                        ], startPoint: .leading, endPoint: .trailing)
+                    }
+            } else {
+                LinearGradient(colors: [
+                    Color.witsAccent.opacity(0.16),
+                    Color.witsSky.opacity(0.08),
+                    Color.witsCard,
+                ], startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+        }
+        .clipShape(shape)
         .overlay(shape.strokeBorder(Color.witsAccent.opacity(0.28), lineWidth: 1))
-        .shadow(color: Color.witsShadow, radius: 10, y: 5)
+        .shadow(color: Color.witsAccent.opacity(0.22), radius: 13, y: 5)
         .accessibilityElement(children: .combine)
     }
 
