@@ -19,10 +19,6 @@ struct ProfileView: View {
         app.profile.displayName?.isEmpty == false ? app.profile.displayName! : "you"
     }
 
-    private var accountStatus: String {
-        supa.isSignedIn ? "signed in" : "not signed in"
-    }
-
     private var entitlementLabel: String {
         switch app.entitlement {
         case .unknown: "—"
@@ -68,6 +64,8 @@ struct ProfileView: View {
             VStack(spacing: 0) {
                 pageHeader
 
+                testsSection
+
                 settingsSection("settings") {
                     Button { showReminder = true } label: {
                         settingsValueRow(icon: "bell.fill",
@@ -87,31 +85,6 @@ struct ProfileView: View {
                                       tint: .witsWarm,
                                       title: "haptics",
                                       isOn: $hapticsEnabled)
-                }
-
-                testsSection
-
-                settingsSection("wits") {
-                    settingsValueRow(icon: "person.fill",
-                                     tint: .witsAccent,
-                                     title: "account",
-                                     value: accountStatus)
-                    settingsDivider
-                    settingsValueRow(icon: "creditcard.fill",
-                                     tint: .witsGold,
-                                     title: "plan",
-                                     value: entitlementLabel)
-                    settingsDivider
-                    Button {
-                        hasCompletedOnboarding = false
-                    } label: {
-                        settingsValueRow(icon: "arrow.clockwise",
-                                         tint: .witsViolet,
-                                         title: "replay onboarding",
-                                         value: "",
-                                         showsChevron: true)
-                    }
-                    .buttonStyle(.plain)
                 }
 
                 settingsSection("account") {
@@ -232,8 +205,7 @@ struct ProfileView: View {
             }
         }
         .clipShape(shape)
-        .overlay(shape.strokeBorder(Color.witsAccent.opacity(0.28), lineWidth: 1))
-        .shadow(color: Color.witsAccent.opacity(0.22), radius: 13, y: 5)
+        .overlay(shape.strokeBorder(.white, lineWidth: 2))
         .accessibilityElement(children: .combine)
     }
 

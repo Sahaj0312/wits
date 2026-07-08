@@ -148,7 +148,7 @@ struct SelfTestListView: View {
                 }
             }
             .clipShape(shape)
-            .overlay(shape.strokeBorder(Color.witsLine, lineWidth: 1))
+            .overlay(shape.strokeBorder(.white, lineWidth: 2))
             .overlay(alignment: .topTrailing) {
                 if taken {
                     Image(systemName: "checkmark")
