@@ -159,7 +159,7 @@ enum SelfTestCatalog {
         score: scoreASRS
     )
 
-    static func scoreASRS(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreASRS(_ values: [Int]) -> SelfTestOutcome {
         // Part A keying: items 1–3 count from "sometimes", items 4–6 from "often".
         let thresholds = [2, 2, 2, 3, 3, 3]
         let markers = zip(values, thresholds).filter { $0 >= $1 }.count
@@ -201,7 +201,7 @@ enum SelfTestCatalog {
         score: scoreAQ10
     )
 
-    static func scoreAQ10(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreAQ10(_ values: [Int]) -> SelfTestOutcome {
         // Agree-keyed items score on (definitely/slightly) agree; the rest on disagree.
         let agreeKeyed: Set<Int> = [0, 6, 7, 9]
         var points = 0
@@ -268,7 +268,7 @@ enum SelfTestCatalog {
         score: scoreVVIQ
     )
 
-    static func scoreVVIQ(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreVVIQ(_ values: [Int]) -> SelfTestOutcome {
         let total = values.reduce(0, +)
         let label: String
         let summary: String
@@ -347,7 +347,7 @@ enum SelfTestCatalog {
         score: scoreRMEQ
     )
 
-    static func scoreRMEQ(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreRMEQ(_ values: [Int]) -> SelfTestOutcome {
         let total = values.reduce(0, +)   // 4...25
         let label: String
         let summary: String
@@ -408,7 +408,7 @@ enum SelfTestCatalog {
         score: scoreMiniIPIP
     )
 
-    static func scoreMiniIPIP(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreMiniIPIP(_ values: [Int]) -> SelfTestOutcome {
         let reversed: Set<Int> = [5, 6, 7, 8, 9, 14, 15, 16, 17, 18, 19]
         let scored = values.enumerated().map { reversed.contains($0.offset) ? 6 - $0.element : $0.element }
         func sum(_ indices: [Int]) -> Double { Double(indices.reduce(0) { $0 + scored[$1] }) }
@@ -458,7 +458,7 @@ enum SelfTestCatalog {
         score: scoreDirtyDozen
     )
 
-    static func scoreDirtyDozen(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreDirtyDozen(_ values: [Int]) -> SelfTestOutcome {
         func sum(_ range: Range<Int>) -> Double { Double(values[range].reduce(0, +)) }
         let subscales: [String: Double] = [
             "machiavellianism": sum(0..<4),
@@ -514,7 +514,7 @@ enum SelfTestCatalog {
         score: scoreNCS6
     )
 
-    static func scoreNCS6(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreNCS6(_ values: [Int]) -> SelfTestOutcome {
         let reversed: Set<Int> = [2, 3]
         let total = values.enumerated().reduce(0) { $0 + (reversed.contains($1.offset) ? 6 - $1.element : $1.element) }
         let label: String
@@ -565,7 +565,7 @@ enum SelfTestCatalog {
         score: scoreWHO5
     )
 
-    static func scoreWHO5(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreWHO5(_ values: [Int]) -> SelfTestOutcome {
         let total = values.reduce(0, +) * 4   // 0...100
         let label: String
         let summary: String
@@ -618,7 +618,7 @@ enum SelfTestCatalog {
         score: scoreRosenberg
     )
 
-    static func scoreRosenberg(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreRosenberg(_ values: [Int]) -> SelfTestOutcome {
         let reversed: Set<Int> = [1, 4, 5, 7, 8]
         let total = values.enumerated().reduce(0) { $0 + (reversed.contains($1.offset) ? 3 - $1.element : $1.element) }
         let label: String
@@ -661,7 +661,7 @@ enum SelfTestCatalog {
         score: scoreGAD7
     )
 
-    static func scoreGAD7(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreGAD7(_ values: [Int]) -> SelfTestOutcome {
         let total = values.reduce(0, +)   // 0...21
         let label: String
         let summary: String
@@ -707,7 +707,7 @@ enum SelfTestCatalog {
         score: scorePHQ8
     )
 
-    static func scorePHQ8(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scorePHQ8(_ values: [Int]) -> SelfTestOutcome {
         let total = values.reduce(0, +)   // 0...24
         let label: String
         let summary: String
@@ -755,7 +755,7 @@ enum SelfTestCatalog {
         score: scoreStress10
     )
 
-    static func scoreStress10(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreStress10(_ values: [Int]) -> SelfTestOutcome {
         let total = values.reduce(0, +)   // 0...40
         let label: String
         let summary: String
@@ -803,7 +803,7 @@ enum SelfTestCatalog {
         score: scoreBurnout10
     )
 
-    static func scoreBurnout10(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreBurnout10(_ values: [Int]) -> SelfTestOutcome {
         func sum(_ range: Range<Int>) -> Double { Double(values[range].reduce(0, +)) }
         let subscales: [String: Double] = [
             "drain (energy)": sum(0..<5),
@@ -856,7 +856,7 @@ enum SelfTestCatalog {
         score: scoreOverthink10
     )
 
-    static func scoreOverthink10(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreOverthink10(_ values: [Int]) -> SelfTestOutcome {
         let total = values.reduce(0, +)   // 0...40
         let label: String
         let summary: String
@@ -904,7 +904,7 @@ enum SelfTestCatalog {
         score: scoreImpostor10
     )
 
-    static func scoreImpostor10(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreImpostor10(_ values: [Int]) -> SelfTestOutcome {
         let total = values.reduce(0, +)   // 10...50
         let label: String
         let summary: String
@@ -951,7 +951,7 @@ enum SelfTestCatalog {
         score: scoreProcrast9
     )
 
-    static func scoreProcrast9(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreProcrast9(_ values: [Int]) -> SelfTestOutcome {
         let reversed: Set<Int> = [4, 7]
         let total = values.enumerated().reduce(0) { $0 + (reversed.contains($1.offset) ? 6 - $1.element : $1.element) }
         // 9...45
@@ -1001,7 +1001,7 @@ enum SelfTestCatalog {
         score: scoreBEIS10
     )
 
-    static func scoreBEIS10(_ values: [Int]) -> SelfTestOutcome {
+    nonisolated static func scoreBEIS10(_ values: [Int]) -> SelfTestOutcome {
         func sum(_ indices: [Int]) -> Double { Double(indices.reduce(0) { $0 + values[$1] }) }
         let subscales: [String: Double] = [
             "reading yourself": sum([0, 1]) * 2,

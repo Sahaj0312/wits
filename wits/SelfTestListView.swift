@@ -71,7 +71,7 @@ struct SelfTestListView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("back to profile")
 
-                Text("self-report")
+                Text("self-assessments")
                     .font(.witsDisplay(30))
                     .foregroundStyle(Color.witsInk)
             }
