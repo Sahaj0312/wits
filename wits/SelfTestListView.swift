@@ -109,19 +109,18 @@ struct SelfTestListView: View {
                     .multilineTextAlignment(.leading)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text(record?.label ?? "\(test.questions.count) questions · \(estimatedMinutes(test)) min")
+                Text(record?.displayLabel ?? "\(test.questions.count) questions · \(estimatedMinutes(test)) min")
                     .font(.witsLabel(11))
                     .foregroundStyle(record == nil ? Color.witsFaint : test.tint)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                    .monospacedDigit()
             }
             .padding(.horizontal, 2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(record.map { "\(test.name), latest result \($0.label)" } ?? "\(test.name), not taken, \(test.questions.count) questions")
+        .accessibilityLabel(record.map { "\(test.name), latest result \($0.displayLabel)" } ?? "\(test.name), not taken, \(test.questions.count) questions")
     }
 
     private func testIllustration(_ test: SelfTest, taken: Bool) -> some View {

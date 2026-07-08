@@ -40,6 +40,15 @@ struct SelfTestRecord: Codable, Equatable {
     var maxScore: Double
     var label: String
     var takenAt: Date
+
+    var displayLabel: String {
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasSuffix(")"),
+              let range = trimmed.range(of: " (", options: .backwards) else {
+            return trimmed
+        }
+        return String(trimmed[..<range.lowerBound])
+    }
 }
 
 struct SelfTest: Identifiable {
@@ -1031,12 +1040,21 @@ struct SelfTestFlowView: View {
     private enum Stage: Equatable {
         case intro
         case question(Int)
+        case analyzing(SelfTestOutcome, UUID)
         case result(SelfTestOutcome)
     }
 
     @State private var stage: Stage = .intro
     @State private var answers: [Int] = []
     @State private var picked: Int?
+    @State private var analyzingSteps: [String] = Self.analyzingScripts[0]
+
+    private static let analyzingScripts = [
+        ["scoring responses", "checking range", "framing result"],
+        ["counting markers", "reading pattern", "preparing reveal"],
+        ["sorting answers", "checking signal", "writing summary"],
+        ["reading pattern", "balancing context", "readying next step"],
+    ]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1044,6 +1062,7 @@ struct SelfTestFlowView: View {
             switch stage {
             case .intro: intro
             case .question(let index): questionView(index)
+            case .analyzing(let outcome, let token): analyzingView(outcome, token: token)
             case .result(let outcome): resultView(outcome)
             }
         }
@@ -1233,7 +1252,7 @@ struct SelfTestFlowView: View {
                     .textCase(.uppercase)
                     .kerning(0.7)
 
-                Text(record.label)
+                Text(record.displayLabel)
                     .font(.witsHeading(21))
                     .foregroundStyle(Color.witsInk)
                     .lineLimit(2)
@@ -1248,7 +1267,7 @@ struct SelfTestFlowView: View {
 
             Spacer(minLength: 8)
 
-            scoreRing(record)
+            lastResultGlyph
         }
         .padding(16)
         .background(
@@ -1260,6 +1279,22 @@ struct SelfTestFlowView: View {
         .overlay(shape.strokeBorder(Color.witsLine, lineWidth: 1))
         .shadow(color: Color.witsShadow, radius: 10, y: 5)
         .accessibilityElement(children: .combine)
+    }
+
+    private var lastResultGlyph: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.witsLine, lineWidth: 6)
+            Circle()
+                .trim(from: 0.08, to: 0.78)
+                .stroke(test.tint, style: StrokeStyle(lineWidth: 6, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Image(systemName: test.icon)
+                .font(.system(size: 24, weight: .heavy))
+                .foregroundStyle(test.tint)
+        }
+        .frame(width: 74, height: 74)
+        .accessibilityHidden(true)
     }
 
     private var screenerFootnote: some View {
@@ -1277,39 +1312,6 @@ struct SelfTestFlowView: View {
         .padding(14)
         .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .accessibilityElement(children: .combine)
-    }
-
-    private func scoreRing(_ record: SelfTestRecord) -> some View {
-        let fraction = scoreFraction(record)
-
-        return ZStack {
-            Circle()
-                .stroke(Color.witsLine, lineWidth: 6)
-            Circle()
-                .trim(from: 0, to: fraction)
-                .stroke(test.tint, style: StrokeStyle(lineWidth: 6, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-            Text(scoreLabel(record))
-                .font(.witsValue(17))
-                .foregroundStyle(test.tint)
-                .monospacedDigit()
-                .minimumScaleFactor(0.72)
-        }
-        .frame(width: 74, height: 74)
-        .accessibilityLabel("score \(scoreLabel(record))")
-    }
-
-    private func scoreFraction(_ record: SelfTestRecord) -> Double {
-        guard record.maxScore > 0 else { return 0 }
-        return min(max(record.score / record.maxScore, 0), 1)
-    }
-
-    private func scoreLabel(_ record: SelfTestRecord) -> String {
-        "\(formatScore(record.score))/\(formatScore(record.maxScore))"
-    }
-
-    private func formatScore(_ value: Double) -> String {
-        value.rounded() == value ? String(Int(value)) : String(format: "%.1f", value)
     }
 
     // MARK: Questions
@@ -1545,78 +1547,672 @@ struct SelfTestFlowView: View {
             stage = .question(index + 1)
         } else {
             let outcome = test.score(answers)
-            stage = .result(outcome)
             onComplete(outcome)
+            analyzingSteps = Self.analyzingScripts.randomElement() ?? Self.analyzingScripts[0]
+            stage = .analyzing(outcome, UUID())
+        }
+    }
+
+    // MARK: Analyzing
+
+    private func analyzingView(_ outcome: SelfTestOutcome, token: UUID) -> some View {
+        SelfTestAnalyzingView(test: test, steps: analyzingSteps)
+            .transition(.opacity.combined(with: .scale(scale: 0.98)))
+            .task(id: token) {
+                await revealResult(outcome, token: token)
+            }
+    }
+
+    @MainActor
+    private func revealResult(_ outcome: SelfTestOutcome, token: UUID) async {
+        let delay = UInt64.random(in: 1_250_000_000...2_050_000_000)
+        try? await Task.sleep(nanoseconds: delay)
+        guard !Task.isCancelled else { return }
+        guard case .analyzing(_, let currentToken) = stage, currentToken == token else { return }
+        GameFeel.shared.uiTick(0.35)
+        withQuestionAnimation {
+            stage = .result(outcome)
         }
     }
 
     // MARK: Result
 
     private func resultView(_ outcome: SelfTestOutcome) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+        GeometryReader { geo in
+            let layout = SelfTestResultLayout(size: geo.size)
+
+            VStack(alignment: .leading, spacing: layout.spacing) {
+                resultHero(outcome, layout: layout)
+
+                resultSummaryCard(outcome, layout: layout)
+
+                if let subscales = outcome.subscales {
+                    resultSubscaleCard(subscales, layout: layout)
+                } else if test.isScreener {
+                    resultScreenerCard(layout: layout)
+                }
+
+                if layout.showsRetakeLine {
+                    resultRetakeCard(layout: layout)
+                }
+
+                Spacer(minLength: 0)
+
+                resultDoneButton(layout: layout)
+            }
+            .padding(.horizontal, layout.horizontalPadding)
+            .padding(.top, layout.topPadding)
+            .padding(.bottom, layout.bottomPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        }
+        .transition(.opacity.combined(with: .move(edge: .bottom)))
+    }
+
+    private func resultHero(_ outcome: SelfTestOutcome, layout: SelfTestResultLayout) -> some View {
+        let shape = RoundedRectangle(cornerRadius: WitsMetrics.heroRadius, style: .continuous)
+
+        return VStack(alignment: .leading, spacing: layout.heroSpacing) {
+            HStack(spacing: 8) {
+                Image(systemName: test.icon)
+                    .font(.system(size: layout.tiny ? 11 : 13, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: layout.tiny ? 26 : 30, height: layout.tiny ? 26 : 30)
+                    .background(test.tint, in: RoundedRectangle(cornerRadius: layout.tiny ? 8 : 10, style: .continuous))
+
                 Text(test.name)
-                    .font(.witsLabel(12.5))
-                    .foregroundStyle(Color.witsFaint)
+                    .font(.witsLabel(layout.tiny ? 11.5 : 12.5))
+                    .foregroundStyle(Color.witsMuted)
                     .textCase(.uppercase)
                     .kerning(0.8)
-                    .padding(.top, 12)
-                Text(outcome.label)
-                    .font(.witsDisplay(28))
-                    .foregroundStyle(test.tint)
-                Text(outcome.summary)
-                    .font(.witsBody(16))
-                    .foregroundStyle(Color.witsMuted)
-                if let subscales = outcome.subscales {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(subscales.sorted { $0.value > $1.value }, id: \.key) { name, value in
-                            VStack(alignment: .leading, spacing: 4) {
-                                HStack {
-                                    Text(name)
-                                        .font(.witsBody(14, weight: .semibold))
-                                        .foregroundStyle(Color.witsInk)
-                                    Spacer()
-                                    Text("\(Int(value))/20")
-                                        .font(.witsBody(13, weight: .semibold))
-                                        .foregroundStyle(Color.witsMuted)
-                                        .monospacedDigit()
-                                }
-                                ProgressTrack(fraction: value / 20.0, tint: test.tint)
-                            }
-                        }
-                    }
-                    .padding(16)
-                    .cardSurface(radius: 14)
-                }
-                if test.isScreener {
-                    Text(SelfTestCatalog.screenerDisclaimer)
-                        .font(.witsBody(13))
-                        .foregroundStyle(Color.witsMuted)
-                        .padding(14)
-                        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                }
-                Text("you can retake this any time — only your latest result is shown on your profile.")
-                    .font(.witsBody(13))
-                    .foregroundStyle(Color.witsFaint)
-                Spacer(minLength: 16)
-                Button {
-                    dismiss()
-                } label: {
-                    Text("done")
-                        .font(.witsBody(17, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 54)
-                        .background(test.tint, in: Capsule())
-                }
-                .buttonStyle(.plain)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.82)
+
+                Spacer(minLength: 10)
+
+                resultStatusChip(test.isScreener ? "screener" : "reflection")
             }
-            .padding(.horizontal, WitsMetrics.screenPadding)
-            .padding(.bottom, 24)
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .center, spacing: layout.heroSpacing) {
+                    resultTitleBlock(outcome, layout: layout)
+                    Spacer(minLength: 8)
+                    resultGlyph(layout: layout)
+                }
+
+                VStack(alignment: .leading, spacing: layout.heroSpacing) {
+                    resultTitleBlock(outcome, layout: layout)
+                    resultGlyph(layout: layout)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+
+            if layout.showsHeroMetrics {
+                HStack(spacing: 8) {
+                    resultMetricChip(icon: "sparkles",
+                                     label: "read",
+                                     value: readingStyle(outcome),
+                                     layout: layout)
+                    resultMetricChip(icon: test.isScreener ? "checkmark.shield.fill" : "moon.stars.fill",
+                                     label: test.isScreener ? "frame" : "mode",
+                                     value: test.isScreener ? "signal" : "reflection",
+                                     layout: layout)
+                }
+            }
         }
+        .padding(layout.heroPadding)
+        .background {
+            ZStack {
+                Color.witsCard
+                LinearGradient(colors: [
+                    test.tint.opacity(0.18),
+                    Color.witsCard.opacity(0.1),
+                    Color.witsCard,
+                ], startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+            .clipShape(shape)
+        }
+        .overlay(shape.strokeBorder(test.tint.opacity(0.25), lineWidth: 1))
+        .shadow(color: test.tint.opacity(0.16), radius: 18, y: 10)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(test.name) result, \(headlineLabel(outcome))")
+    }
+
+    private func resultTitleBlock(_ outcome: SelfTestOutcome, layout: SelfTestResultLayout) -> some View {
+        VStack(alignment: .leading, spacing: layout.tiny ? 4 : 8) {
+            Text(test.isScreener ? "current signal" : "current read")
+                .font(.witsLabel(layout.tiny ? 10.5 : 12))
+                .foregroundStyle(Color.witsFaint)
+                .textCase(.uppercase)
+                .kerning(0.7)
+
+            Text(headlineLabel(outcome))
+                .font(.witsDisplay(layout.titleSize))
+                .foregroundStyle(test.tint)
+                .lineLimit(layout.tiny ? 1 : 2)
+                .minimumScaleFactor(0.62)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(resultSubtitle(outcome))
+                .font(.witsBody(layout.tiny ? 13.5 : 15, weight: .bold))
+                .foregroundStyle(Color.witsMuted)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+        }
+        .layoutPriority(1)
+    }
+
+    private func resultGlyph(layout: SelfTestResultLayout) -> some View {
+        SelfTestResultGlyph(icon: test.icon,
+                            tint: test.tint,
+                            size: layout.gaugeSize,
+                            lineWidth: layout.glyphLineWidth,
+                            iconSize: layout.glyphIconSize)
+    }
+
+    private func resultStatusChip(_ label: String) -> some View {
+        Text(label)
+            .font(.witsLabel(11.5))
+            .foregroundStyle(test.tint)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(test.tint.opacity(0.13), in: Capsule())
+    }
+
+    private func resultMetricChip(icon: String, label: String, value: String, layout: SelfTestResultLayout) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundStyle(test.tint)
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text(label)
+                    .font(.witsLabel(10.5))
+                    .foregroundStyle(Color.witsFaint)
+                    .textCase(.uppercase)
+                    .kerning(0.5)
+
+                Text(value)
+                    .font(.witsValue(layout.compact ? 12.5 : 13.5))
+                    .foregroundStyle(Color.witsInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, layout.compact ? 10 : 12)
+        .padding(.vertical, layout.compact ? 8 : 10)
+        .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+
+    private func resultSummaryCard(_ outcome: SelfTestOutcome, layout: SelfTestResultLayout) -> some View {
+        VStack(alignment: .leading, spacing: layout.tiny ? 6 : 9) {
+            if !layout.tiny {
+                Label("the read", systemImage: "sparkle.magnifyingglass")
+                    .font(.witsLabel(12))
+                    .foregroundStyle(test.tint)
+                    .textCase(.uppercase)
+                    .kerning(0.7)
+            }
+
+            Text(outcome.summary)
+                .font(.witsBody(layout.compact ? 14.5 : 15.5))
+                .foregroundStyle(Color.witsMuted)
+                .lineSpacing(layout.compact ? 1 : 2)
+                .lineLimit(layout.summaryLineLimit)
+                .minimumScaleFactor(0.86)
+        }
+        .padding(layout.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface(radius: WitsMetrics.panelRadius, elevation: .raised)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func resultSubscaleCard(_ subscales: [String: Double], layout: SelfTestResultLayout) -> some View {
+        let rows = subscales.sorted { lhs, rhs in
+            lhs.value == rhs.value ? lhs.key < rhs.key : lhs.value > rhs.value
+        }
+
+        return VStack(alignment: .leading, spacing: layout.subscaleSpacing) {
+            if !layout.tiny {
+                HStack {
+                    Label("threads", systemImage: "sparkles")
+                        .font(.witsLabel(12))
+                        .foregroundStyle(test.tint)
+                        .textCase(.uppercase)
+                        .kerning(0.7)
+                    Spacer(minLength: 8)
+                    Text("strongest first")
+                        .font(.witsLabel(11))
+                        .foregroundStyle(Color.witsFaint)
+                }
+            }
+
+            VStack(spacing: layout.subscaleRowSpacing) {
+                ForEach(rows, id: \.key) { name, value in
+                    resultSubscaleRow(name: name, value: value, layout: layout)
+                }
+            }
+        }
+        .padding(layout.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardSurface(radius: WitsMetrics.panelRadius, elevation: .raised)
+    }
+
+    private func resultSubscaleRow(name: String, value: Double, layout: SelfTestResultLayout) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            Image(systemName: "sparkle")
+                .font(.system(size: layout.tiny ? 10 : 12, weight: .bold))
+                .foregroundStyle(test.tint.opacity(threadOpacity(value)))
+                .frame(width: layout.tiny ? 22 : 26, height: layout.tiny ? 22 : 26)
+                .background(test.tint.opacity(0.10), in: Circle())
+
+            Text(name)
+                .font(.witsBody(layout.tiny ? 12.5 : 14, weight: .bold))
+                .foregroundStyle(Color.witsInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+
+            Spacer(minLength: 8)
+
+            Text(threadLabel(value))
+                .font(.witsLabel(layout.tiny ? 10.5 : 11.5))
+                .foregroundStyle(test.tint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 5)
+                .background(test.tint.opacity(0.12), in: Capsule())
+        }
+    }
+
+    private func resultScreenerCard(layout: SelfTestResultLayout) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "checkmark.shield.fill")
+                .font(.system(size: layout.tiny ? 13 : 16, weight: .bold))
+                .foregroundStyle(test.tint)
+                .frame(width: layout.tiny ? 28 : 34, height: layout.tiny ? 28 : 34)
+                .background(test.tint.opacity(0.13), in: Circle())
+
+            VStack(alignment: .leading, spacing: layout.tiny ? 3 : 5) {
+                if !layout.tiny {
+                    Text("screening signal")
+                        .font(.witsHeading(16))
+                        .foregroundStyle(Color.witsInk)
+                }
+
+                Text(SelfTestCatalog.screenerDisclaimer)
+                    .font(.witsBody(layout.tiny ? 12.5 : 13.5))
+                    .foregroundStyle(Color.witsMuted)
+                    .lineSpacing(layout.tiny ? 0 : 2)
+                    .lineLimit(layout.screenerLineLimit)
+                    .minimumScaleFactor(0.84)
+            }
+        }
+        .padding(layout.cardPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(test.tint.opacity(0.09), in: RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+                .strokeBorder(test.tint.opacity(0.18), lineWidth: 1)
+        )
+        .accessibilityElement(children: .combine)
+    }
+
+    private func resultRetakeCard(layout: SelfTestResultLayout) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: "arrow.clockwise")
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(Color.witsFaint)
+                .frame(width: 24, height: 24)
+                .background(Color.witsTint, in: Circle())
+
+            Text("retake any time. latest result shows on your profile.")
+                .font(.witsBody(layout.compact ? 12.5 : 13))
+                .foregroundStyle(Color.witsFaint)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
+        }
+        .padding(.horizontal, 4)
+        .accessibilityElement(children: .combine)
+    }
+
+    private func resultDoneButton(layout: SelfTestResultLayout) -> some View {
+        Button {
+            GameFeel.shared.uiTick(0.55)
+            dismiss()
+        } label: {
+            Text("done")
+                .font(.witsBody(layout.compact ? 16 : 17, weight: .heavy))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: layout.buttonHeight)
+                .background(test.tint, in: Capsule())
+                .shadow(color: test.tint.opacity(0.28), radius: 16, y: 8)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func resultSubtitle(_ outcome: SelfTestOutcome) -> String {
+        if test.isScreener {
+            return "a signal to reflect on, not a label"
+        }
+
+        switch test.id {
+        case "who5": return "your wellbeing weather lately"
+        case "rmeq": return "your body-clock signature"
+        case "mini_ipip": return "your trait constellation"
+        case "vviq16": return "your mind's-eye style"
+        case "dirty_dozen": return "your shadow-side pattern"
+        default: return "your answer pattern right now"
+        }
+    }
+
+    private func readingStyle(_ outcome: SelfTestOutcome) -> String {
+        if test.isScreener { return "signal" }
+        if outcome.subscales != nil { return "constellation" }
+
+        switch test.id {
+        case "who5": return "weather"
+        case "rmeq": return "rhythm"
+        case "vviq16": return "imagery"
+        default: return "archetype"
+        }
+    }
+
+    private func threadLabel(_ value: Double) -> String {
+        switch value {
+        case 16...: return "loud"
+        case 12..<16: return "present"
+        case 8..<12: return "soft"
+        default: return "quiet"
+        }
+    }
+
+    private func threadOpacity(_ value: Double) -> Double {
+        switch value {
+        case 16...: return 1
+        case 12..<16: return 0.78
+        case 8..<12: return 0.55
+        default: return 0.34
+        }
+    }
+
+    private func headlineLabel(_ outcome: SelfTestOutcome) -> String {
+        let label = outcome.label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard label.hasSuffix(")"),
+              let range = label.range(of: " (", options: .backwards) else {
+            return label
+        }
+        return String(label[..<range.lowerBound])
     }
 
     static func shortDate(_ date: Date) -> String {
         date.formatted(.dateTime.month(.abbreviated).day()).lowercased()
+    }
+}
+
+private struct SelfTestResultLayout {
+    let size: CGSize
+
+    var tiny: Bool { size.height < 560 || size.width < 340 }
+    var compact: Bool { tiny || size.height < 700 }
+
+    var horizontalPadding: CGFloat { tiny ? 18 : WitsMetrics.screenPadding }
+    var topPadding: CGFloat { tiny ? 4 : compact ? 8 : 10 }
+    var bottomPadding: CGFloat { tiny ? 8 : 12 }
+    var spacing: CGFloat { tiny ? 8 : compact ? 10 : 14 }
+
+    var heroPadding: CGFloat { tiny ? 12 : compact ? 14 : 18 }
+    var heroSpacing: CGFloat { tiny ? 8 : compact ? 12 : 18 }
+    var titleSize: CGFloat { tiny ? 25 : compact ? 29 : 34 }
+    var gaugeSize: CGFloat { tiny ? 88 : compact ? 108 : 126 }
+    var glyphLineWidth: CGFloat { tiny ? 8 : 10 }
+    var glyphIconSize: CGFloat { tiny ? 26 : compact ? 30 : 34 }
+    var showsHeroMetrics: Bool { !tiny && size.height >= 620 }
+
+    var cardPadding: CGFloat { tiny ? 12 : compact ? 14 : 18 }
+    var summaryLineLimit: Int { tiny ? 2 : compact ? 3 : 4 }
+    var screenerLineLimit: Int { tiny ? 2 : compact ? 3 : 4 }
+
+    var subscaleSpacing: CGFloat { tiny ? 8 : 12 }
+    var subscaleRowSpacing: CGFloat { tiny ? 6 : compact ? 8 : 12 }
+
+    var showsRetakeLine: Bool { size.height >= 590 }
+    var buttonHeight: CGFloat { tiny ? 50 : compact ? 52 : 56 }
+}
+
+private struct SelfTestResultGlyph: View {
+    let icon: String
+    let tint: Color
+    let size: CGFloat
+    let lineWidth: CGFloat
+    let iconSize: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(Color.witsLine, lineWidth: lineWidth)
+
+            Circle()
+                .trim(from: 0.07, to: 0.82)
+                .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+
+            Circle()
+                .fill(tint.opacity(0.10))
+                .frame(width: size * 0.58, height: size * 0.58)
+
+            ForEach(0..<4, id: \.self) { index in
+                SelfTestGlyphStar(index: index, size: size, tint: tint)
+            }
+
+            Image(systemName: icon)
+                .font(.system(size: iconSize, weight: .heavy))
+                .foregroundStyle(tint)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
+private struct SelfTestGlyphStar: View {
+    let index: Int
+    let size: CGFloat
+    let tint: Color
+
+    private var dotSize: CGFloat {
+        index == 0 ? size * 0.075 : size * 0.045
+    }
+
+    private var offset: CGSize {
+        switch index {
+        case 0: CGSize(width: size * 0.28, height: -size * 0.24)
+        case 1: CGSize(width: -size * 0.29, height: -size * 0.12)
+        case 2: CGSize(width: size * 0.18, height: size * 0.30)
+        default: CGSize(width: -size * 0.14, height: size * 0.24)
+        }
+    }
+
+    var body: some View {
+        Circle()
+            .fill(index == 0 ? tint : Color.witsInk.opacity(0.36))
+            .frame(width: dotSize, height: dotSize)
+            .offset(x: offset.width, y: offset.height)
+    }
+}
+
+private struct SelfTestAnalyzingLayout {
+    let size: CGSize
+
+    var tiny: Bool { size.height < 560 || size.width < 340 }
+
+    var horizontalPadding: CGFloat { tiny ? 18 : WitsMetrics.screenPadding }
+    var bottomPadding: CGFloat { tiny ? 8 : 20 }
+    var spacing: CGFloat { tiny ? 12 : 24 }
+    var topSpacer: CGFloat { tiny ? 8 : 20 }
+    var bottomSpacer: CGFloat { tiny ? 12 : 34 }
+
+    var indicatorSize: CGFloat { tiny ? 112 : 148 }
+    var innerIndicatorSize: CGFloat { tiny ? 64 : 86 }
+    var ringWidth: CGFloat { tiny ? 9 : 12 }
+    var iconSize: CGFloat { tiny ? 26 : 34 }
+
+    var titleSize: CGFloat { tiny ? 24 : 29 }
+    var subtitleSize: CGFloat { tiny ? 13.5 : 15 }
+
+    var rowIconSize: CGFloat { tiny ? 24 : 28 }
+    var activeDotSize: CGFloat { tiny ? 7 : 8 }
+    var idleDotSize: CGFloat { tiny ? 5 : 6 }
+    var rowTextSize: CGFloat { tiny ? 13.5 : 15 }
+    var rowHorizontalPadding: CGFloat { tiny ? 12 : 14 }
+    var rowVerticalPadding: CGFloat { tiny ? 10 : 13 }
+    var rowDividerInset: CGFloat { rowIconSize + rowHorizontalPadding * 2 }
+}
+
+private struct SelfTestAnalyzingView: View {
+    let test: SelfTest
+    let steps: [String]
+
+    @State private var rotating = false
+    @State private var breathing = false
+    @State private var currentStep = 0
+
+    var body: some View {
+        GeometryReader { geo in
+            let layout = SelfTestAnalyzingLayout(size: geo.size)
+
+            VStack(spacing: layout.spacing) {
+                Spacer(minLength: layout.topSpacer)
+
+                indicator(layout: layout)
+
+                VStack(spacing: layout.tiny ? 5 : 8) {
+                    Text(test.isScreener ? "checking the signal" : "reading the pattern")
+                        .font(.witsDisplay(layout.titleSize))
+                        .foregroundStyle(Color.witsInk)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.78)
+
+                    Text(test.isScreener ? "screening signal, not a diagnosis." : "reading your answer pattern.")
+                        .font(.witsBody(layout.subtitleSize))
+                        .foregroundStyle(Color.witsMuted)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.84)
+                }
+
+                stepPanel(layout: layout)
+
+                Spacer(minLength: layout.bottomSpacer)
+            }
+            .padding(.horizontal, layout.horizontalPadding)
+            .padding(.bottom, layout.bottomPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .onAppear {
+            withAnimation(.linear(duration: 1.05).repeatForever(autoreverses: false)) {
+                rotating = true
+            }
+            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
+                breathing = true
+            }
+        }
+        .task {
+            await runSteps()
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("analyzing responses")
+    }
+
+    private func indicator(layout: SelfTestAnalyzingLayout) -> some View {
+        ZStack {
+            Circle()
+                .stroke(Color.witsLine, lineWidth: layout.ringWidth)
+
+            Circle()
+                .trim(from: 0.08, to: 0.74)
+                .stroke(test.tint, style: StrokeStyle(lineWidth: layout.ringWidth, lineCap: .round))
+                .rotationEffect(.degrees(rotating ? 360 : 0))
+
+            Circle()
+                .fill(test.tint.opacity(breathing ? 0.18 : 0.08))
+                .frame(width: layout.innerIndicatorSize, height: layout.innerIndicatorSize)
+
+            Image(systemName: test.icon)
+                .font(.system(size: layout.iconSize, weight: .heavy))
+                .foregroundStyle(test.tint)
+                .scaleEffect(breathing ? 1.06 : 0.98)
+        }
+        .frame(width: layout.indicatorSize, height: layout.indicatorSize)
+        .shadow(color: test.tint.opacity(0.18), radius: 18, y: 8)
+    }
+
+    private func stepPanel(layout: SelfTestAnalyzingLayout) -> some View {
+        VStack(spacing: 0) {
+            ForEach(Array(steps.enumerated()), id: \.offset) { index, step in
+                if index > 0 {
+                    Rectangle()
+                        .fill(Color.witsLine)
+                        .frame(height: 1)
+                        .padding(.leading, layout.rowDividerInset)
+                }
+
+                stepRow(step, index: index, layout: layout)
+            }
+        }
+        .background(Color.witsCard.opacity(0.78), in: RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+                .strokeBorder(Color.witsLine, lineWidth: 1)
+        )
+        .shadow(color: Color.witsShadow, radius: 12, y: 6)
+    }
+
+    private func stepRow(_ step: String, index: Int, layout: SelfTestAnalyzingLayout) -> some View {
+        let complete = index < currentStep
+        let active = index == currentStep
+
+        return HStack(spacing: layout.tiny ? 10 : 12) {
+            ZStack {
+                Circle()
+                    .fill((complete || active) ? test.tint : Color.witsTint)
+                    .frame(width: layout.rowIconSize, height: layout.rowIconSize)
+
+                if complete {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: layout.tiny ? 10 : 11, weight: .heavy))
+                        .foregroundStyle(.white)
+                } else {
+                    Circle()
+                        .fill(active ? .white : Color.witsFaint.opacity(0.55))
+                        .frame(width: active ? layout.activeDotSize : layout.idleDotSize,
+                               height: active ? layout.activeDotSize : layout.idleDotSize)
+                }
+            }
+
+            Text(step)
+                .font(.witsBody(layout.rowTextSize, weight: active ? .bold : .semibold))
+                .foregroundStyle(active ? Color.witsInk : Color.witsMuted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.84)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, layout.rowHorizontalPadding)
+        .padding(.vertical, layout.rowVerticalPadding)
+        .animation(.easeOut(duration: 0.18), value: currentStep)
+    }
+
+    private func runSteps() async {
+        for index in steps.indices {
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(.easeOut(duration: 0.18)) {
+                    currentStep = index
+                }
+            }
+            try? await Task.sleep(nanoseconds: 430_000_000)
+        }
     }
 }
