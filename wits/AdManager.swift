@@ -44,6 +44,10 @@ final class AdManager {
     private var completedGames = 0
     private var lastAdShownAt: Date?
 
+    private var rewarded: RewardedAd?
+    private var isLoadingRewarded = false
+    private var rewardedWatcher: FullScreenAdWatcher?   // strong ref while presenting
+
     private init() {}
 
     /// Idempotent. Asks for tracking consent first so the SDK knows whether
@@ -54,6 +58,41 @@ final class AdManager {
         _ = await ATTrackingManager.requestTrackingAuthorization()
         await MobileAds.shared.start()
         loadInterstitial()
+        loadRewardedIfNeeded()
+    }
+
+    // MARK: Rewarded (opt-in "watch to continue" — not gated by ad-free)
+
+    var rewardedReady: Bool { rewarded != nil }
+
+    func loadRewardedIfNeeded() {
+        guard started, rewarded == nil, !isLoadingRewarded else { return }
+        isLoadingRewarded = true
+        Task {
+            defer { isLoadingRewarded = false }
+            rewarded = try? await RewardedAd.load(with: Self.rewardedUnitID,
+                                                  request: Request())
+        }
+    }
+
+    /// Presents a rewarded ad. `completion(earned)` fires once the ad is
+    /// dismissed — resuming gameplay any earlier would run it behind the ad.
+    func showRewarded(completion: @escaping (Bool) -> Void) {
+        guard let ad = rewarded, let top = Self.topViewController() else {
+            loadRewardedIfNeeded()
+            completion(false)
+            return
+        }
+        rewarded = nil
+        var earned = false
+        let watcher = FullScreenAdWatcher { [weak self] in
+            self?.rewardedWatcher = nil
+            self?.loadRewardedIfNeeded()
+            completion(earned)
+        }
+        rewardedWatcher = watcher
+        ad.fullScreenContentDelegate = watcher
+        ad.present(from: top) { earned = true }
     }
 
     func gameCompleted() {
@@ -94,5 +133,22 @@ final class AdManager {
         var top = scene?.keyWindow?.rootViewController
         while let presented = top?.presentedViewController { top = presented }
         return top
+    }
+}
+
+/// Fires its callback when a full-screen ad closes (or fails to open).
+private final class FullScreenAdWatcher: NSObject, FullScreenContentDelegate {
+    private let onDismiss: () -> Void
+
+    init(onDismiss: @escaping () -> Void) {
+        self.onDismiss = onDismiss
+    }
+
+    func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
+        onDismiss()
+    }
+
+    func ad(_ ad: FullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
+        onDismiss()
     }
 }

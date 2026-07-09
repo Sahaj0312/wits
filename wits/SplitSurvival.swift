@@ -90,6 +90,20 @@ final class SplitGame {
         lastTick = nil
     }
 
+    /// Rewarded-ad continue: restart the current level with a clear field.
+    /// Run totals (level, trials) survive; one slip still ends the run.
+    /// `sincePipe = 0` grants a full spacing of clear air, unlike reset's
+    /// forced early first pipe.
+    func revive() {
+        birdY = 0.42; birdV = 0
+        pipes = []; emojis = []
+        levelElapsed = 0
+        alive = true; started = false; deathReason = ""
+        sincePipe = 0
+        sinceEmoji = 0.5
+        lastTick = nil
+    }
+
     func flap() {
         guard alive else { return }
         started = true
@@ -315,6 +329,13 @@ struct SplitSurvivalScreen: View {
     /// 3…2…1 pre-launch count (0 = "go!", nil = live). Taps are ignored while
     /// it runs; at "go!" the flyer auto-launches with a flap kick.
     @State private var countdown: Int?
+    /// One rewarded-ad continue per run. `canContinue` is snapshotted at death
+    /// so the offer doesn't pop in while the game-over card is already up.
+    @State private var usedContinue = false
+    @State private var canContinue = false
+    @State private var adBusy = false
+    /// False while a death sits unrecorded behind a pending continue offer.
+    @State private var runRecorded = true
 
     private enum Phase { case intro, playing, over }
 
@@ -354,8 +375,12 @@ struct SplitSurvivalScreen: View {
                                   })
             }
         }
-        .onAppear { GameFeel.shared.warmUp() }
+        .onAppear {
+            GameFeel.shared.warmUp()
+            AdManager.shared.loadRewardedIfNeeded()
+        }
         .onDisappear {
+            finalizeRun()   // no-op unless a death sat behind a continue offer
             pauseController.reset()
             GameFeel.shared.teardown()
         }
@@ -537,13 +562,25 @@ struct SplitSurvivalScreen: View {
             .cardSurface()
             .rise()
             Spacer()
-            Cta(title: "play again", action: startRun)
-                .rise(0.1)
-            QuietButton(title: "done", action: onQuit)
+            if canContinue {
+                Cta(title: "continue · watch ad", action: continueRun)
+                    .rise(0.1)
+                Text("pick back up at level \(endLevel) — once per run")
+                    .font(.witsLabel(11.5))
+                    .foregroundStyle(Color.witsFaint)
+                    .padding(.top, 8)
+                QuietButton(title: "play again", action: playAgain)
+                    .padding(.top, 10)
+            } else {
+                Cta(title: "play again", action: playAgain)
+                    .rise(0.1)
+            }
+            QuietButton(title: "done", action: finishAndQuit)
                 .padding(.top, 6)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 16)
+        .disabled(adBusy)
     }
 
     // MARK: Run lifecycle
@@ -551,6 +588,8 @@ struct SplitSurvivalScreen: View {
     private func startRun() {
         pauseController.reset()
         model.reset()
+        usedContinue = false
+        canContinue = false
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }
 
@@ -561,8 +600,46 @@ struct SplitSurvivalScreen: View {
         endReason = model.deathReason
         newBest = endLevel > best
         GameFeel.shared.play(newBest ? .newBest : .gameOver)
-        onRunComplete(model.level, model.depthIntoLevel, model.trials)
+        // A continue offer defers recording — the run isn't over until the
+        // player passes on it. No offer → record right away, as before.
+        canContinue = !usedContinue && AdManager.shared.rewardedReady
+        if canContinue {
+            runRecorded = false
+        } else {
+            runRecorded = true
+            onRunComplete(model.level, model.depthIntoLevel, model.trials)
+        }
         withAnimation(.easeOut(duration: 0.25)) { phase = .over }
+    }
+
+    private func finalizeRun() {
+        guard !runRecorded else { return }
+        runRecorded = true
+        onRunComplete(model.level, model.depthIntoLevel, model.trials)
+    }
+
+    private func playAgain() {
+        finalizeRun()
+        startRun()
+    }
+
+    private func finishAndQuit() {
+        finalizeRun()
+        onQuit()
+    }
+
+    private func continueRun() {
+        guard !adBusy else { return }
+        adBusy = true
+        AdManager.shared.showRewarded { earned in
+            adBusy = false
+            guard earned else { return }   // closed early — offer stays on the table
+            usedContinue = true
+            canContinue = false
+            pauseController.reset()
+            model.revive()
+            withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+        }
     }
 }
 
