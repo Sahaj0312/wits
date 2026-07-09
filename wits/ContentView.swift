@@ -18,6 +18,10 @@ struct ContentView: View {
             switch app.load {
             case .ready:
                 RootShell()
+                    .task {
+                        AdManager.shared.adFreeProvider = { [weak app] in app?.entitlement.isAdFree ?? false }
+                        await AdManager.shared.startIfNeeded()
+                    }
             case .idle:
                 SplashView()
                     .onAppear { app.bootstrap() }

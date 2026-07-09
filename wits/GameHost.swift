@@ -213,7 +213,10 @@ struct GameHost: View {
         r.raw["mapLevel"] = Double(servedLevel)
         results.append(r)
         onGameResult(r)
+        AdManager.shared.gameCompleted()
         withAnimation { proceed() }
+        // Over the static lead-in card or summary, never over gameplay.
+        AdManager.shared.maybeShowInterstitial()
     }
 
     /// Advance to the next game's lead-in, or the summary.

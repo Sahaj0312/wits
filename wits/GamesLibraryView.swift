@@ -421,12 +421,16 @@ private struct GameLauncher: View {
         lastQuality = quality
         lastImproved = stars > starsBefore || (stars >= 1 && quality > qualityBefore)
         withAnimation(.easeOut(duration: 0.2)) { phase = .levelResult }
+        AdManager.shared.gameCompleted()
+        AdManager.shared.maybeShowInterstitial()
     }
 
     private func endMarathon() {
         marathonNewBest = marathonDepth >= 1
             && app.levels.recordMarathon(game: game, depth: marathonDepth, score: marathonScore)
         withAnimation(.easeOut(duration: 0.2)) { phase = .marathonResult }
+        AdManager.shared.gameCompleted()
+        AdManager.shared.maybeShowInterstitial()
     }
 
     private func splitResult(level: Int, depth: Double, trials: Int) -> GameResult {

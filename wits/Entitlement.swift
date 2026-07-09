@@ -25,6 +25,13 @@ enum Entitlement: Equatable {
 
     var isExpired: Bool { self == .expired }
 
+    /// Ads are removed only by a real paid subscription. The `.distantFuture`
+    /// sentinel (paywall disabled → everyone "subscribed") still shows ads.
+    var isAdFree: Bool {
+        if case let .subscribed(until) = self { return until != .distantFuture }
+        return false
+    }
+
     /// Whole days left in the trial (0 if not on trial).
     var trialDaysLeft: Int {
         guard case let .trial(endsAt) = self else { return 0 }
