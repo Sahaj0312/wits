@@ -14,23 +14,19 @@ import Observation
 // MARK: - Identity
 
 enum GameID: String, CaseIterable, Codable, Identifiable {
-    // shipped (built as adaptive, replayable games)
+    // star-map games (fixed exam levels + marathon)
     case arrowStorm, crowdControl, echoGrid
-    case spotSpeed, colorClash, matchBack, ruleFinder
-    // expanded library
-    case numberRush, estimator, oddOneOut, tileShift, lastSeen, pathKeeper
-    case wordConnect, memoryLock, dotsConnect, oneLine, towerOfHanoi, slidePuzzle, blockEscape, pegSolitaire
-    // Standalone survival mode. Playable in the library, not prescribed in daily
-    // workouts, and not connected to WPI/mastery scoring.
+    case colorClash, tileShift, lastSeen
+    case slidePuzzle, blockEscape, pegSolitaire
+    // Standalone survival mode.
     case split
 
     var id: String { rawValue }
 
-    /// Games in the daily-workout pool (mastery-adjusted train mode).
+    /// Star-map games (everything but the standalone survival modes).
     static var live: [GameID] {
-        [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .spotSpeed, .matchBack, .ruleFinder,
-         .numberRush, .estimator, .oddOneOut, .tileShift, .lastSeen, .pathKeeper, .wordConnect, .dotsConnect,
-         .oneLine, .memoryLock, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire]
+        [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .tileShift, .lastSeen,
+         .slidePuzzle, .blockEscape, .pegSolitaire]
     }
     var isLive: Bool { Self.live.contains(self) }
 
@@ -47,18 +43,13 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
     /// their own top/bottom spacing.
     var ownsSafeAreaSurface: Bool {
         switch self {
-        case .echoGrid, .pathKeeper, .wordConnect, .memoryLock, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire: true
+        case .echoGrid, .slidePuzzle, .blockEscape, .pegSolitaire: true
         default: false
         }
     }
 
     /// Some games place their own primary top-left control inside the playfield.
-    var usesEmbeddedQuitControl: Bool {
-        switch self {
-        case .dotsConnect, .oneLine: true
-        default: false
-        }
-    }
+    var usesEmbeddedQuitControl: Bool { false }
 }
 
 enum CognitiveDomain: String, Codable, CaseIterable, Identifiable {
@@ -79,16 +70,14 @@ enum CognitiveDomain: String, Codable, CaseIterable, Identifiable {
 }
 
 extension GameID {
-    /// Scoring bucket for the progress breakdown.
+    /// Scoring bucket (cosmetic grouping in the library).
     var domain: CognitiveDomain {
         switch self {
-        case .arrowStorm, .spotSpeed, .oddOneOut: .focus
+        case .arrowStorm: .focus
         case .crowdControl: .multitasking
-        case .echoGrid, .matchBack, .lastSeen, .pathKeeper: .memory
+        case .echoGrid, .lastSeen: .memory
         case .colorClash, .tileShift: .flexibility
-        case .ruleFinder, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire: .reasoning
-        case .numberRush, .estimator: .math
-        case .wordConnect, .memoryLock: .language
+        case .slidePuzzle, .blockEscape, .pegSolitaire: .reasoning
         case .split: .multitasking
         }
     }
@@ -98,21 +87,9 @@ extension GameID {
         case .arrowStorm: "arrow storm"
         case .crowdControl: "crowd control"
         case .echoGrid: "echo grid"
-        case .spotSpeed: "spot speed"
         case .colorClash: "color clash"
-        case .matchBack: "memory lane"
-        case .ruleFinder: "rule finder"
-        case .numberRush: "number rush"
-        case .estimator: "target forge"
-        case .oddOneOut: "odd one out"
         case .tileShift: "tile shift"
         case .lastSeen: "last seen"
-        case .pathKeeper: "path keeper"
-        case .wordConnect: "word connect"
-        case .memoryLock: "memory lock"
-        case .dotsConnect: "dots connect"
-        case .oneLine: "one line"
-        case .towerOfHanoi: "tower of hanoi"
         case .slidePuzzle: "slide puzzle"
         case .blockEscape: "block escape"
         case .pegSolitaire: "peg solitaire"
@@ -126,21 +103,9 @@ extension GameID {
         case .arrowStorm: "answer only to the middle arrow."
         case .crowdControl: "track the dots through the crowd."
         case .echoGrid: "play the path back — backwards."
-        case .spotSpeed: "catch the flash before it fades."
         case .colorClash: "tap the colour, not the word."
-        case .matchBack: "compare each card to the lane behind it."
-        case .ruleFinder: "find the rule, finish the grid."
-        case .numberRush: "keep the running total, then type it."
-        case .estimator: "build the number."
-        case .oddOneOut: "find the one that doesn't fit."
         case .tileShift: "the rule keeps changing."
         case .lastSeen: "never tap the same one twice."
-        case .pathKeeper: "repeat the hops, in order."
-        case .wordConnect: "connect letters into hidden words."
-        case .memoryLock: "solve the word before the clues fade."
-        case .dotsConnect: "connect matching dots without crossing paths."
-        case .oneLine: "draw every segment in a single stroke."
-        case .towerOfHanoi: "rebuild the goal arrangement in as few moves as you can."
         case .slidePuzzle: "slide the tiles back into order."
         case .blockEscape: "free the big block."
         case .pegSolitaire: "jump pegs. leave just one."
@@ -151,38 +116,23 @@ extension GameID {
     /// Breadcrumb: top-level discipline shown on the card.
     var domainTitle: String {
         switch self {
-        case .arrowStorm, .crowdControl, .oddOneOut: "attention"
-        case .spotSpeed: "speed"
-        case .echoGrid, .matchBack, .lastSeen, .pathKeeper: "memory"
+        case .arrowStorm, .crowdControl: "attention"
+        case .echoGrid, .lastSeen: "memory"
         case .colorClash, .tileShift: "flexibility"
-        case .ruleFinder, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire: "problem solving"
-        case .numberRush, .estimator: "math"
-        case .wordConnect, .memoryLock: "language"
+        case .slidePuzzle, .blockEscape, .pegSolitaire: "problem solving"
         case .split: "attention"
         }
     }
 
-    /// Breadcrumb: the specific sub-skill the game trains.
+    /// Breadcrumb: the specific sub-skill the game leans on.
     var subskill: String {
         switch self {
         case .arrowStorm: "selective attention"
         case .crowdControl: "divided attention"
-        case .oddOneOut: "visual search"
-        case .spotSpeed: "field of view"
         case .echoGrid: "spatial recall"
-        case .matchBack: "working memory"
         case .lastSeen: "short-term memory"
-        case .pathKeeper: "working memory"
         case .colorClash: "response inhibition"
         case .tileShift: "task switching"
-        case .ruleFinder: "logical reasoning"
-        case .numberRush: "arithmetic"
-        case .estimator: "mental arithmetic"
-        case .wordConnect: "vocabulary"
-        case .memoryLock: "lexical memory"
-        case .dotsConnect: "planning"
-        case .oneLine: "logical reasoning"
-        case .towerOfHanoi: "sequential planning"
         case .slidePuzzle: "spatial planning"
         case .blockEscape: "forward planning"
         case .pegSolitaire: "strategic planning"
@@ -196,21 +146,9 @@ extension GameID {
         case .arrowStorm: "spot which way the middle arrow points while the crowd around it tries to pull your answer the other way."
         case .crowdControl: "keep your eyes on a few glowing dots as they scatter into an identical crowd, then pick them back out."
         case .echoGrid: "watch a path of tiles light up, then tap them back in reverse order."
-        case .spotSpeed: "identify the shape in the centre and catch where a target flashes at the edge — before it's masked."
         case .colorClash: "tap the colour a word is printed in, not the word it spells."
-        case .matchBack: "cards move through a short lane. decide if the current card matches the one a few steps back by symbol, colour, or both."
-        case .ruleFinder: "work out the rule running across the grid and pick the figure that completes it."
-        case .numberRush: "watch a start value and operations appear one at a time. keep the running total in mind, then type the final answer before the timer bar drains."
-        case .estimator: "use number tiles and operators to hit the target exactly, or get as close as you can before the clock bites."
-        case .oddOneOut: "scan the grid and tap the single shape that doesn't match the rest."
         case .tileShift: "follow the rule on screen — sometimes match by colour, sometimes by shape. it keeps flipping."
         case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
-        case .pathKeeper: "watch a token hop across the board, then repeat its path in the same order."
-        case .wordConnect: "connect letters in the wheel to uncover every hidden word in the grid. clear two boards to unlock the next level."
-        case .memoryLock: "guess the hidden word in 6 tries. after each guess, green means right letter and right spot, yellow means right letter but wrong spot, and gray means that letter is not in the word. clues fade after a moment — faster, with longer words, as your level climbs."
-        case .dotsConnect: "draw paths between matching dots, cover every square, and avoid crossing another path."
-        case .oneLine: "trace the graph in one continuous route. each segment can be used once, so every choice changes what remains open."
-        case .towerOfHanoi: "clear a 36-level tower campaign. every level deals a scrambled tower and a goal arrangement; plan ahead and rebuild the goal in as few moves as possible."
         case .slidePuzzle: "the numbered tiles are scrambled around one empty square. slide them through the gap until they read in order — in as few moves as you can."
         case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit — in as few moves as you can."
         case .pegSolitaire: "every jump leaps one peg over a neighbour into an empty hole, and the jumped peg is removed. keep jumping until a single peg remains — on the marked hole at higher levels."
@@ -221,25 +159,15 @@ extension GameID {
     /// Second card paragraph — what the skill is.
     var cardAbout: String {
         switch self {
-        case .arrowStorm, .oddOneOut: "selective attention is focusing on what matters while ignoring everything competing for your eyes."
+        case .arrowStorm: "selective attention is focusing on what matters while ignoring everything competing for your eyes."
         case .crowdControl: "divided attention is following several moving things at once without losing track of any."
-        case .spotSpeed: "field of view is how much you can take in at a single glance, without moving your eyes."
         case .echoGrid: "spatial recall is holding where things were in mind and replaying that layout accurately."
-        case .matchBack, .pathKeeper: "working memory is holding recent information in mind and acting on it."
         case .lastSeen: "short-term memory is keeping recent items in mind so you don't repeat yourself."
         case .colorClash: "response inhibition is overriding the automatic answer to give the correct one."
         case .tileShift: "task switching is adapting quickly when the goal keeps changing underneath you."
-        case .ruleFinder: "logical reasoning is recognising patterns, drawing conclusions, and making decisions."
-        case .dotsConnect: "planning is building a sequence of moves that satisfies several constraints at the same time."
-        case .oneLine: "logical reasoning is recognising structure, spotting constraints, and planning a path that leaves no segment stranded."
-        case .towerOfHanoi: "sequential planning is thinking several moves ahead while respecting a changing set of constraints."
         case .slidePuzzle: "spatial planning is seeing moves ahead — how each slide reshapes the board and which tile it frees up next."
         case .blockEscape: "forward planning is simulating moves in your head — seeing how each slide opens or closes the big block's path several steps ahead."
         case .pegSolitaire: "strategic planning is ordering moves so nothing gets stranded — every jump has to leave the rest of the board still clearable."
-        case .numberRush: "arithmetic is performing quick mental calculations accurately under time pressure."
-        case .estimator: "mental arithmetic is composing numbers quickly: scanning options, choosing operations, and keeping the result in mind."
-        case .wordConnect: "vocabulary is fluent word retrieval: spotting letter patterns, spelling accurately, and finding possibilities quickly."
-        case .memoryLock: "lexical memory is keeping spelling clues in mind while searching for the word that fits them."
         case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
         }
     }
@@ -250,21 +178,9 @@ extension GameID {
         case .arrowStorm: "arrowtriangle.right.fill"
         case .crowdControl: "circle.grid.3x3.fill"
         case .echoGrid: "square.grid.3x3.fill"
-        case .spotSpeed: "eye.fill"
         case .colorClash: "paintpalette.fill"
-        case .matchBack: "rectangle.stack.fill"
-        case .ruleFinder: "puzzlepiece.fill"
-        case .numberRush: "plus.forwardslash.minus"
-        case .estimator: "equal.circle.fill"
-        case .oddOneOut: "magnifyingglass"
         case .tileShift: "arrow.triangle.2.circlepath"
         case .lastSeen: "sparkles"
-        case .pathKeeper: "point.topleft.down.to.point.bottomright.curvepath.fill"
-        case .wordConnect: "textformat.abc"
-        case .memoryLock: "lock.fill"
-        case .dotsConnect: "point.topleft.down.to.point.bottomright.curvepath.fill"
-        case .oneLine: "point.topleft.down.to.point.bottomright.curvepath.fill"
-        case .towerOfHanoi: "square.stack.3d.up.fill"
         case .slidePuzzle: "square.grid.3x3.topleft.filled"
         case .blockEscape: "square.split.2x2.fill"
         case .pegSolitaire: "circle.grid.cross.fill"
@@ -272,11 +188,10 @@ extension GameID {
         }
     }
 
-    /// Starting mastery/difficulty level for a brand-new player (1…10).
+    /// Starting difficulty level for a brand-new player (1…10).
     var seedLevel: Double {
         switch self {
-        case .crowdControl, .echoGrid, .lastSeen, .pathKeeper, .matchBack: 1
-        case .wordConnect, .memoryLock, .dotsConnect, .oneLine, .towerOfHanoi, .slidePuzzle, .blockEscape, .pegSolitaire: 1
+        case .crowdControl, .echoGrid, .lastSeen, .slidePuzzle, .blockEscape, .pegSolitaire: 1
         default: 2
         }
     }
@@ -288,75 +203,36 @@ extension GameID {
         switch self {
         case .crowdControl: "perfectRounds"
         case .echoGrid: "maxSpan"
-        case .spotSpeed: "thresholdMs"
-        case .matchBack: "n"
-        case .ruleFinder: "complexity"
         case .lastSeen: "remembered"
-        case .pathKeeper: "maxSpan"    // TracePathArcade emits maxSpan for both path games
-        case .wordConnect: "wordsFound"
-        case .memoryLock: "wordsSolved"
-        case .dotsConnect: "boardsSolved"
-        case .oneLine: "perfectBoards"
-        case .towerOfHanoi: "efficiency"
         case .slidePuzzle: "efficiency"
         case .blockEscape: "efficiency"
         case .pegSolitaire: "clearPct"
         case .split: "maxLevel"
-        case .estimator: "exact"
         default: "bestStreak"
         }
     }
 
-    var statLowerIsBetter: Bool { self == .spotSpeed }
+    var statLowerIsBetter: Bool { false }
 
     func statLabel(_ v: Double) -> String {
         switch self {
         case .echoGrid: "\(Int(v)) tiles"
-        case .spotSpeed: "\(Int(v)) ms"
-        case .matchBack: "\(Int(v))-back"
-        case .ruleFinder: "tier \(Int(v))"
         case .crowdControl: "\(Int(v)) perfect"
         case .lastSeen: "\(Int(v)) recalled"
-        case .pathKeeper: "\(Int(v)) steps"
-        case .wordConnect: "\(Int(v)) words"
-        case .memoryLock: "\(Int(v)) solved"
-        case .dotsConnect: "\(Int(v)) boards"
-        case .oneLine: "\(Int(v)) perfect"
-        case .towerOfHanoi: "\(Int(v))% optimal"
         case .slidePuzzle: "\(Int(v))% of par"
         case .blockEscape: "\(Int(v))% of par"
         case .pegSolitaire: "\(Int(v))% cleared"
         case .split: "level \(Int(v))"
-        case .estimator: "\(Int(v)) exact"
         default: "streak \(Int(v))"
         }
     }
 }
 
 extension GameID {
-    var difficultyScoringVersion: String {
-        switch self {
-        case .estimator:
-            "target_forge_v1"
-        default:
-            ScoringVersion.current
-        }
-    }
+    var difficultyScoringVersion: String { ScoringVersion.current }
 
     func difficultyState(from stored: DifficultyState?) -> DifficultyState {
-        guard let stored else { return .seed(for: self) }
-        guard shouldResetDifficulty(stored) else { return stored }
-        return .seed(for: self)
-    }
-
-    func shouldResetDifficulty(_ stored: DifficultyState?) -> Bool {
-        guard let stored else { return false }
-        switch self {
-        case .estimator:
-            return stored.scoringVersion != difficultyScoringVersion
-        default:
-            return false
-        }
+        stored ?? .seed(for: self)
     }
 }
 

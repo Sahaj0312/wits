@@ -43,7 +43,7 @@ final class LevelSystemTests: XCTestCase {
     }
 
     func testNearestLevelRoundTripsTheMapping() {
-        for game in [GameID.colorClash, .towerOfHanoi, .wordConnect] {
+        for game in [GameID.colorClash, .echoGrid, .pegSolitaire] {
             let count = LevelLadder.levelCount(for: game)
             for level in [1, count / 2, count] {
                 let difficulty = LevelLadder.legacyDifficulty(for: game, level: level)
@@ -99,11 +99,11 @@ final class LevelSystemTests: XCTestCase {
 
     func testStarsNeverGoDown() {
         let store = LevelProgressStore()
-        store.recordAttempt(game: .towerOfHanoi, level: 3, stars: 3, quality: 0.95)
-        let improved = store.recordAttempt(game: .towerOfHanoi, level: 3, stars: 1, quality: 0.62)
+        store.recordAttempt(game: .blockEscape, level: 3, stars: 3, quality: 0.95)
+        let improved = store.recordAttempt(game: .blockEscape, level: 3, stars: 1, quality: 0.62)
         XCTAssertFalse(improved)
-        XCTAssertEqual(store.stars(for: .towerOfHanoi, level: 3), 3)
-        XCTAssertEqual(store.record(for: .towerOfHanoi, level: 3)?.bestQuality, 0.95)
+        XCTAssertEqual(store.stars(for: .blockEscape, level: 3), 3)
+        XCTAssertEqual(store.record(for: .blockEscape, level: 3)?.bestQuality, 0.95)
     }
 
     func testMarathonBestTracksDepthThenScore() {
@@ -175,20 +175,4 @@ final class LevelSystemTests: XCTestCase {
         XCTAssertEqual(MarathonMath.points(level: 10, quality: 0), 0)
     }
 
-    // MARK: Hanoi ladder
-
-    func testHanoiMapSpecLadder() {
-        XCTAssertEqual(TowerOfHanoiScreen.mapSpec(1).disks, 3)
-        XCTAssertEqual(TowerOfHanoiScreen.mapSpec(1).moves, 3)
-        XCTAssertEqual(TowerOfHanoiScreen.mapSpec(5).disks, 3)   // par 7 = 3-disk diameter
-        XCTAssertEqual(TowerOfHanoiScreen.mapSpec(6).disks, 4)   // par 8 needs 4 disks
-        XCTAssertEqual(TowerOfHanoiScreen.mapSpec(40).disks, 6)
-        XCTAssertEqual(TowerOfHanoiScreen.mapSpec(40).moves, 42)
-        // Every rung must be achievable: par within the disk count's diameter.
-        for level in 1...40 {
-            let spec = TowerOfHanoiScreen.mapSpec(level)
-            XCTAssertLessThanOrEqual(spec.moves, (1 << spec.disks) - 1,
-                                     "level \(level) par exceeds \(spec.disks)-disk diameter")
-        }
-    }
 }

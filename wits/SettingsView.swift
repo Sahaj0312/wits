@@ -1,81 +1,26 @@
 //
-//  ProfileView.swift
+//  SettingsView.swift
 //  wits
 //
-//  Settings-style profile page.
+//  Settings sheet: feel toggles, Game Center, and the ad-free subscription.
 //
 
 import SwiftUI
 
-struct ProfileView: View {
-    @Environment(AppModel.self) private var app
-    @Environment(SupabaseManager.self) private var supa
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
+struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
     @AppStorage("wits.soundEffectsEnabled") private var soundEffectsEnabled = true
     @AppStorage("wits.hapticsEnabled") private var hapticsEnabled = true
-    @State private var showReminder = false
-
-    private var displayName: String {
-        app.profile.displayName?.isEmpty == false ? app.profile.displayName! : "you"
-    }
-
-    private var entitlementLabel: String {
-        switch app.entitlement {
-        case .unknown: "—"
-        case .trial: "\(app.entitlement.trialDaysLeft)-day trial"
-        case .subscribed: "full access"
-        case .expired: "trial ended"
-        }
-    }
-
-    private var reminderEnabled: Bool {
-        app.profile.notificationsEnabled && app.profile.reminderHour != nil
-    }
-
-    private var reminderLabel: String {
-        guard let h = app.profile.reminderHour else { return "off" }
-        let m = app.profile.reminderMinute
-        let suffix = h < 12 ? "am" : "pm"
-        let hour12 = h % 12 == 0 ? 12 : h % 12
-        return String(format: "%d:%02d %@", hour12, m, suffix)
-    }
-
-    private var reminderStatusLabel: String {
-        reminderEnabled ? "on · \(reminderLabel)" : "off"
-    }
-
-    private var latestSelfTest: (test: SelfTest, record: SelfTestRecord)? {
-        SelfTestCatalog.all
-            .compactMap { test -> (test: SelfTest, record: SelfTestRecord)? in
-                guard let record = app.selfTests[test.id] else { return nil }
-                return (test, record)
-            }
-            .max { $0.record.takenAt < $1.record.takenAt }
-    }
+    @State private var showPaywall = false
+    @State private var restoreMessage: String?
+    @State private var restoring = false
 
     var body: some View {
-        NavigationStack {
-            profileContent
-        }
-    }
-
-    private var profileContent: some View {
         ScrollView {
             VStack(spacing: 0) {
                 pageHeader
 
-                testsSection
-
-                settingsSection("settings") {
-                    Button { showReminder = true } label: {
-                        settingsValueRow(icon: "bell.fill",
-                                         tint: .witsSky,
-                                         title: "daily reminder",
-                                         value: reminderStatusLabel,
-                                         showsChevron: true)
-                    }
-                    .buttonStyle(.plain)
-                    settingsDivider
+                settingsSection("game feel") {
                     settingsToggleRow(icon: "speaker.wave.2.fill",
                                       tint: .witsViolet,
                                       title: "sound effects",
@@ -87,21 +32,61 @@ struct ProfileView: View {
                                       isOn: $hapticsEnabled)
                 }
 
-                settingsSection("account") {
+                settingsSection("game center") {
                     Button {
-                        supa.signOut()
-                        app.resetForSignOut()
-                        hasCompletedOnboarding = false
+                        if GameCenterManager.shared.isAuthenticated {
+                            GameCenterManager.shared.presentDashboard()
+                        } else {
+                            GameCenterManager.shared.authenticate()
+                        }
                     } label: {
-                        settingsValueRow(icon: "rectangle.portrait.and.arrow.right",
-                                         tint: .witsWarm,
-                                         title: "sign out",
-                                         value: "")
+                        settingsValueRow(icon: "trophy.fill",
+                                         tint: .witsGold,
+                                         title: "leaderboards & achievements",
+                                         value: GameCenterManager.shared.isAuthenticated ? "" : "sign in",
+                                         showsChevron: true)
                     }
                     .buttonStyle(.plain)
                 }
 
-                Text("you're using \(entitlementLabel).")
+                settingsSection("subscription") {
+                    if PurchasesManager.shared.isAdFree {
+                        settingsValueRow(icon: "checkmark.seal.fill",
+                                         tint: .witsAccent,
+                                         title: "ad-free",
+                                         value: "active")
+                    } else {
+                        Button { showPaywall = true } label: {
+                            settingsValueRow(icon: "sparkles",
+                                             tint: .witsAccent,
+                                             title: "remove ads",
+                                             value: "",
+                                             showsChevron: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    settingsDivider
+                    Button {
+                        restorePurchases()
+                    } label: {
+                        settingsValueRow(icon: "arrow.clockwise",
+                                         tint: .witsSky,
+                                         title: "restore purchases",
+                                         value: restoring ? "…" : "")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(restoring)
+                }
+
+                if let restoreMessage {
+                    Text(restoreMessage)
+                        .font(.witsBody(14))
+                        .foregroundStyle(Color.witsMuted)
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 16)
+                }
+
+                Text("wits · made for quick daily play")
                     .font(.witsBody(14))
                     .foregroundStyle(Color.witsFaint)
                     .frame(maxWidth: .infinity)
@@ -110,10 +95,7 @@ struct ProfileView: View {
             }
         }
         .background(Color.witsBg.ignoresSafeArea())
-        .toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $showReminder) {
-            ReminderSettingsSheet(app: app)
-        }
+        .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
         .onAppear {
             syncGameFeelSettings()
         }
@@ -126,87 +108,44 @@ struct ProfileView: View {
     }
 
     private var pageHeader: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            WitsBrandMark()
-            Text("hi \(displayName)")
-                .font(.witsDisplay(30))
-                .foregroundStyle(Color.witsInk)
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                WitsBrandMark()
+                Text("settings")
+                    .font(.witsDisplay(30))
+                    .foregroundStyle(Color.witsInk)
+            }
+            Spacer()
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 14, weight: .heavy))
+                    .foregroundStyle(Color.witsMuted)
+                    .frame(width: 38, height: 38)
+                    .background(Color.witsCard, in: Circle())
+                    .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1))
+            }
+            .buttonStyle(PressScale())
+            .accessibilityLabel("Close settings")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.top, 8)
-        .padding(.bottom, 16)
+        .padding(.top, 20)
+        .padding(.bottom, 4)
     }
 
-    private var testsSection: some View {
-        NavigationLink {
-            SelfTestListView()
-        } label: {
-            testsSummaryCard
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.top, 24)
-    }
-
-    private var testsSummaryCard: some View {
-        let shape = RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
-        let hasArt = UIImage(named: "selftest-profile-card") != nil
-        // The illustration's own background color, used to scrim the text side.
-        let artBg = Color(red: 0x0C / 255.0, green: 0x15 / 255.0, blue: 0x35 / 255.0)
-
-        return HStack(alignment: .center, spacing: 14) {
-            if !hasArt {
-                Image(systemName: latestSelfTest?.test.icon ?? "list.clipboard.fill")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(Color.witsAccent)
-                    .frame(width: 44, height: 44)
-                    .background(Color.witsAccent.opacity(0.15), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-            }
-
-            Text("self-assessments")
-                .font(.witsHeading(hasArt ? 18 : 16.5))
-                .foregroundStyle(hasArt ? .white : Color.witsInk)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .layoutPriority(1)
-
-            Spacer(minLength: 8)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(hasArt ? .white.opacity(0.85) : Color.witsAccent)
-        }
-        .padding(16)
-        .frame(height: hasArt ? 118 : nil)
-        .background {
-            if hasArt {
-                Color.clear
-                    .overlay {
-                        Image("selftest-profile-card")
-                            .resizable()
-                            .scaledToFill()
-                    }
-                    .overlay {
-                        LinearGradient(stops: [
-                            .init(color: artBg.opacity(0.94), location: 0),
-                            .init(color: artBg.opacity(0.55), location: 0.42),
-                            .init(color: artBg.opacity(0), location: 0.72),
-                        ], startPoint: .leading, endPoint: .trailing)
-                    }
-            } else {
-                LinearGradient(colors: [
-                    Color.witsAccent.opacity(0.16),
-                    Color.witsSky.opacity(0.08),
-                    Color.witsCard,
-                ], startPoint: .topLeading, endPoint: .bottomTrailing)
+    private func restorePurchases() {
+        restoring = true
+        restoreMessage = nil
+        Task {
+            defer { restoring = false }
+            do {
+                let restored = try await PurchasesManager.shared.restore()
+                restoreMessage = restored ? "purchases restored." : "no purchases to restore."
+            } catch {
+                restoreMessage = "restore failed — try again later."
             }
         }
-        .clipShape(shape)
-        .overlay(shape.strokeBorder(.white, lineWidth: 2))
-        .accessibilityElement(children: .combine)
     }
 
     private func settingsSection<Content: View>(_ title: String,

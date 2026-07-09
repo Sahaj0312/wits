@@ -8,29 +8,22 @@
 import SwiftUI
 
 struct ContentView: View {
-    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @Environment(AppModel.self) private var app
 
     var body: some View {
         if let g = ProcessInfo.processInfo.environment["WITS_GAME"], let id = GameID(rawValue: g) {
             DebugGameHarness(id: id)            // dev-only: SIMCTL_CHILD_WITS_GAME=<id>
-        } else if hasCompletedOnboarding {
-            switch app.load {
-            case .ready:
-                RootShell()
-                    .task {
-                        AdManager.shared.adFreeProvider = { [weak app] in app?.entitlement.isAdFree ?? false }
-                        await AdManager.shared.startIfNeeded()
-                    }
-            case .idle:
-                SplashView()
-                    .onAppear { app.bootstrap() }
-            }
         } else {
-            OnboardingView {
-                hasCompletedOnboarding = true
-                app.bootstrap()
-            }
+            GamesLibraryView()
+                .task {
+                    GameCenterManager.shared.onAuthenticated = { [weak app] in
+                        guard let app else { return }
+                        GameCenterManager.shared.syncLocalBests(levels: app.levels, streak: app.streak)
+                    }
+                    GameCenterManager.shared.authenticate()
+                    AdManager.shared.adFreeProvider = { PurchasesManager.shared.isAdFree }
+                    await AdManager.shared.startIfNeeded()
+                }
         }
     }
 }
@@ -64,18 +57,7 @@ struct DebugGameHarness: View {
     }
 }
 
-/// Branded loader shown only while the cache hydrates (sub-second in practice).
-struct SplashView: View {
-    var body: some View {
-        ZStack {
-            Color.witsBg.ignoresSafeArea()
-            LogoBlob(size: 64, breathe: true)
-        }
-    }
-}
-
 #Preview {
     ContentView()
-        .environment(SupabaseManager.shared)
-        .environment(AppModel(supa: .shared))
+        .environment(AppModel())
 }

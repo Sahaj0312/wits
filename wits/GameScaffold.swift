@@ -22,22 +22,9 @@ struct GameStageBackground: View {
 
     var body: some View {
         switch game {
-        case .wordConnect:
-            WordConnectSafeAreaBackground()
-        case .memoryLock:
-            MemoryLockSafeAreaBackground()
-        case .dotsConnect:
-            DotsConnectSafeAreaBackground()
-        case .oneLine:
-            OneLineSafeAreaBackground()
         case .slidePuzzle:
             LinearGradient(colors: [Color(light: 0x4A3A22, dark: 0x33270F),
                                     Color(light: 0x392C18, dark: 0x261C0B)],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        case .towerOfHanoi:
-            LinearGradient(colors: [Color(light: 0x24536A, dark: 0x16384A),
-                                    Color(light: 0x1A465D, dark: 0x102E41)],
                            startPoint: .top, endPoint: .bottom)
                 .ignoresSafeArea()
         case .blockEscape:
@@ -360,47 +347,11 @@ extension GameID {
                 "when the board goes dark, tap them backwards.",
                 "you get a fixed set of rounds — perfect ones earn the stars."
             ]
-        case .spotSpeed:
-            [
-                "watch the centre and the edge at the same time.",
-                "pick whether the centre showed a car or bus.",
-                "then tap the ring position where the dot flashed."
-            ]
         case .colorClash:
             [
                 "look at the ink colour, not the word.",
                 "tap the matching colour button.",
                 "answer before the timer bar drains."
-            ]
-        case .matchBack:
-            [
-                "a new card enters the lane each beat.",
-                "compare it with the card a few steps back.",
-                "answer yes or no for the prompted feature."
-            ]
-        case .ruleFinder:
-            [
-                "study the figures already in the grid.",
-                "find the rule running across the row or column.",
-                "choose the missing figure that completes the pattern."
-            ]
-        case .numberRush:
-            [
-                "watch the start value.",
-                "keep the running total as operations appear.",
-                "submit with the checkmark before the timer bar drains."
-            ]
-        case .estimator:
-            [
-                "use the number tiles and operators to build the target.",
-                "exact answers score best, but close answers still count.",
-                "submit before time runs out."
-            ]
-        case .oddOneOut:
-            [
-                "scan the whole grid.",
-                "tap the one shape that does not match the rest.",
-                "later boards get denser and faster."
             ]
         case .tileShift:
             [
@@ -413,42 +364,6 @@ extension GameID {
                 "tap an object you have not chosen yet.",
                 "keep the earlier picks in mind.",
                 "never tap the same object twice."
-            ]
-        case .pathKeeper:
-            [
-                "watch the token hop across the board.",
-                "repeat the path in the same order.",
-                "you get a fixed set of rounds — perfect ones earn the stars."
-            ]
-        case .wordConnect:
-            [
-                "connect letters to spell hidden words.",
-                "fill the grid by finding every target word.",
-                "clear two boards to unlock the next level."
-            ]
-        case .memoryLock:
-            [
-                "guess the hidden word in six tries.",
-                "use the green, yellow, and gray clues.",
-                "remember them quickly before the clues fade."
-            ]
-        case .dotsConnect:
-            [
-                "draw paths between matching dots.",
-                "cover every square on the board.",
-                "paths cannot cross each other."
-            ]
-        case .oneLine:
-            [
-                "choose a starting dot on the graph.",
-                "move dot to dot along unused segments.",
-                "solve the board when every segment has been used once."
-            ]
-        case .towerOfHanoi:
-            [
-                "move one top disk at a time.",
-                "never place a bigger disk on a smaller disk.",
-                "rebuild the goal arrangement shown above the towers in as few moves as you can."
             ]
         case .slidePuzzle:
             [

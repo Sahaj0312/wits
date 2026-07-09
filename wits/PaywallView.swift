@@ -2,19 +2,43 @@
 //  PaywallView.swift
 //  wits
 //
-//  Placeholder paywall. Subscriptions will be handled by RevenueCat — for now
-//  this is a non-blocking screen: closing it leaves the user with full access.
-//  The gate is disabled via EntitlementEngine.paywallEnabled, so this isn't
-//  presented automatically yet; it's here to wire RevenueCat into later.
+//  The ad-free subscription paywall. Renders RevenueCat's remotely configured
+//  paywall when an offering is available; falls back to a friendly placeholder
+//  while the RevenueCat project isn't wired up (e.g. dev builds).
 //
 
 import SwiftUI
+import RevenueCat
+import RevenueCatUI
 
 struct PaywallView: View {
     @Environment(\.dismiss) private var dismiss
-    var dismissable = true
+    @State private var offering: Offering?
+    @State private var loaded = false
 
     var body: some View {
+        Group {
+            if let offering {
+                RevenueCatUI.PaywallView(offering: offering)
+                    .onPurchaseCompleted { _ in dismiss() }
+                    .onRestoreCompleted { _ in dismiss() }
+            } else if loaded {
+                unavailableFallback
+            } else {
+                ZStack {
+                    Color.witsBg.ignoresSafeArea()
+                    ProgressView()
+                }
+            }
+        }
+        .task {
+            offering = await PurchasesManager.shared.currentOffering()
+            loaded = true
+        }
+    }
+
+    /// Shown when no offering could be loaded (offline, or RC not configured).
+    private var unavailableFallback: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
                 Wordmark()
@@ -37,10 +61,10 @@ struct PaywallView: View {
                         in: RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
                     )
                     .shadow(color: Color.witsAccent.opacity(0.4), radius: 12, y: 6)
-                Text("wits premium")
+                Text("go ad-free")
                     .font(.witsDisplay(30))
                     .foregroundStyle(Color.witsInk)
-                Text("subscriptions are coming soon. for now, everything's unlocked — enjoy full access.")
+                Text("the ad-free subscription isn't available right now. check your connection and try again.")
                     .font(.witsBody(15.5))
                     .foregroundStyle(Color.witsMuted)
                     .multilineTextAlignment(.center)
@@ -49,7 +73,7 @@ struct PaywallView: View {
             .frame(maxWidth: .infinity)
             .cardSurface(radius: WitsMetrics.panelRadius, elevation: .hero)
             Spacer()
-            Cta(title: "continue") { dismiss() }
+            Cta(title: "close") { dismiss() }
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 14)

@@ -51,28 +51,14 @@ enum HeroPattern {
             arrows(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .crowdControl, .split:
             crowd(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .echoGrid, .ruleFinder:
-            grid(&ctx, size, litPath: game == .echoGrid, ink: ink, soft: inkSoft, glow: glow)
-        case .spotSpeed:
-            radar(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
+        case .echoGrid:
+            grid(&ctx, size, litPath: true, ink: ink, soft: inkSoft, glow: glow)
         case .colorClash:
             rings(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .matchBack:
-            lane(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .numberRush, .estimator:
-            numerals(&ctx, size, forge: game == .estimator, soft: inkSoft, glow: glow)
-        case .oddOneOut:
-            oddOne(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .tileShift:
             shiftTiles(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .lastSeen:
             sparks(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .pathKeeper, .dotsConnect, .oneLine:
-            path(&ctx, size, closed: game == .oneLine, ink: ink, soft: inkSoft, glow: glow)
-        case .wordConnect, .memoryLock:
-            letters(&ctx, size, wheel: game == .wordConnect, ink: ink, soft: inkSoft, glow: glow)
-        case .towerOfHanoi:
-            tower(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .slidePuzzle:
             slide(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .blockEscape:
@@ -157,23 +143,6 @@ enum HeroPattern {
         }
     }
 
-    /// Concentric field-of-view rings with a flash at the periphery.
-    private static func radar(_ ctx: inout GraphicsContext, _ size: CGSize,
-                              ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
-                              glow: GraphicsContext.Shading) {
-        let c = CGPoint(x: size.width * 0.74, y: size.height * 0.5)
-        for (i, r) in [36, 74, 112, 150].enumerated() {
-            ctx.stroke(Path(ellipseIn: CGRect(x: c.x - CGFloat(r), y: c.y - CGFloat(r),
-                                              width: CGFloat(r) * 2, height: CGFloat(r) * 2)),
-                       with: i % 2 == 0 ? ink : soft, lineWidth: 2)
-        }
-        ctx.fill(Path(ellipseIn: CGRect(x: c.x - 7, y: c.y - 7, width: 14, height: 14)), with: glow)
-        // the peripheral flash
-        let f = CGPoint(x: c.x + 96, y: c.y - 82)
-        ctx.fill(Path(ellipseIn: CGRect(x: f.x - 9, y: f.y - 9, width: 18, height: 18)), with: glow)
-        ctx.stroke(Path(ellipseIn: CGRect(x: f.x - 17, y: f.y - 17, width: 34, height: 34)),
-                   with: soft, lineWidth: 2)
-    }
 
     /// Interlocking rings — color vs word tension.
     private static func rings(_ ctx: inout GraphicsContext, _ size: CGSize,
@@ -190,70 +159,8 @@ enum HeroPattern {
         }
     }
 
-    /// A receding lane of stacked cards.
-    private static func lane(_ ctx: inout GraphicsContext, _ size: CGSize,
-                             ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
-                             glow: GraphicsContext.Shading) {
-        for i in 0..<5 {
-            let t = CGFloat(i)
-            let w = 120 - t * 14, h = 156 - t * 18
-            let x = size.width - 60 - w / 2 - t * 44
-            let y = size.height / 2 - h / 2 + t * 4
-            let p = Path(roundedRect: CGRect(x: x, y: y, width: w, height: h), cornerRadius: 16)
-            if i == 0 {
-                ctx.fill(p, with: soft)
-                ctx.stroke(p, with: glow, lineWidth: 2.5)
-            } else {
-                ctx.stroke(p, with: i < 2 ? ink : soft, lineWidth: 2)
-            }
-        }
-    }
 
-    /// Drifting numerals and operators; estimator adds the target ring.
-    private static func numerals(_ ctx: inout GraphicsContext, _ size: CGSize, forge: Bool,
-                                 soft: GraphicsContext.Shading,
-                                 glow: GraphicsContext.Shading) {
-        let glyphs = forge ? ["7", "×", "3", "+", "42", "−", "9"] : ["8", "+", "5", "−", "12", "÷", "3"]
-        let spots: [(CGFloat, CGFloat, CGFloat)] = [
-            (0.46, 0.16, 30), (0.62, 0.36, 46), (0.82, 0.14, 34),
-            (0.90, 0.44, 30), (0.56, 0.66, 34), (0.76, 0.78, 52), (0.92, 0.72, 30),
-        ]
-        for (i, g) in glyphs.enumerated() {
-            let s = spots[i]
-            let text = Text(g).font(.system(size: s.2, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white.opacity(i == 4 ? 0.30 : (i % 2 == 0 ? 0.16 : 0.09)))
-            ctx.draw(text, at: CGPoint(x: size.width * s.0, y: size.height * s.1), anchor: .center)
-        }
-        if forge {
-            let c = CGPoint(x: size.width * 0.76, y: size.height * 0.52)
-            ctx.stroke(Path(ellipseIn: CGRect(x: c.x - 64, y: c.y - 64, width: 128, height: 128)),
-                       with: soft, style: StrokeStyle(lineWidth: 2.5, dash: [8, 8]))
-        }
-    }
 
-    /// A field of identical shapes, one rotated stranger glowing.
-    private static func oddOne(_ ctx: inout GraphicsContext, _ size: CGSize,
-                               ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
-                               glow: GraphicsContext.Shading) {
-        let cell: CGFloat = 48
-        for r in 0..<4 {
-            for c in 0..<4 {
-                let x = size.width - 24 - CGFloat(4 - c) * cell
-                let y = size.height * 0.12 + CGFloat(r) * cell * 1.06
-                let rect = CGRect(x: x, y: y, width: 26, height: 26)
-                var p = Path(roundedRect: rect, cornerRadius: 7)
-                let isOdd = r == 2 && c == 1
-                if isOdd {
-                    p = p.applying(CGAffineTransform(translationX: -rect.midX, y: -rect.midY)
-                        .concatenating(.init(rotationAngle: .pi / 4))
-                        .concatenating(.init(translationX: rect.midX, y: rect.midY)))
-                    ctx.fill(p, with: glow)
-                } else {
-                    ctx.stroke(p, with: (r + c).isMultiple(of: 2) ? ink : soft, lineWidth: 2)
-                }
-            }
-        }
-    }
 
     /// Tiles mid-swap with rotation arrows.
     private static func shiftTiles(_ ctx: inout GraphicsContext, _ size: CGSize,
@@ -300,104 +207,8 @@ enum HeroPattern {
         }
     }
 
-    /// A node path hopping across the space; oneLine closes the circuit.
-    private static func path(_ ctx: inout GraphicsContext, _ size: CGSize, closed: Bool,
-                             ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
-                             glow: GraphicsContext.Shading) {
-        let pts = [
-            CGPoint(x: size.width * 0.46, y: size.height * 0.72),
-            CGPoint(x: size.width * 0.60, y: size.height * 0.24),
-            CGPoint(x: size.width * 0.76, y: size.height * 0.60),
-            CGPoint(x: size.width * 0.88, y: size.height * 0.18),
-            CGPoint(x: size.width * 0.94, y: size.height * 0.66),
-        ]
-        var line = Path()
-        line.move(to: pts[0])
-        for p in pts.dropFirst() { line.addLine(to: p) }
-        if closed { line.addLine(to: pts[0]) }
-        ctx.stroke(line, with: ink, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-        for (i, p) in pts.enumerated() {
-            let d: CGFloat = i == 0 ? 20 : 14
-            let rect = CGRect(x: p.x - d / 2, y: p.y - d / 2, width: d, height: d)
-            ctx.fill(Path(ellipseIn: rect), with: i == 0 ? glow : soft)
-            ctx.stroke(Path(ellipseIn: rect), with: i == 0 ? glow : ink, lineWidth: 2)
-        }
-    }
 
-    /// Letter tiles: a wheel for wordConnect, a guess row for memoryLock.
-    private static func letters(_ ctx: inout GraphicsContext, _ size: CGSize, wheel: Bool,
-                                ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
-                                glow: GraphicsContext.Shading) {
-        if wheel {
-            let c = CGPoint(x: size.width * 0.74, y: size.height * 0.5)
-            let r: CGFloat = 82
-            let ls = ["W", "I", "T", "S", "E"]
-            ctx.stroke(Path(ellipseIn: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)),
-                       with: soft, lineWidth: 2)
-            var link = Path()
-            for (i, _) in ls.enumerated() {
-                let a = -CGFloat.pi / 2 + CGFloat(i) * 2 * .pi / CGFloat(ls.count)
-                let p = CGPoint(x: c.x + cos(a) * r, y: c.y + sin(a) * r)
-                if i == 0 { link.move(to: p) } else if i != 3 { link.addLine(to: p) }
-            }
-            ctx.stroke(link, with: glow, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
-            for (i, l) in ls.enumerated() {
-                let a = -CGFloat.pi / 2 + CGFloat(i) * 2 * .pi / CGFloat(ls.count)
-                let p = CGPoint(x: c.x + cos(a) * r, y: c.y + sin(a) * r)
-                let rect = CGRect(x: p.x - 19, y: p.y - 19, width: 38, height: 38)
-                ctx.fill(Path(ellipseIn: rect), with: soft)
-                ctx.draw(Text(l).font(.system(size: 18, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.55)), at: p, anchor: .center)
-            }
-        } else {
-            let word = ["W", "I", "T", "S", "?"]
-            let cell: CGFloat = 46, gap: CGFloat = 8
-            let total = cell * CGFloat(word.count) + gap * CGFloat(word.count - 1)
-            let ox = size.width - total - 26
-            let oy = size.height / 2 - cell / 2
-            for (i, l) in word.enumerated() {
-                let rect = CGRect(x: ox + CGFloat(i) * (cell + gap), y: oy + (i.isMultiple(of: 2) ? -10 : 10),
-                                  width: cell, height: cell)
-                let p = Path(roundedRect: rect, cornerRadius: 10)
-                if i == 2 { ctx.fill(p, with: glow) }
-                else if i == 4 { ctx.stroke(p, with: glow, style: StrokeStyle(lineWidth: 2, dash: [5, 5])) }
-                else { ctx.fill(p, with: i.isMultiple(of: 2) ? ink : soft) }
-                if i != 4 {
-                    ctx.draw(Text(l).font(.system(size: 20, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white.opacity(i == 2 ? 0.8 : 0.45)),
-                             at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
-                }
-            }
-        }
-    }
 
-    /// Three pegs, discs mid-migration.
-    private static func tower(_ ctx: inout GraphicsContext, _ size: CGSize,
-                              ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
-                              glow: GraphicsContext.Shading) {
-        let baseY = size.height * 0.78
-        let pegXs: [CGFloat] = [0.52, 0.72, 0.92].map { size.width * $0 }
-        var base = Path()
-        base.move(to: CGPoint(x: pegXs[0] - 44, y: baseY))
-        base.addLine(to: CGPoint(x: pegXs[2] + 44, y: baseY))
-        ctx.stroke(base, with: ink, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-        for x in pegXs {
-            var peg = Path()
-            peg.move(to: CGPoint(x: x, y: baseY))
-            peg.addLine(to: CGPoint(x: x, y: baseY - 116))
-            ctx.stroke(peg, with: soft, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-        }
-        func disc(_ x: CGFloat, _ level: Int, _ w: CGFloat, _ shading: GraphicsContext.Shading) {
-            let rect = CGRect(x: x - w / 2, y: baseY - CGFloat(level) * 24 - 20, width: w, height: 16)
-            ctx.fill(Path(roundedRect: rect, cornerRadius: 8), with: shading)
-        }
-        disc(pegXs[0], 0, 76, ink)
-        disc(pegXs[0], 1, 58, soft)
-        disc(pegXs[2], 0, 66, ink)
-        // the flying disc
-        let rect = CGRect(x: pegXs[1] - 21, y: baseY - 148, width: 42, height: 16)
-        ctx.fill(Path(roundedRect: rect, cornerRadius: 8), with: glow)
-    }
 
     /// Slide puzzle mid-move: numbered tiles, one gap, one tile slipping in.
     private static func slide(_ ctx: inout GraphicsContext, _ size: CGSize,

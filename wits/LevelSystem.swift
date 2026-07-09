@@ -26,16 +26,13 @@ enum LevelLadder {
     /// steps the game's curves support (see design doc §1).
     static func levelCount(for game: GameID) -> Int {
         switch game {
-        case .arrowStorm, .colorClash, .tileShift, .oddOneOut, .spotSpeed,
-             .numberRush, .estimator:
+        case .arrowStorm, .colorClash, .tileShift:
             50
-        case .matchBack, .crowdControl, .echoGrid, .pathKeeper, .lastSeen,
-             .towerOfHanoi, .slidePuzzle, .oneLine, .dotsConnect, .ruleFinder, .blockEscape, .pegSolitaire:
+        case .crowdControl, .echoGrid, .lastSeen,
+             .slidePuzzle, .blockEscape, .pegSolitaire:
             40
         case .split:
             30
-        case .wordConnect, .memoryLock:
-            20
         }
     }
 
@@ -118,8 +115,8 @@ struct MarathonBest: Codable, Equatable {
     var score: Int
 }
 
-/// Local-first persistence for map progress. Mirrors to Supabase best-effort
-/// (AppModel owns the sync); UserDefaults is the source of truth on device.
+/// Local-first persistence for map progress; UserDefaults is the source of
+/// truth on device. Game Center mirrors bests/achievements best-effort.
 @MainActor
 @Observable
 final class LevelProgressStore {
@@ -233,24 +230,6 @@ final class LevelProgressStore {
             save()
         }
         return newBest
-    }
-
-    /// Bulk-apply server rows (Supabase → local). Local best wins.
-    func merge(serverRecords: [(game: GameID, level: Int, stars: Int, quality: Double)]) {
-        var changed = false
-        for row in serverRecords {
-            var perGame = records[row.game] ?? [:]
-            let existing = perGame[row.level]
-            if row.stars > (existing?.stars ?? 0) || row.quality > (existing?.bestQuality ?? 0) {
-                perGame[row.level] = LevelRecord(
-                    stars: max(row.stars, existing?.stars ?? 0),
-                    bestQuality: max(row.quality, existing?.bestQuality ?? 0)
-                )
-                records[row.game] = perGame
-                changed = true
-            }
-        }
-        if changed { save() }
     }
 
     // MARK: Migration seeding

@@ -99,7 +99,7 @@ final class ArcadeSKScene: SKScene {
 
         // Background: these games use the themed app background (matching arrow
         // storm's clean look); other arcade games use the provided light field art.
-        let themedBackgroundGames: Set<GameID> = [.crowdControl, .echoGrid, .pathKeeper]
+        let themedBackgroundGames: Set<GameID> = [.crowdControl, .echoGrid]
         if themedBackgroundGames.contains(game.id) {
             backgroundColor = UIColor(Color.witsBg)
         } else {
