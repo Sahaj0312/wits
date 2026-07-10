@@ -93,99 +93,87 @@ struct GamesLibraryView: View {
         .accessibilityLabel("Settings")
     }
 
+    /// Poster card: a per-game color world with an illustrated gameplay
+    /// vignette, framed in a thin card-colored border like a tiny game poster.
     private func card(_ g: GameID) -> some View {
         Button {
             launch = g
         } label: {
-            VStack(alignment: .leading, spacing: 11) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 10) {
-                        gameIcon(g)
-                        Spacer(minLength: 0)
-                        gameBadge(g)
-                    }
-                    VStack(alignment: .leading, spacing: 8) {
-                        gameIcon(g)
-                        gameBadge(g)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
+            ZStack(alignment: .topLeading) {
+                g.posterBackground
+                GamePosterArt(game: g)
+                VStack(alignment: .leading, spacing: 6) {
                     Text(g.displayName)
-                        .font(.system(size: 16, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsInk)
+                        .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        .foregroundStyle(g.posterAccent)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Text(g.tagline)
-                        .font(.system(size: 12.5, weight: .medium, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .minimumScaleFactor(0.72)
+                    Capsule()
+                        .fill(g.posterAccent)
+                        .frame(width: 32, height: 3.5)
                 }
-
-                Spacer(minLength: 0)
-                progressLine(g)
+                .padding(.horizontal, 14)
+                .padding(.top, 13)
             }
-            .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
-            .padding(16)
-            .cardSurface()
+            .aspectRatio(0.74, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
+            .overlay(alignment: .bottomLeading) {
+                progressPill(g).padding(9)
+            }
+            .padding(4)
+            .background(Color.witsCard, in: RoundedRectangle(cornerRadius: 25, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 25, style: .continuous)
+                    .strokeBorder(Color.witsLine, lineWidth: 1)
+            )
+            .shadow(color: .witsShadow, radius: 10, y: 5)
+            .overlay(alignment: .topTrailing) {
+                if g.isStandalone {
+                    survivalSticker.offset(x: 5, y: -5)
+                }
+            }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressScale())
+        .accessibilityLabel(Text("\(g.displayName). \(g.tagline)"))
     }
 
     /// One quiet line of progression per card: star total for map games,
     /// best level for split.
-    private func progressLine(_ g: GameID) -> some View {
-        HStack(spacing: 5) {
-            if g.isStandalone {
-                Image(systemName: "trophy.fill")
-                    .font(.system(size: 11, weight: .heavy))
-                    .foregroundStyle(Color.witsGold)
-                let best = app.levels.marathonBest(for: g)?.depth ?? 0
-                Text(best > 0 ? "best level \(best)" : "no runs yet")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
-            } else {
-                Image(systemName: "star.fill")
-                    .font(.system(size: 11, weight: .heavy))
-                    .foregroundStyle(Color.witsGold)
-                Text("\(app.levels.totalStars(for: g))/\(3 * LevelLadder.levelCount(for: g))")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
-            }
+    private func progressPill(_ g: GameID) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: g.isStandalone ? "trophy.fill" : "star.fill")
+                .font(.system(size: 10, weight: .heavy))
+                .foregroundStyle(Color.witsGold)
+            Text(progressLabel(g))
+                .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .monospacedDigit()
         }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 5)
+        .background(.black.opacity(0.35), in: Capsule())
     }
 
-    private func gameIcon(_ g: GameID) -> some View {
-        Image(systemName: g.symbol)
-            .font(.system(size: 19, weight: .heavy))
+    private func progressLabel(_ g: GameID) -> String {
+        if g.isStandalone {
+            let best = app.levels.marathonBest(for: g)?.depth ?? 0
+            return best > 0 ? "best \(best)" : "no runs yet"
+        }
+        return "\(app.levels.totalStars(for: g))/\(3 * LevelLadder.levelCount(for: g))"
+    }
+
+    /// Tilted sticker in the reference-app spirit — marks split as the one
+    /// one-life survival mode on the shelf.
+    private var survivalSticker: some View {
+        Text("survival!")
+            .font(.system(size: 11, weight: .heavy, design: .rounded))
             .foregroundStyle(.white)
-            .frame(width: 44, height: 44)
-            .background(
-                LinearGradient(colors: [g.domain.color, g.domain.heroTopColor],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: WitsMetrics.chipRadius, style: .continuous)
-            )
-            .shadow(color: g.domain.color.opacity(0.35), radius: 6, y: 3)
-    }
-
-    private func gameBadge(_ g: GameID) -> some View {
-        Text(gameBadgeLabel(g))
-            .font(.witsLabel(10.5))
-            .foregroundStyle(g.domain.color)
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(g.domain.color.opacity(0.13), in: Capsule())
-    }
-
-    private func gameBadgeLabel(_ g: GameID) -> String {
-        if g.isStandalone { return "survival" }
-        return g.domain == .multitasking ? "multitask" : g.domain.label
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(Color(hexAny: 0xE84545), in: Capsule())
+            .overlay(Capsule().strokeBorder(.white, lineWidth: 2))
+            .rotationEffect(.degrees(7))
+            .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
     }
 }
 
