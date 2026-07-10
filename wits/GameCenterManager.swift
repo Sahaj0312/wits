@@ -2,13 +2,13 @@
 //  GameCenterManager.swift
 //  wits
 //
-//  Game Center: sign-in, Split's endless leaderboard, a total-stars
-//  leaderboard, and run/streak achievements. Everything degrades silently
+//  Game Center: sign-in, per-game recurring weekly leaderboards, Split's
+//  endless leaderboard, and progress achievements. Everything degrades silently
 //  when the player is not signed in — the app never blocks on Game Center.
 //
 //  Leaderboard IDs (create these in App Store Connect; immutable once live):
-//    wits.split.survival      split's best level reached
-//    wits.stars.total         total stars across all games
+//    wits.split.survival.depth.v2   Split level plus fractional depth
+//    wits.weekly.<game-id>    recurring every Monday at 00:00 UTC for 7 days
 //  Achievement IDs:
 //    wits.ach.first3star                  first 3★ on any level
 //    wits.ach.stars.50 / .150 / .300      star-total milestones
@@ -71,31 +71,33 @@ final class GameCenterManager {
     // MARK: Leaderboards
 
     static func leaderboardID(for game: GameID) -> String {
-        game == .split ? "wits.split.survival" : "wits.marathon.\(game.rawValue)"
+        game == .split ? "wits.split.survival.depth.v2" : "wits.marathon.\(game.rawValue)"
     }
-    static let totalStarsLeaderboardID = "wits.stars.total"
-
     func submitMarathonBest(game: GameID, levels: LevelProgressStore) {
         guard isAuthenticated, let best = levels.marathonBest(for: game) else { return }
-        // Split's headline number is the level reached. The non-Split branch
-        // remains for decoding leaderboard bests created by older app builds.
-        submit(game == .split ? best.depth : best.score, to: Self.leaderboardID(for: game))
+        submit(game == .split ? best.leaderboardScore : best.score,
+               to: Self.leaderboardID(for: game))
     }
 
-    private func submit(_ value: Int, to leaderboardID: String) {
-        GKLeaderboard.submitScore(value, context: 0, player: GKLocalPlayer.local,
+    func submitWeeklyBest(challenge: WeeklyChallenge, levels: LevelProgressStore) {
+        guard isAuthenticated, let best = levels.weeklyBest(for: challenge) else { return }
+        submit(best.score, to: challenge.leaderboardID, context: Int(truncatingIfNeeded: challenge.seed))
+    }
+
+    private func submit(_ value: Int, to leaderboardID: String, context: Int = 0) {
+        GKLeaderboard.submitScore(value, context: context, player: GKLocalPlayer.local,
                                   leaderboardIDs: [leaderboardID]) { _ in }
     }
 
     // MARK: Progress → leaderboard + achievements
 
-    /// Called after every recorded run: refresh the star-total board and any
-    /// newly earned achievements. All predicates are computed from local
+    /// Called after every recorded run: refresh newly earned achievements.
+    /// Lifetime stars remain an achievement signal, never a grind leaderboard.
+    /// All predicates are computed from local
     /// state, so re-evaluating is idempotent.
     func recordProgress(levels: LevelProgressStore, streak: StreakState) {
         guard isAuthenticated else { return }
         let totalStars = GameID.live.reduce(0) { $0 + levels.totalStars(for: $1) }
-        submit(totalStars, to: Self.totalStarsLeaderboardID)
 
         var earned: [String] = []
 
@@ -117,8 +119,11 @@ final class GameCenterManager {
     /// recorded while signed out).
     func syncLocalBests(levels: LevelProgressStore, streak: StreakState) {
         guard isAuthenticated else { return }
-        for game in GameID.allCases where levels.marathonBest(for: game) != nil {
-            submitMarathonBest(game: game, levels: levels)
+        if levels.marathonBest(for: .split) != nil {
+            submitMarathonBest(game: .split, levels: levels)
+        }
+        for game in GameID.allCases {
+            submitWeeklyBest(challenge: .current(for: game), levels: levels)
         }
         // Force a clean re-report on fresh sign-ins.
         reportedAchievements = []

@@ -61,8 +61,19 @@ final class SplitGame {
     private var sincePipe: CGFloat = .greatestFiniteMagnitude  // force an early first pipe
     private var sinceEmoji: Double = 0.5
     private var nextID = 0
-    private var rng = SystemRandomNumberGenerator()
+    private let fixedSeed: UInt64?
+    private var rng: SeededRandomNumberGenerator
     private var lastTick: Date?
+
+    init(seed: UInt64? = nil) {
+        fixedSeed = seed
+        if let seed {
+            rng = SeededRandomNumberGenerator(seed: seed)
+        } else {
+            var system = SystemRandomNumberGenerator()
+            rng = SeededRandomNumberGenerator(seed: system.next())
+        }
+    }
 
     // Escalation: difficulty saturates around level 13 (k caps at 12).
     private func k() -> CGFloat { CGFloat(min(level - 1, 12)) }
@@ -88,6 +99,12 @@ final class SplitGame {
         sinceEmoji = 0.5
         nextID = 0
         lastTick = nil
+        if let fixedSeed {
+            rng = SeededRandomNumberGenerator(seed: fixedSeed)
+        } else {
+            var system = SystemRandomNumberGenerator()
+            rng = SeededRandomNumberGenerator(seed: system.next())
+        }
     }
 
     /// Rewarded-ad continue: restart the current level with a clear field.
@@ -315,11 +332,14 @@ final class SplitGame {
 
 struct SplitSurvivalScreen: View {
     let best: Int
+    let bestDepthFraction: Double
+    let isWeekly: Bool
+    let weeklyBestScore: Int
     /// (level reached, depth into the next level 0…1, emoji trials) → persist.
     let onRunComplete: (Int, Double, Int) -> Void
     let onQuit: () -> Void
 
-    @State private var model = SplitGame()
+    @State private var model: SplitGame
     @State private var phase: Phase
     @State private var endLevel = 1
     @State private var endReason = ""
@@ -340,12 +360,20 @@ struct SplitSurvivalScreen: View {
     private enum Phase { case intro, playing, over }
 
     init(best: Int,
+         bestDepthFraction: Double = 0,
+         seed: UInt64? = nil,
+         isWeekly: Bool = false,
+         weeklyBestScore: Int = 0,
          startsImmediately: Bool = false,
          onRunComplete: @escaping (Int, Double, Int) -> Void,
          onQuit: @escaping () -> Void) {
         self.best = best
+        self.bestDepthFraction = bestDepthFraction
+        self.isWeekly = isWeekly
+        self.weeklyBestScore = weeklyBestScore
         self.onRunComplete = onRunComplete
         self.onQuit = onQuit
+        _model = State(initialValue: SplitGame(seed: seed))
         _phase = State(initialValue: startsImmediately ? .playing : .intro)
     }
 
@@ -360,13 +388,17 @@ struct SplitSurvivalScreen: View {
         }
         .overlay {
             if phase == .playing, !pauseController.isPaused {
-                GamePauseButtonLayer(game: .split) {
-                    pauseController.pause()
+                if isWeekly {
+                    GameExitButtonLayer(game: .split) { onQuit() }
+                } else {
+                    GamePauseButtonLayer(game: .split) {
+                        pauseController.pause()
+                    }
                 }
             }
         }
         .overlay {
-            if phase == .playing, pauseController.isPaused {
+            if !isWeekly, phase == .playing, pauseController.isPaused {
                 GamePausedOverlay(game: .split,
                                   controller: pauseController,
                                   onQuit: {
@@ -390,7 +422,7 @@ struct SplitSurvivalScreen: View {
 
     private var intro: some View {
         VStack(spacing: 0) {
-            GameTopTag(text: "survival")
+            GameTopTag(text: isWeekly ? "weekly challenge" : "survival")
                 .padding(.bottom, 18)
             SplitIntroHero(target: model.target, lookAlike: model.lookAlike)
                 .rise()
@@ -434,7 +466,7 @@ struct SplitSurvivalScreen: View {
 
     private var splitIntroStats: some View {
         HStack(spacing: 10) {
-            SplitStatPill(title: "mode", value: "survival")
+            SplitStatPill(title: "mode", value: isWeekly ? "weekly" : "survival")
             SplitStatPill(title: "best", value: best > 0 ? "level \(best)" : "—")
             SplitStatPill(title: "rule", value: "1 slip")
         }
@@ -548,12 +580,12 @@ struct SplitSurvivalScreen: View {
                         .background(Color.witsWarm, in: Capsule())
                         .padding(.top, 2)
                 }
-                Text("level \(endLevel)")
+                Text(isWeekly ? weeklyScore.headline : "level \(endLevel)")
                     .font(.system(size: 56, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsInk)
                     .monospacedDigit()
                 HStack(spacing: 10) {
-                    SplitStatPill(title: "best", value: "level \(max(best, endLevel))")
+                    SplitStatPill(title: "best", value: splitBestLabel)
                     SplitStatPill(title: "picks", value: "\(model.trials)")
                 }
             }
@@ -598,11 +630,11 @@ struct SplitSurvivalScreen: View {
         pauseController.reset()
         endLevel = model.level
         endReason = model.deathReason
-        newBest = endLevel > best
+        newBest = weeklyScore.rankValue > comparisonBestScore
         GameFeel.shared.play(newBest ? .newBest : .gameOver)
         // A continue offer defers recording — the run isn't over until the
         // player passes on it. No offer → record right away, as before.
-        canContinue = !usedContinue && AdManager.shared.rewardedReady
+        canContinue = !isWeekly && !usedContinue && AdManager.shared.rewardedReady
         if canContinue {
             runRecorded = false
         } else {
@@ -616,6 +648,20 @@ struct SplitSurvivalScreen: View {
         guard !runRecorded else { return }
         runRecorded = true
         onRunComplete(model.level, model.depthIntoLevel, model.trials)
+    }
+
+    private var weeklyScore: WeeklyChallengeScore {
+        WeeklyChallengeScorer.split(level: endLevel, depth: model.depthIntoLevel)
+    }
+
+    private var splitBestLabel: String {
+        WeeklyChallengeScorer.splitLabel(rankValue: max(comparisonBestScore, weeklyScore.rankValue))
+    }
+
+    private var comparisonBestScore: Int {
+        if isWeekly { return weeklyBestScore }
+        guard best > 0 else { return 0 }
+        return WeeklyChallengeScorer.split(level: best, depth: bestDepthFraction).rankValue
     }
 
     private func playAgain() {

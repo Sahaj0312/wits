@@ -24,8 +24,10 @@ struct FlankerScreen: View {
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
         self.onResult = onResult
+        var rng = cfg.makeRandomGenerator()
         _window = State(initialValue: Self.seededWindow(cfg.difficulty.level))
-        _trial = State(initialValue: Self.makeTrial())
+        _trial = State(initialValue: Self.makeTrial(using: &rng))
+        _rng = State(initialValue: rng)
     }
 
     private static let gameSeconds = 45.0
@@ -45,12 +47,13 @@ struct FlankerScreen: View {
         let yShift: CGFloat
     }
 
-    private static func makeTrial() -> Trial {
-        Trial(right: Bool.random(),
-              congruent: Double.random(in: 0..<1) < 0.35,
-              yShift: CGFloat.random(in: -34...34))
+    private static func makeTrial<R: RandomNumberGenerator>(using rng: inout R) -> Trial {
+        Trial(right: Bool.random(using: &rng),
+              congruent: Double.random(in: 0..<1, using: &rng) < 0.35,
+              yShift: CGFloat.random(in: -34...34, using: &rng))
     }
 
+    @State private var rng: SeededRandomNumberGenerator
     @State private var stats = FlankerStats()
     @State private var streak = 0
     @State private var trial: Trial?
@@ -198,7 +201,7 @@ struct FlankerScreen: View {
 
     private func nextTrial() {
         withAnimation(.easeOut(duration: 0.13)) {
-            trial = Self.makeTrial()
+            trial = Self.makeTrial(using: &rng)
         }
         trialStart = Date()
         windowFrac = 1

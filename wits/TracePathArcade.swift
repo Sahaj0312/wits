@@ -32,6 +32,7 @@ final class TracePathArcade: ArcadeGame {
     private var perfectRounds = 0
     private var roundsPlayed = 0
     private var complete = false
+    private var rng: SeededRandomNumberGenerator
 
     // Frozen exam spec, fixed at seed() for the whole run.
     private var grid = 4
@@ -42,7 +43,11 @@ final class TracePathArcade: ArcadeGame {
     private var nodeRadius = 0.09
     private var tapRadius = 0.11
 
-    init(id: GameID, reverse: Bool) { self.id = id; self.reverse = reverse }
+    init(id: GameID, reverse: Bool, seed: UInt64) {
+        self.id = id
+        self.reverse = reverse
+        self.rng = SeededRandomNumberGenerator(seed: seed)
+    }
 
     /// The exam spec for a map level. Bands overlap on purpose: a bigger board
     /// resets span, so each band opens with a sideways-then-up step instead of
@@ -217,7 +222,7 @@ final class TracePathArcade: ArcadeGame {
     }
 
     private func startRound(_ scene: ArcadeScene) {
-        let ids = scene.entities.filter { $0.kind == 1 }.map(\.id).shuffled()
+        let ids = scene.entities.filter { $0.kind == 1 }.map(\.id).shuffled(using: &rng)
         seq = Array(ids.prefix(span))
         entered = []
         for i in scene.entities.indices { scene.entities[i].a = 0 }   // clear prior selection

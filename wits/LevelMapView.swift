@@ -11,6 +11,7 @@ import SwiftUI
 struct DifficultySelectView: View {
     let game: GameID
     var onPlay: (ChallengeDifficulty, Int) -> Void
+    var onWeekly: (WeeklyChallenge) -> Void
     var onClose: () -> Void
 
     @Environment(AppModel.self) private var app
@@ -32,6 +33,8 @@ struct DifficultySelectView: View {
                     difficultyControl
                     playButton
                         .padding(.top, 28)
+                    weeklyButton
+                        .padding(.top, 11)
                         .padding(.bottom, 30)
                 }
                 .padding(.horizontal, 22)
@@ -149,6 +152,43 @@ struct DifficultySelectView: View {
         .shadow(color: difficultyColor.opacity(0.25), radius: 12, y: 6)
     }
 
+    private var weeklyButton: some View {
+        let challenge = WeeklyChallenge.current(for: game)
+        let best = app.levels.weeklyBest(for: challenge)
+        return Button { onWeekly(challenge) } label: {
+            HStack(spacing: 13) {
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 22, weight: .black))
+                    .foregroundStyle(world.accent)
+                    .frame(width: 42, height: 42)
+                    .background(world.accent.opacity(0.13), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("WEEKLY CHALLENGE")
+                        .font(.system(size: 14, weight: .black, design: world.titleDesign))
+                    Text(best.map { "best · \($0.headline)" } ?? challenge.shortWeekLabel.uppercased())
+                        .font(.system(size: 11.5, weight: .bold, design: world.bodyDesign))
+                        .foregroundStyle(world.muted)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 15, weight: .black))
+                    .foregroundStyle(world.muted)
+            }
+            .foregroundStyle(world.ink)
+            .padding(.horizontal, 15)
+            .frame(maxWidth: .infinity)
+            .frame(height: 64)
+            .background(world.surface,
+                        in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(world.accent.opacity(0.45), lineWidth: 1)
+            )
+        }
+        .buttonStyle(PressScale())
+    }
+
     private var titleSize: CGFloat {
         switch game {
         case .crowdControl, .pegSolitaire: 34
@@ -167,6 +207,125 @@ struct DifficultySelectView: View {
                 .frame(width: 44, height: 44)
                 .background(world.surface, in: Circle())
                 .overlay(Circle().strokeBorder(world.accent.opacity(0.42), lineWidth: 1))
+        }
+        .buttonStyle(PressScale())
+        .accessibilityLabel(label)
+    }
+}
+
+struct SplitModeSelectView: View {
+    var onSurvival: () -> Void
+    var onWeekly: (WeeklyChallenge) -> Void
+    var onClose: () -> Void
+
+    @Environment(AppModel.self) private var app
+
+    private let game = GameID.split
+    private var world: GameWorld { game.world }
+    private var challenge: WeeklyChallenge { .current(for: game) }
+
+    var body: some View {
+        ZStack {
+            GameWorldBackdrop(game: game)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    HStack {
+                        iconButton("chevron.left", label: "Close", action: onClose)
+                        Spacer()
+                        Text("DUAL-TASKING")
+                            .font(.system(size: 10.5, weight: .black, design: world.bodyDesign))
+                            .foregroundStyle(world.muted)
+                        Spacer()
+                        Color.clear.frame(width: 44, height: 44)
+                    }
+                    .padding(.top, 10)
+
+                    GamePosterArt(game: game)
+                        .frame(height: 260)
+                        .frame(maxWidth: 440)
+
+                    Text(game.worldTitle())
+                        .font(.system(size: 44, weight: .black, design: world.titleDesign))
+                        .foregroundStyle(world.ink)
+                    Text(game.tagline)
+                        .font(.system(size: 14.5, weight: .semibold, design: world.bodyDesign))
+                        .foregroundStyle(world.muted)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 7)
+
+                    modeButton(title: "SURVIVAL",
+                               subtitle: survivalSubtitle,
+                               symbol: "infinity",
+                               color: world.accent,
+                               action: onSurvival)
+                        .padding(.top, 30)
+
+                    modeButton(title: "WEEKLY CHALLENGE",
+                               subtitle: weeklySubtitle,
+                               symbol: "calendar.badge.clock",
+                               color: world.secondary) {
+                        onWeekly(challenge)
+                    }
+                    .padding(.top, 11)
+                    .padding(.bottom, 30)
+                }
+                .padding(.horizontal, 22)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
+            }
+        }
+    }
+
+    private var survivalSubtitle: String {
+        guard let best = app.levels.marathonBest(for: game) else { return "all-time run" }
+        return "all-time best · \(WeeklyChallengeScorer.splitLabel(rankValue: best.leaderboardScore))"
+    }
+
+    private var weeklySubtitle: String {
+        app.levels.weeklyBest(for: challenge).map { "best · \($0.headline)" }
+            ?? challenge.shortWeekLabel.uppercased()
+    }
+
+    private func modeButton(title: String,
+                            subtitle: String,
+                            symbol: String,
+                            color: Color,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 14) {
+                Image(systemName: symbol)
+                    .font(.system(size: 24, weight: .black))
+                    .frame(width: 45)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.system(size: 18, weight: .black, design: world.titleDesign))
+                    Text(subtitle)
+                        .font(.system(size: 11.5, weight: .bold, design: world.bodyDesign))
+                        .opacity(0.72)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 19, weight: .black))
+            }
+            .foregroundStyle(world.background)
+            .padding(.horizontal, 18)
+            .frame(maxWidth: .infinity)
+            .frame(height: 70)
+            .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(PressScale())
+    }
+
+    private func iconButton(_ symbol: String,
+                            label: String,
+                            action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .black))
+                .foregroundStyle(world.ink)
+                .frame(width: 44, height: 44)
+                .background(world.surface, in: Circle())
         }
         .buttonStyle(PressScale())
         .accessibilityLabel(label)

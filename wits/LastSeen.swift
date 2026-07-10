@@ -37,7 +37,10 @@ struct LastSeenScreen: View {
         self.cfg = cfg
         self.onResult = onResult
         self.level = cfg.difficulty.level
+        _rng = State(initialValue: cfg.makeRandomGenerator())
     }
+
+    @State private var rng: SeededRandomNumberGenerator
 
     var body: some View {
         VStack(spacing: 12) {
@@ -85,12 +88,12 @@ struct LastSeenScreen: View {
 
     private func startSet(size: Int) {
         let s = min(lastSeenPool.count, size)
-        icons = Array(lastSeenPool.indices.shuffled().prefix(s))
+        icons = Array(lastSeenPool.indices.shuffled(using: &rng).prefix(s))
         tapped = []
         reshuffle()
     }
 
-    private func reshuffle() { order = icons.shuffled() }
+    private func reshuffle() { order = icons.shuffled(using: &rng) }
 
     private func tap(_ iconID: Int) {
         guard !finished else { return }

@@ -108,6 +108,16 @@ enum DifficultyScale {
         return state
     }
 
+    static func initialState(for game: GameID,
+                             difficulty: ChallengeDifficulty,
+                             trackLevel: Int = 1) -> DifficultyState {
+        let level = legacyDifficulty(for: difficulty, level: trackLevel)
+        return DifficultyState(level: level,
+                               mastery: level,
+                               variance: 1.2,
+                               scoringVersion: game.difficultyScoringVersion)
+    }
+
     /// Best-effort conversion used only by the one-time star-map migration.
     static func trackPosition(forLegacyDifficulty legacyDifficulty: Double) ->
         (difficulty: ChallengeDifficulty, level: Int) {
@@ -158,6 +168,18 @@ struct DifficultyTrackProgress: Codable, Equatable {
 struct MarathonBest: Codable, Equatable {
     var depth: Int
     var score: Int
+    var depthFraction: Double?
+
+    var leaderboardScore: Int {
+        WeeklyChallengeScorer.split(level: depth, depth: depthFraction ?? 0).rankValue
+    }
+}
+
+struct WeeklyChallengeBest: Codable, Equatable {
+    var weekID: String
+    var score: Int
+    var headline: String
+    var detail: String
 }
 
 @MainActor
@@ -167,6 +189,7 @@ final class LevelProgressStore {
     private(set) var selections: [GameID: ChallengeDifficulty] = [:]
     /// Retained for Split, the app's standalone endless mode.
     private(set) var marathonBests: [GameID: MarathonBest] = [:]
+    private(set) var weeklyBests: [GameID: WeeklyChallengeBest] = [:]
 
     private static let storageKey = "wits.difficultyProgress.v2"
     private static let migrationKey = "wits.difficultyProgress.migrated.v2"
@@ -220,6 +243,11 @@ final class LevelProgressStore {
         marathonBests[game]
     }
 
+    func weeklyBest(for challenge: WeeklyChallenge) -> WeeklyChallengeBest? {
+        guard let best = weeklyBests[challenge.game], best.weekID == challenge.weekID else { return nil }
+        return best
+    }
+
     // MARK: Mutations
 
     func select(_ difficulty: ChallengeDifficulty, for game: GameID) {
@@ -255,15 +283,30 @@ final class LevelProgressStore {
     }
 
     @discardableResult
-    func recordMarathon(game: GameID, depth: Int, score: Int) -> Bool {
+    func recordMarathon(game: GameID, depth: Int, depthFraction: Double = 0, score: Int) -> Bool {
         let current = marathonBests[game]
+        let safeFraction = min(0.999, max(0, depthFraction))
         let newBest = depth > (current?.depth ?? 0) ||
-            (depth == (current?.depth ?? 0) && score > (current?.score ?? 0))
+            (depth == (current?.depth ?? 0) && safeFraction > (current?.depthFraction ?? 0)) ||
+            (depth == (current?.depth ?? 0) && safeFraction == (current?.depthFraction ?? 0) &&
+             score > (current?.score ?? 0))
         if newBest {
-            marathonBests[game] = MarathonBest(depth: depth, score: score)
+            marathonBests[game] = MarathonBest(depth: depth, score: score, depthFraction: safeFraction)
             save()
         }
         return newBest
+    }
+
+    @discardableResult
+    func recordWeekly(challenge: WeeklyChallenge, score: WeeklyChallengeScore) -> Bool {
+        let current = weeklyBest(for: challenge)
+        guard current == nil || score.rankValue > (current?.score ?? 0) else { return false }
+        weeklyBests[challenge.game] = WeeklyChallengeBest(weekID: challenge.weekID,
+                                                          score: score.rankValue,
+                                                          headline: score.headline,
+                                                          detail: score.detail)
+        save()
+        return true
     }
 
     // MARK: Migration
@@ -351,10 +394,16 @@ final class LevelProgressStore {
         var best: MarathonBest
     }
 
+    private struct StoredWeekly: Codable {
+        var game: GameID
+        var best: WeeklyChallengeBest
+    }
+
     private struct Snapshot: Codable {
         var tracks: [StoredTrack]
         var selections: [StoredSelection]
         var marathon: [StoredMarathon]
+        var weekly: [StoredWeekly]?
     }
 
     private func load() {
@@ -372,10 +421,13 @@ final class LevelProgressStore {
         for entry in snapshot.marathon {
             marathonBests[entry.game] = entry.best
         }
+        for entry in snapshot.weekly ?? [] {
+            weeklyBests[entry.game] = entry.best
+        }
     }
 
     private func save() {
-        var snapshot = Snapshot(tracks: [], selections: [], marathon: [])
+        var snapshot = Snapshot(tracks: [], selections: [], marathon: [], weekly: [])
         for (game, values) in tracks {
             for (difficulty, progress) in values {
                 snapshot.tracks.append(StoredTrack(game: game,
@@ -388,6 +440,9 @@ final class LevelProgressStore {
         }
         for (game, best) in marathonBests {
             snapshot.marathon.append(StoredMarathon(game: game, best: best))
+        }
+        for (game, best) in weeklyBests {
+            snapshot.weekly?.append(StoredWeekly(game: game, best: best))
         }
         if let data = try? JSONEncoder().encode(snapshot) {
             UserDefaults.standard.set(data, forKey: Self.storageKey)

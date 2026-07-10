@@ -26,7 +26,11 @@ enum CrowdControl: Game {
 enum EchoGrid: Game {
     static let id = GameID.echoGrid
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(ArcadeSpriteHost(cfg: config, game: TracePathArcade(id: .echoGrid, reverse: true), onResult: onComplete))
+        AnyView(ArcadeSpriteHost(cfg: config,
+                                 game: TracePathArcade(id: .echoGrid,
+                                                       reverse: true,
+                                                       seed: config.resolvedRandomSeed()),
+                                 onResult: onComplete))
     }
 }
 

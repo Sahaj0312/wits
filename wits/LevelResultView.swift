@@ -161,3 +161,120 @@ struct DifficultyLevelResultView: View {
         }
     }
 }
+
+struct WeeklyChallengeResultView: View {
+    let game: GameID
+    let challenge: WeeklyChallenge
+    let score: WeeklyChallengeScore
+    let best: WeeklyChallengeBest?
+    let improved: Bool
+    let onRetry: () -> Void
+    let onDone: () -> Void
+
+    private var world: GameWorld { game.world }
+
+    var body: some View {
+        ZStack {
+            GameWorldBackdrop(game: game)
+            VStack(spacing: 0) {
+                Spacer(minLength: 22)
+
+                Image(systemName: improved ? "trophy.fill" : "calendar.badge.checkmark")
+                    .font(.system(size: 38, weight: .black))
+                    .foregroundStyle(world.background)
+                    .frame(width: 88, height: 88)
+                    .background(world.accent, in: Circle())
+                    .overlay(Circle().strokeBorder(world.ink.opacity(0.18), lineWidth: 1))
+
+                Text("WEEKLY CHALLENGE")
+                    .font(.system(size: 11, weight: .black, design: world.bodyDesign))
+                    .foregroundStyle(world.accent)
+                    .padding(.top, 20)
+
+                Text(improved ? "NEW WEEKLY BEST" : "RUN COMPLETE")
+                    .font(.system(size: 30, weight: .black, design: world.titleDesign))
+                    .foregroundStyle(world.ink)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 5)
+
+                Text(score.headline)
+                    .font(.system(size: 44, weight: .black, design: world.titleDesign))
+                    .foregroundStyle(world.accent)
+                    .minimumScaleFactor(0.65)
+                    .lineLimit(1)
+                    .padding(.top, 28)
+
+                Text(score.detail)
+                    .font(.system(size: 14, weight: .bold, design: world.bodyDesign))
+                    .foregroundStyle(world.muted)
+                    .padding(.top, 7)
+
+                if let best {
+                    HStack {
+                        Text("WEEK BEST")
+                        Spacer()
+                        Text(best.headline)
+                    }
+                    .font(.system(size: 12, weight: .black, design: world.bodyDesign))
+                    .foregroundStyle(world.ink)
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(world.surface,
+                                in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    .padding(.top, 25)
+                }
+
+                Spacer(minLength: 28)
+
+                Button(action: onRetry) {
+                    HStack {
+                        Text("RUN IT AGAIN")
+                        Spacer()
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .font(.system(size: 17, weight: .black, design: world.titleDesign))
+                    .foregroundStyle(world.background)
+                    .padding(.horizontal, 19)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(world.accent,
+                                in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                }
+                .buttonStyle(PressScale())
+
+                Button {
+                    GameCenterManager.shared.presentDashboard()
+                } label: {
+                    Label("LEADERBOARD", systemImage: "trophy")
+                        .font(.system(size: 14, weight: .black, design: world.bodyDesign))
+                        .foregroundStyle(world.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(world.surface,
+                                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7)
+                                .strokeBorder(world.accent.opacity(0.42), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(PressScale())
+                .padding(.top, 10)
+
+                Button(action: onDone) {
+                    Text("BACK TO MODES")
+                        .font(.system(size: 11.5, weight: .black, design: world.bodyDesign))
+                        .foregroundStyle(world.muted)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 18)
+            .frame(maxWidth: 560)
+        }
+        .overlay {
+            if improved { ConfettiBurst().ignoresSafeArea() }
+        }
+    }
+}

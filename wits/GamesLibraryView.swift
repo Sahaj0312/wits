@@ -157,8 +157,8 @@ struct GamesLibraryView: View {
 
     private func progressLabel(_ g: GameID) -> String {
         if g.isStandalone {
-            let best = app.levels.marathonBest(for: g)?.depth ?? 0
-            return best > 0 ? "best \(best)" : "no runs yet"
+            guard let best = app.levels.marathonBest(for: g) else { return "no runs yet" }
+            return "best \(WeeklyChallengeScorer.splitLabel(rankValue: best.leaderboardScore))"
         }
         let difficulty = app.levels.selectedDifficulty(for: g)
         let level = app.levels.currentLevel(for: g, difficulty: difficulty)
@@ -191,27 +191,42 @@ private struct GameLauncher: View {
     @State private var lastStars = 0
     @State private var lastQuality = 0.0
     @State private var lastImproved = false
+    @State private var weeklyChallenge: WeeklyChallenge?
+    @State private var lastWeeklyScore = WeeklyChallengeScore(rankValue: 0,
+                                                               headline: "0 points",
+                                                               detail: "")
+    @State private var lastWeeklyImproved = false
     @State private var attempt = 0   // bump to force a fresh game instance
     @State private var pauseController = GamePauseController()
 
-    private enum Phase { case selector, tutorial, playing, levelResult }
+    private enum Phase { case selector, tutorial, playing, levelResult, weeklyResult }
+    private enum RunKind { case campaign, weekly, survival }
+    @State private var runKind = RunKind.campaign
 
     var body: some View {
         switch phase {
         case .selector:
             if game == .split {
-                // Split is survival-only: no selector to show, and its screen
-                // carries its own intro/game-over chrome — go straight there.
-                GameWorldBackdrop(game: .split)
-                    .onAppear { startRun() }
+                SplitModeSelectView(
+                    onSurvival: {
+                        runKind = .survival
+                        weeklyChallenge = nil
+                        startRun()
+                    },
+                    onWeekly: beginWeekly,
+                    onClose: { dismiss() }
+                )
             } else {
                 DifficultySelectView(
                     game: game,
                     onPlay: { difficulty, level in
+                        runKind = .campaign
+                        weeklyChallenge = nil
                         playDifficulty = difficulty
                         playLevel = level
                         startRun()
                     },
+                    onWeekly: beginWeekly,
                     onClose: { dismiss() }
                 )
             }
@@ -225,24 +240,34 @@ private struct GameLauncher: View {
                 },
                 onBack: {
                     pauseController.reset()
-                    if game == .split {
-                        dismiss()   // no map page behind split's tutorial
-                    } else {
-                        withAnimation(.easeOut(duration: 0.2)) { phase = .selector }
-                    }
+                    withAnimation(.easeOut(duration: 0.2)) { phase = .selector }
                 }
             )
         case .playing:
             if game == .split {
+                let challenge = weeklyChallenge ?? .current(for: .split)
+                let isWeekly = runKind == .weekly
+                let survivalBest = app.levels.marathonBest(for: .split)
                 SplitSurvivalScreen(
-                    best: app.levels.marathonBest(for: .split)?.depth ?? splitBestLevel,
+                    best: survivalBest?.depth ?? splitBestLevel,
+                    bestDepthFraction: survivalBest?.depthFraction ?? 0,
+                    seed: isWeekly ? challenge.seed : nil,
+                    isWeekly: isWeekly,
+                    weeklyBestScore: app.levels.weeklyBest(for: challenge)?.score ?? 0,
                     startsImmediately: false,
                     onRunComplete: { level, depth, trials in
                         let result = splitResult(level: level, depth: depth, trials: trials)
-                        app.recordStandaloneGameResult(result)
-                        app.recordMarathon(game: .split, depth: level, score: splitScore(level: level))
+                        if isWeekly {
+                            _ = app.recordWeeklyChallengeResult(result, challenge: challenge)
+                        } else {
+                            app.recordStandaloneGameResult(result)
+                            app.recordMarathon(game: .split,
+                                               depth: level,
+                                               depthFraction: depth,
+                                               score: splitScore(level: level))
+                        }
                     },
-                    onQuit: { dismiss() }
+                    onQuit: { withAnimation { phase = .selector } }
                 )
             } else {
                 GeometryReader { _ in
@@ -250,12 +275,7 @@ private struct GameLauncher: View {
                         // Full-bleed stage matching the game's surface, so no
                         // app-background band shows in the safe areas.
                         GameStageBackground(game: game)
-                        makeGameView(game, config: .challenge(game,
-                                                              difficulty: playDifficulty,
-                                                              trackLevel: playLevel,
-                                                              persisted: app.difficultyFor(game),
-                                                              freePlay: true,
-                                                              pauseController: pauseController)) { r in
+                        makeGameView(game, config: activeConfig) { r in
                             handle(r)
                         }
                         .id(attempt)
@@ -270,13 +290,20 @@ private struct GameLauncher: View {
                     }
                     .overlay {
                         if !game.usesEmbeddedQuitControl, !pauseController.isPaused {
-                            GamePauseButtonLayer(game: game) {
-                                pauseController.pause()
+                            if runKind == .weekly {
+                                GameExitButtonLayer(game: game) {
+                                    pauseController.reset()
+                                    withAnimation { phase = .selector }
+                                }
+                            } else {
+                                GamePauseButtonLayer(game: game) {
+                                    pauseController.pause()
+                                }
                             }
                         }
                     }
                     .overlay {
-                        if pauseController.isPaused {
+                        if runKind != .weekly, pauseController.isPaused {
                             GamePausedOverlay(game: game,
                                               controller: pauseController,
                                               onQuit: {
@@ -307,7 +334,42 @@ private struct GameLauncher: View {
                 },
                 onSelector: { withAnimation(.easeOut(duration: 0.2)) { phase = .selector } }
             )
+        case .weeklyResult:
+            if let challenge = weeklyChallenge {
+                WeeklyChallengeResultView(
+                    game: game,
+                    challenge: challenge,
+                    score: lastWeeklyScore,
+                    best: app.levels.weeklyBest(for: challenge),
+                    improved: lastWeeklyImproved,
+                    onRetry: { startRun() },
+                    onDone: { withAnimation(.easeOut(duration: 0.2)) { phase = .selector } }
+                )
+            } else {
+                GameWorldBackdrop(game: game)
+                    .onAppear { phase = .selector }
+            }
         }
+    }
+
+    private var activeConfig: GameConfig {
+        if runKind == .weekly, let weeklyChallenge {
+            return .weekly(weeklyChallenge)
+        }
+        return .challenge(game,
+                          difficulty: playDifficulty,
+                          trackLevel: playLevel,
+                          persisted: app.difficultyState(for: game, difficulty: playDifficulty),
+                          freePlay: true,
+                          pauseController: pauseController)
+    }
+
+    private func beginWeekly(_ challenge: WeeklyChallenge) {
+        runKind = .weekly
+        weeklyChallenge = challenge
+        playDifficulty = challenge.difficulty
+        playLevel = challenge.trackLevel
+        startRun()
     }
 
     private func startRun() {
@@ -319,6 +381,16 @@ private struct GameLauncher: View {
 
     private func handle(_ result: GameResult) {
         pauseController.reset()
+        if runKind == .weekly, let weeklyChallenge {
+            let outcome = app.recordWeeklyChallengeResult(result, challenge: weeklyChallenge)
+            lastWeeklyScore = outcome.score
+            lastWeeklyImproved = outcome.improved
+            withAnimation(.easeOut(duration: 0.2)) { phase = .weeklyResult }
+            AdManager.shared.gameCompleted()
+            AdManager.shared.maybeShowInterstitial()
+            return
+        }
+
         // Snapshot before recording — recordGameResult merges this run in.
         let starsBefore = app.levels.stars(for: game,
                                            difficulty: playDifficulty,

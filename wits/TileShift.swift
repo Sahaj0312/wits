@@ -50,29 +50,34 @@ struct TileShiftScreen: View {
         self.cfg = cfg
         self.onResult = onResult
         self.level = cfg.difficulty.level
+        var rng = cfg.makeRandomGenerator()
         _window = State(initialValue: max(1.0, 2.2 - cfg.difficulty.level * 0.1))
-        _round = State(initialValue: Self.make(byColor: Bool.random()))
+        _round = State(initialValue: Self.make(byColor: Bool.random(using: &rng), using: &rng))
+        _rng = State(initialValue: rng)
     }
 
     private var multiplier: Int { min(5, 1 + streak / 3) }
     private var world: GameWorld { GameID.tileShift.world }
 
-    private static func make(byColor: Bool) -> Round {
-        let target = Tile(shape: .random(in: 0..<3), color: .random(in: 0..<3))
+    @State private var rng: SeededRandomNumberGenerator
+
+    private static func make<R: RandomNumberGenerator>(byColor: Bool, using rng: inout R) -> Round {
+        let target = Tile(shape: .random(in: 0..<3, using: &rng),
+                          color: .random(in: 0..<3, using: &rng))
         // correct matches target on the active dimension, differs on the other
         var correct = target
-        if byColor { correct.shape = (target.shape + Int.random(in: 1...2)) % 3 }
-        else { correct.color = (target.color + Int.random(in: 1...2)) % 3 }
+        if byColor { correct.shape = (target.shape + Int.random(in: 1...2, using: &rng)) % 3 }
+        else { correct.color = (target.color + Int.random(in: 1...2, using: &rng)) % 3 }
         // distractor differs on the active dimension
         var distractor = target
         if byColor {
-            distractor.color = (target.color + Int.random(in: 1...2)) % 3
-            distractor.shape = .random(in: 0..<3)
+            distractor.color = (target.color + Int.random(in: 1...2, using: &rng)) % 3
+            distractor.shape = .random(in: 0..<3, using: &rng)
         } else {
-            distractor.shape = (target.shape + Int.random(in: 1...2)) % 3
-            distractor.color = .random(in: 0..<3)
+            distractor.shape = (target.shape + Int.random(in: 1...2, using: &rng)) % 3
+            distractor.color = .random(in: 0..<3, using: &rng)
         }
-        let correctFirst = Bool.random()
+        let correctFirst = Bool.random(using: &rng)
         let options = correctFirst ? [correct, distractor] : [distractor, correct]
         return Round(byColor: byColor, target: target, options: options, correct: correctFirst ? 0 : 1)
     }
@@ -180,8 +185,10 @@ struct TileShiftScreen: View {
 
     private func next() {
         let pSwitch = min(0.7, 0.3 + level * 0.04)
-        let nextByColor = Double.random(in: 0..<1) < pSwitch ? !round.byColor : round.byColor
-        withAnimation(.easeOut(duration: 0.12)) { round = Self.make(byColor: nextByColor) }
+        let nextByColor = Double.random(in: 0..<1, using: &rng) < pSwitch ? !round.byColor : round.byColor
+        withAnimation(.easeOut(duration: 0.12)) {
+            round = Self.make(byColor: nextByColor, using: &rng)
+        }
         trialStart = Date(); windowFrac = 1
     }
 

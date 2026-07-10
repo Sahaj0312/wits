@@ -243,6 +243,20 @@ nonisolated enum PegSolitaireEngine {
     /// randomized DFS with backtracking — dense targets (the classic 32-peg
     /// game) stay reachable.
     static func generate(mapLevel: Int, attempts: Int = 12) -> (puzzle: PegPuzzle, solution: [PegMove]) {
+        var rng = SystemRandomNumberGenerator()
+        return generate(mapLevel: mapLevel, attempts: attempts, using: &rng)
+    }
+
+    static func generate(mapLevel: Int,
+                         seed: UInt64,
+                         attempts: Int = 12) -> (puzzle: PegPuzzle, solution: [PegMove]) {
+        var rng = SeededRandomNumberGenerator(seed: seed)
+        return generate(mapLevel: mapLevel, attempts: attempts, using: &rng)
+    }
+
+    private static func generate<R: RandomNumberGenerator>(mapLevel: Int,
+                                                            attempts: Int,
+                                                            using rng: inout R) -> (puzzle: PegPuzzle, solution: [PegMove]) {
         let spec = spec(forMapLevel: mapLevel)
         let board = spec.shape.parsed
         // Degrade the peg target rather than fail: a slightly easier board
@@ -250,13 +264,15 @@ nonisolated enum PegSolitaireEngine {
         var want = spec.pegs
         while want > 2 {
             for _ in 0..<attempts {
-                let goal = spec.targetRequired ? board.center : board.holes.randomElement()!
+                let goal = spec.targetRequired
+                    ? board.center
+                    : board.holes.sorted().randomElement(using: &rng)!
                 var puzzle = PegPuzzle(cols: board.cols, rows: board.rows, holes: board.holes,
                                        pegs: [goal], target: spec.targetRequired ? goal : nil,
                                        hex: spec.shape.isHex)
                 var forward: [PegMove] = []
                 var budget = 150_000
-                if reverseFill(&puzzle, forward: &forward, target: want, budget: &budget) {
+                if reverseFill(&puzzle, forward: &forward, target: want, budget: &budget, rng: &rng) {
                     return (puzzle, forward.reversed())
                 }
             }
@@ -268,24 +284,36 @@ nonisolated enum PegSolitaireEngine {
                                pegs: [goal], target: nil, hex: spec.shape.isHex)
         var forward: [PegMove] = []
         var budget = 1_000
-        _ = reverseFill(&puzzle, forward: &forward, target: 2, budget: &budget)
+        _ = reverseFill(&puzzle, forward: &forward, target: 2, budget: &budget, rng: &rng)
         return (puzzle, forward.reversed())
     }
 
     /// Randomized depth-first reverse fill: un-jump until `target` pegs are
     /// on the board, backtracking out of dead ends. Budget bounds the node
     /// count so a pathological seed can't stall the UI.
-    private static func reverseFill(_ puzzle: inout PegPuzzle, forward: inout [PegMove],
-                                    target: Int, budget: inout Int) -> Bool {
+    private static func reverseFill<R: RandomNumberGenerator>(_ puzzle: inout PegPuzzle,
+                                                               forward: inout [PegMove],
+                                                               target: Int,
+                                                               budget: inout Int,
+                                                               rng: inout R) -> Bool {
         if puzzle.pegs.count == target { return true }
         guard budget > 0 else { return false }
-        for pick in reverseOptions(puzzle).shuffled() {
+        let ordered = reverseOptions(puzzle).sorted {
+            if $0.from != $1.from { return $0.from < $1.from }
+            if $0.over != $1.over { return $0.over < $1.over }
+            return $0.to < $1.to
+        }
+        for pick in ordered.shuffled(using: &rng) {
             budget -= 1
             puzzle.pegs.remove(pick.to)
             puzzle.pegs.insert(pick.over)
             puzzle.pegs.insert(pick.from)
             forward.append(pick)
-            if reverseFill(&puzzle, forward: &forward, target: target, budget: &budget) { return true }
+            if reverseFill(&puzzle,
+                           forward: &forward,
+                           target: target,
+                           budget: &budget,
+                           rng: &rng) { return true }
             puzzle.pegs.remove(pick.over)
             puzzle.pegs.remove(pick.from)
             puzzle.pegs.insert(pick.to)
@@ -622,8 +650,9 @@ struct PegSolitaireScreen: View {
     private func setUpAndRun() async {
         if !ready {
             let target = mapLevel
+            let seed = cfg.resolvedRandomSeed()
             let generated = await Task.detached(priority: .userInitiated) {
-                PegSolitaireEngine.generate(mapLevel: target)
+                PegSolitaireEngine.generate(mapLevel: target, seed: seed)
             }.value
             puzzle = generated.puzzle
             startPegs = generated.puzzle.pegs.count

@@ -24,6 +24,7 @@ struct TrackerScreen: View {
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
         self.onResult = onResult
+        _rng = State(initialValue: cfg.makeRandomGenerator())
     }
 
     private var startedAt = Date()
@@ -54,7 +55,8 @@ struct TrackerScreen: View {
     @State private var stats = TrackStats()
     @State private var pulse = false
     @State private var generation = 0
-    @State private var boardSize: CGSize = .zero
+    @State private var rng: SeededRandomNumberGenerator
+    private static let simulationSize = CGSize(width: 390, height: 500)
 
     private var config: (targets: Int, dots: Int, speed: Double) {
         let level = cfg.difficulty.level
@@ -104,12 +106,6 @@ struct TrackerScreen: View {
                     }
                 }
                 .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                .onAppear {
-                    boardSize = size
-                }
-                .onChange(of: size) { _, newSize in
-                    boardSize = newSize
-                }
                 .onTapGesture { location in
                     tapBoard(location, in: size)
                 }
@@ -206,7 +202,6 @@ struct TrackerScreen: View {
         generation += 1
         let gen = generation
         let c = config
-        var rng = SystemRandomNumberGenerator()
         var seeded: [Dot] = []
         for i in 0..<c.dots {
             // keep spawn points spread out
@@ -225,7 +220,7 @@ struct TrackerScreen: View {
                 isTarget: i < c.targets
             ))
         }
-        let fresh = seeded.shuffled()
+        let fresh = seeded.shuffled(using: &rng)
 
         Task {
             // fade the previous round's dots out, pause, then fade the new set in
@@ -264,8 +259,8 @@ struct TrackerScreen: View {
         for i in dots.indices {
             var d = dots[i]
             // occasional heading change so paths can't be extrapolated
-            if Double.random(in: 0..<1) < 0.012 {
-                let turn = Double.random(in: -0.9...0.9)
+            if Double.random(in: 0..<1, using: &rng) < 0.012 {
+                let turn = Double.random(in: -0.9...0.9, using: &rng)
                 let speed = hypot(d.vel.dx, d.vel.dy)
                 let heading = atan2(d.vel.dy, d.vel.dx) + turn
                 d.vel = CGVector(dx: Darwin.cos(heading) * speed, dy: Darwin.sin(heading) * speed)
@@ -279,11 +274,11 @@ struct TrackerScreen: View {
     }
 
     private func resolveDotCollisions() {
-        guard dots.count > 1, boardSize.width > 0, boardSize.height > 0 else { return }
+        guard dots.count > 1 else { return }
         for _ in 0..<Self.collisionIterations {
             for i in dots.indices {
                 for j in dots.indices where j > i {
-                    resolveCollision(i, j, in: boardSize)
+                    resolveCollision(i, j, in: Self.simulationSize)
                 }
             }
             for i in dots.indices {

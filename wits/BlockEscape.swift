@@ -221,6 +221,12 @@ nonisolated enum KlotskiEngine {
     /// A random legal layout with the hero already at the exit (solved), used
     /// as the seed whose move graph the generator explores.
     static func randomSolvedLayout(_ spec: KlotskiSpec) -> KlotskiBoard? {
+        var rng = SystemRandomNumberGenerator()
+        return randomSolvedLayout(spec, using: &rng)
+    }
+
+    private static func randomSolvedLayout<R: RandomNumberGenerator>(_ spec: KlotskiSpec,
+                                                                      using rng: inout R) -> KlotskiBoard? {
         outer: for _ in 0..<40 {
             var board = KlotskiBoard(width: spec.width, height: spec.height,
                                      blocks: [KlotskiBlock(x: (spec.width - 2) / 2, y: spec.height - 2, w: 2, h: 2)])
@@ -230,7 +236,7 @@ nonisolated enum KlotskiEngine {
             shapes.append(contentsOf: Array(repeating: (2, 1), count: spec.horizontals))
             shapes.append(contentsOf: Array(repeating: (1, 1), count: spec.singles))
             for shape in shapes {
-                let candidates = (0..<(spec.width * spec.height)).shuffled()
+                let candidates = (0..<(spec.width * spec.height)).shuffled(using: &rng)
                 var placed = false
                 for cell in candidates {
                     let (x, y) = (cell % spec.width, cell / spec.width)
@@ -264,10 +270,26 @@ nonisolated enum KlotskiEngine {
     /// then walk distances back from every solved position in it and serve
     /// the state whose exact par lands closest to the level's target.
     static func generate(mapLevel: Int, attempts: Int = 6, cap: Int = 400_000) -> (board: KlotskiBoard, par: Int) {
+        var rng = SystemRandomNumberGenerator()
+        return generate(mapLevel: mapLevel, attempts: attempts, cap: cap, using: &rng)
+    }
+
+    static func generate(mapLevel: Int,
+                         seed: UInt64,
+                         attempts: Int = 6,
+                         cap: Int = 400_000) -> (board: KlotskiBoard, par: Int) {
+        var rng = SeededRandomNumberGenerator(seed: seed)
+        return generate(mapLevel: mapLevel, attempts: attempts, cap: cap, using: &rng)
+    }
+
+    private static func generate<R: RandomNumberGenerator>(mapLevel: Int,
+                                                            attempts: Int,
+                                                            cap: Int,
+                                                            using rng: inout R) -> (board: KlotskiBoard, par: Int) {
         let spec = spec(forMapLevel: mapLevel)
         var best: (KlotskiBoard, Int)?
         for _ in 0..<attempts {
-            guard let seed = randomSolvedLayout(spec),
+            guard let seed = randomSolvedLayout(spec, using: &rng),
                   let component = explore(from: seed, cap: cap) else { continue }
             let distances = distancesFromGoals(component: component, width: spec.width, height: spec.height)
             // A random layout can jam into a tiny locked pocket of the move
@@ -342,7 +364,15 @@ nonisolated enum KlotskiEngine {
 
     private static func pickStart(_ distances: [Key: Int], target: Int) -> (key: Key, par: Int)? {
         var best: (Key, Int)?
-        for (k, d) in distances where d >= 2 {
+        let ordered = distances.filter { $0.value >= 2 }.sorted {
+            if $0.value != $1.value {
+                let lhsGap = abs($0.value - target)
+                let rhsGap = abs($1.value - target)
+                if lhsGap != rhsGap { return lhsGap < rhsGap }
+            }
+            return $0.key.a == $1.key.a ? $0.key.b < $1.key.b : $0.key.a < $1.key.a
+        }
+        for (k, d) in ordered {
             if d == target { return (k, d) }
             if best == nil || abs(d - target) < abs(best!.1 - target) { best = (k, d) }
         }
@@ -586,8 +616,9 @@ struct BlockEscapeScreen: View {
     private func setUpAndRun() async {
         if board == nil {
             let target = mapLevel
+            let seed = cfg.resolvedRandomSeed()
             let generated = await Task.detached(priority: .userInitiated) {
-                KlotskiEngine.generate(mapLevel: target)
+                KlotskiEngine.generate(mapLevel: target, seed: seed)
             }.value
             board = generated.board
             par = generated.par

@@ -35,7 +35,8 @@ struct SlidePuzzleScreen: View {
         let spec = Self.boardSpec(for: cfg.difficulty.level)
         self.size = spec.size
         self.scrambleDepth = spec.depth
-        let scrambled = Self.scrambledTiles(size: spec.size, depth: spec.depth)
+        var rng = cfg.makeRandomGenerator()
+        let scrambled = Self.scrambledTiles(size: spec.size, depth: spec.depth, using: &rng)
         self.manhattanStart = Self.manhattan(scrambled, size: spec.size)
         self.parMoves = Self.par(manhattan: manhattanStart, size: spec.size)
         _tiles = State(initialValue: scrambled)
@@ -282,12 +283,19 @@ struct SlidePuzzleScreen: View {
     /// around the level's target, so two boards at the same level feel
     /// comparably hard instead of swinging with walk luck.
     static func scrambledTiles(size: Int, depth: Int) -> [Int] {
+        var rng = SystemRandomNumberGenerator()
+        return scrambledTiles(size: size, depth: depth, using: &rng)
+    }
+
+    static func scrambledTiles<R: RandomNumberGenerator>(size: Int,
+                                                          depth: Int,
+                                                          using rng: inout R) -> [Int] {
         let target = targetManhattan(size: size, depth: depth)
         let tolerance = max(2, target / 6)
         var best: [Int] = []
         var bestGap = Int.max
         for _ in 0..<24 {
-            let tiles = randomWalk(size: size, depth: depth)
+            let tiles = randomWalk(size: size, depth: depth, using: &rng)
             guard !isSolved(tiles) else { continue }
             let gap = abs(manhattan(tiles, size: size) - target)
             if gap <= tolerance { return tiles }
@@ -297,7 +305,7 @@ struct SlidePuzzleScreen: View {
             }
         }
         while best.isEmpty {
-            let tiles = randomWalk(size: size, depth: depth)
+            let tiles = randomWalk(size: size, depth: depth, using: &rng)
             if !isSolved(tiles) { best = tiles }
         }
         return best
@@ -313,7 +321,9 @@ struct SlidePuzzleScreen: View {
 
     /// One scramble attempt: `depth` random blank moves from solved, never
     /// immediately undoing the previous step so depth ≈ real disorder.
-    private static func randomWalk(size: Int, depth: Int) -> [Int] {
+    private static func randomWalk<R: RandomNumberGenerator>(size: Int,
+                                                              depth: Int,
+                                                              using rng: inout R) -> [Int] {
         var tiles = Array(1..<(size * size)) + [0]
         var blank = size * size - 1
         var previous = -1
@@ -326,7 +336,7 @@ struct SlidePuzzleScreen: View {
             if col > 0 { candidates.append(blank - 1) }
             if col < size - 1 { candidates.append(blank + 1) }
             candidates.removeAll { $0 == previous }
-            guard let pick = candidates.randomElement() else { continue }
+            guard let pick = candidates.randomElement(using: &rng) else { continue }
             tiles[blank] = tiles[pick]
             tiles[pick] = 0
             previous = blank

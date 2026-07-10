@@ -14,7 +14,11 @@ import Observation
 @MainActor
 final class AppModel {
     var streak = StreakState.empty
+    /// Legacy per-game state retained for cache migration and old untagged runs.
     var difficulty: [GameID: DifficultyState] = [:]
+    /// Campaign mastery is isolated by difficulty, matching the four independent
+    /// level frontiers. Easy performance can never raise Hard or Extra Hard.
+    var trackDifficulty: [GameID: [ChallengeDifficulty: DifficultyState]] = [:]
     var gameStats: [GameID: GameStats] = [:]
     /// Independent Easy/Medium/Hard/Extra Hard progression.
     let levels = LevelProgressStore()
@@ -24,6 +28,7 @@ final class AppModel {
     init() {
         loadCache()
         levels.migrateIfNeeded(from: difficulty)
+        migrateTrackDifficultyIfNeeded()
     }
 
     // MARK: Lifecycle
@@ -37,12 +42,16 @@ final class AppModel {
         }
     }
 
-    var difficultyFor: (GameID) -> DifficultyState {
-        { [difficulty] id in id.difficultyState(from: difficulty[id]) }
+    func difficultyState(for game: GameID,
+                         difficulty challengeDifficulty: ChallengeDifficulty) -> DifficultyState {
+        trackDifficulty[game]?[challengeDifficulty]
+            ?? DifficultyScale.initialState(for: game, difficulty: challengeDifficulty)
     }
 
     func hasPlayed(_ game: GameID) -> Bool {
-        (gameStats[game]?.totalPlays ?? 0) > 0 || (difficulty[game]?.sessionsPlayed ?? 0) > 0
+        (gameStats[game]?.totalPlays ?? 0) > 0 ||
+            (difficulty[game]?.sessionsPlayed ?? 0) > 0 ||
+            (trackDifficulty[game]?.values.contains { $0.sessionsPlayed > 0 } ?? false)
     }
 
     // MARK: Game events
@@ -55,10 +64,11 @@ final class AppModel {
         if id.isStandalone {
             return recordStandaloneGameResult(result)
         }
-        let current = id.difficultyState(from: difficulty[id])
         let trackLevel = result.raw["trackLevel"].map { Int($0) }
         let trackDifficulty = result.raw["difficultyTrack"]
             .flatMap { ChallengeDifficulty(ordinal: Int($0)) }
+        let current = trackDifficulty.map { difficultyState(for: id, difficulty: $0) }
+            ?? id.difficultyState(from: difficulty[id])
         let previous: DifficultyState
         if let trackLevel, let trackDifficulty {
             previous = DifficultyScale.gameDifficulty(for: id,
@@ -69,7 +79,13 @@ final class AppModel {
             previous = current
         }
         let scored = ScoringEngine.score(result, previous: previous)
-        difficulty[id] = scored.next
+        if let trackDifficulty {
+            var perGame = self.trackDifficulty[id] ?? [:]
+            perGame[trackDifficulty] = scored.next
+            self.trackDifficulty[id] = perGame
+        } else {
+            difficulty[id] = scored.next
+        }
         let r = scored.result
 
         recordStats(for: r)
@@ -88,6 +104,35 @@ final class AppModel {
         return r
     }
 
+    /// Weekly competition is deliberately outside campaign progression. It
+    /// records the run and streak, keeps only this week's best, and submits the
+    /// comparable fixed-seed score without changing levels, stars, or mastery.
+    @discardableResult
+    func recordWeeklyChallengeResult(_ result: GameResult,
+                                     challenge: WeeklyChallenge) -> WeeklyRunOutcome {
+        precondition(result.game == challenge.game)
+        let scoredResult: GameResult
+        if result.game == .split {
+            scoredResult = result
+        } else {
+            let fixed = DifficultyScale.initialState(for: challenge.game,
+                                                     difficulty: challenge.difficulty,
+                                                     trackLevel: challenge.trackLevel)
+            scoredResult = ScoringEngine.score(result, previous: fixed).result
+        }
+        let score = WeeklyChallengeScorer.score(scoredResult)
+        let improved = levels.recordWeekly(challenge: challenge, score: score)
+
+        recordStats(for: scoredResult)
+        streak = StreakEngine.recordActivity(streak, today: Date())
+        saveCache()
+        if improved {
+            GameCenterManager.shared.submitWeeklyBest(challenge: challenge, levels: levels)
+        }
+        GameCenterManager.shared.recordProgress(levels: levels, streak: streak)
+        return WeeklyRunOutcome(result: scoredResult, score: score, improved: improved)
+    }
+
     /// Standalone modes (Split) are saved for lifetime stats and the streak,
     /// but skip mastery/star bookkeeping.
     @discardableResult
@@ -104,8 +149,11 @@ final class AppModel {
     /// Record a finished marathon run; on a new best, submit it to Game Center.
     /// Returns true when the run set a new best.
     @discardableResult
-    func recordMarathon(game: GameID, depth: Int, score: Int) -> Bool {
-        let improved = levels.recordMarathon(game: game, depth: depth, score: score)
+    func recordMarathon(game: GameID, depth: Int, depthFraction: Double = 0, score: Int) -> Bool {
+        let improved = levels.recordMarathon(game: game,
+                                             depth: depth,
+                                             depthFraction: depthFraction,
+                                             score: score)
         if improved {
             GameCenterManager.shared.submitMarathonBest(game: game, levels: levels)
         }
@@ -136,13 +184,19 @@ final class AppModel {
         var streak: StreakState
         var difficulty: [String: DifficultyState]
         var gameStats: [String: GameStats]?
+        var trackDifficulty: [String: DifficultyState]?
     }
 
     private func saveCache() {
         let state = CacheState(
             streak: streak,
             difficulty: Dictionary(uniqueKeysWithValues: difficulty.map { ($0.key.rawValue, $0.value) }),
-            gameStats: Dictionary(uniqueKeysWithValues: gameStats.map { ($0.key.rawValue, $0.value) })
+            gameStats: Dictionary(uniqueKeysWithValues: gameStats.map { ($0.key.rawValue, $0.value) }),
+            trackDifficulty: Dictionary(uniqueKeysWithValues: trackDifficulty.flatMap { game, values in
+                values.map { difficulty, state in
+                    (Self.trackKey(game: game, difficulty: difficulty), state)
+                }
+            })
         )
         if let data = try? JSONEncoder().encode(state) {
             UserDefaults.standard.set(data, forKey: cacheKey)
@@ -159,5 +213,36 @@ final class AppModel {
         gameStats = Dictionary(uniqueKeysWithValues: (state.gameStats ?? [:]).compactMap { k, v in
             GameID(rawValue: k).map { ($0, v) }
         })
+        for (key, value) in state.trackDifficulty ?? [:] {
+            guard let parsed = Self.parseTrackKey(key) else { continue }
+            var perGame = trackDifficulty[parsed.game] ?? [:]
+            perGame[parsed.difficulty] = value
+            trackDifficulty[parsed.game] = perGame
+        }
+    }
+
+    private func migrateTrackDifficultyIfNeeded() {
+        guard trackDifficulty.isEmpty else { return }
+        for (game, state) in difficulty where state.sessionsPlayed > 0 && game.isLive {
+            let selected = levels.selectedDifficulty(for: game)
+            var migrated = state
+            migrated.level = DifficultyScale.legacyDifficulty(for: selected,
+                                                               level: levels.currentLevel(for: game,
+                                                                                          difficulty: selected))
+            trackDifficulty[game] = [selected: migrated]
+        }
+        if !trackDifficulty.isEmpty { saveCache() }
+    }
+
+    private static func trackKey(game: GameID, difficulty: ChallengeDifficulty) -> String {
+        "\(game.rawValue)|\(difficulty.rawValue)"
+    }
+
+    private static func parseTrackKey(_ key: String) -> (game: GameID, difficulty: ChallengeDifficulty)? {
+        let pieces = key.split(separator: "|", maxSplits: 1).map(String.init)
+        guard pieces.count == 2,
+              let game = GameID(rawValue: pieces[0]),
+              let difficulty = ChallengeDifficulty(rawValue: pieces[1]) else { return nil }
+        return (game, difficulty)
     }
 }

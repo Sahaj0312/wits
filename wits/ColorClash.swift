@@ -51,19 +51,24 @@ struct ColorClashScreen: View {
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
         self.onResult = onResult
+        var rng = cfg.makeRandomGenerator()
         _window = State(initialValue: max(0.7, 1.6 - cfg.difficulty.level * 0.09))
-        _trial = State(initialValue: Self.makeTrial(pIncongruent: 0.5))
+        _trial = State(initialValue: Self.makeTrial(pIncongruent: 0.5, using: &rng))
+        _rng = State(initialValue: rng)
     }
 
     private var pIncongruent: Double { min(0.85, 0.4 + cfg.difficulty.level * 0.04) }
     private var multiplier: Int { min(5, 1 + streak / 3) }
     private var world: GameWorld { GameID.colorClash.world }
 
-    private static func makeTrial(pIncongruent: Double) -> Trial {
-        let word = StroopColor.allCases.randomElement()!
-        let incongruent = Double.random(in: 0..<1) < pIncongruent
+    @State private var rng: SeededRandomNumberGenerator
+
+    private static func makeTrial<R: RandomNumberGenerator>(pIncongruent: Double,
+                                                             using rng: inout R) -> Trial {
+        let word = StroopColor.allCases.randomElement(using: &rng)!
+        let incongruent = Double.random(in: 0..<1, using: &rng) < pIncongruent
         let ink = incongruent
-            ? StroopColor.allCases.filter { $0 != word }.randomElement()!
+            ? StroopColor.allCases.filter { $0 != word }.randomElement(using: &rng)!
             : word
         return Trial(word: word, ink: ink)
     }
@@ -180,7 +185,9 @@ struct ColorClashScreen: View {
     }
 
     private func nextTrial() {
-        withAnimation(.easeOut(duration: 0.13)) { trial = Self.makeTrial(pIncongruent: pIncongruent) }
+        withAnimation(.easeOut(duration: 0.13)) {
+            trial = Self.makeTrial(pIncongruent: pIncongruent, using: &rng)
+        }
         trialStart = Date()
         windowFrac = 1
     }
