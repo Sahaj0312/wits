@@ -2,8 +2,8 @@
 //  LevelSystemTests.swift
 //  witsTests
 //
-//  Star-map core: ladder math, star grading, gating, frontier/workout level
-//  selection, marathon bests, and the one-time adaptive-difficulty seeding.
+//  Infinite difficulty tracks: tuning math, isolated progression, persistence,
+//  migration, grading, and Split's retained endless best.
 //
 
 import XCTest
@@ -14,40 +14,49 @@ final class LevelSystemTests: XCTestCase {
 
     override func setUp() {
         super.setUp()
-        UserDefaults.standard.removeObject(forKey: "wits.levelProgress.v1")
-        UserDefaults.standard.removeObject(forKey: "wits.levelProgress.seeded.v1")
-    }
-
-    // MARK: Ladder
-
-    func testLevelCountsArePageMultiplesAndCoverAllGames() {
-        for game in GameID.allCases {
-            let count = LevelLadder.levelCount(for: game)
-            XCTAssertGreaterThanOrEqual(count, 20, "\(game) map too short")
-            XCTAssertEqual(count % LevelLadder.pageSize, 0, "\(game) count not a page multiple")
+        for key in [
+            "wits.difficultyProgress.v2",
+            "wits.difficultyProgress.migrated.v2",
+            "wits.levelProgress.v1",
+            "wits.levelProgress.seeded.v1"
+        ] {
+            UserDefaults.standard.removeObject(forKey: key)
         }
     }
 
-    func testLegacyDifficultySpansFullScaleMonotonically() {
-        for game in GameID.allCases {
-            let count = LevelLadder.levelCount(for: game)
-            XCTAssertEqual(LevelLadder.legacyDifficulty(for: game, level: 1), 1)
-            XCTAssertEqual(LevelLadder.legacyDifficulty(for: game, level: count), 10)
+    // MARK: Difficulty scale
+
+    func testDifficultyTracksStartInDistinctOrderedBands() {
+        let starts = ChallengeDifficulty.allCases.map {
+            DifficultyScale.legacyDifficulty(for: $0, level: 1)
+        }
+        XCTAssertEqual(starts.count, 4)
+        XCTAssertEqual(starts[0], 1, accuracy: 0.0001)
+        XCTAssertTrue(zip(starts, starts.dropFirst()).allSatisfy(<))
+        XCTAssertLessThan(starts.last ?? 10, 10)
+    }
+
+    func testEveryTrackRampsMonotonicallyWithoutExceedingEngineBounds() {
+        for difficulty in ChallengeDifficulty.allCases {
             var previous = 0.0
-            for level in 1...count {
-                let d = LevelLadder.legacyDifficulty(for: game, level: level)
-                XCTAssertGreaterThan(d, previous, "\(game) difficulty not strictly increasing at \(level)")
-                previous = d
+            for level in [1, 2, 8, 50, 1_000, 1_000_000] {
+                let value = DifficultyScale.legacyDifficulty(for: difficulty, level: level)
+                XCTAssertGreaterThanOrEqual(value, previous)
+                XCTAssertGreaterThanOrEqual(value, 1)
+                XCTAssertLessThanOrEqual(value, 10)
+                previous = value
             }
         }
     }
 
-    func testNearestLevelRoundTripsTheMapping() {
-        for game in [GameID.colorClash, .echoGrid, .pegSolitaire] {
-            let count = LevelLadder.levelCount(for: game)
-            for level in [1, count / 2, count] {
-                let difficulty = LevelLadder.legacyDifficulty(for: game, level: level)
-                XCTAssertEqual(LevelLadder.nearestLevel(for: game, legacyDifficulty: difficulty), level)
+    func testInfiniteTrackLevelsAlwaysMapToSafeContentSteps() {
+        for game in GameID.allCases {
+            for difficulty in ChallengeDifficulty.allCases {
+                let content = DifficultyScale.contentLevel(for: game,
+                                                           difficulty: difficulty,
+                                                           trackLevel: 1_000_000)
+                XCTAssertGreaterThanOrEqual(content, 1)
+                XCTAssertLessThanOrEqual(content, DifficultyScale.contentCeiling(for: game))
             }
         }
     }
@@ -61,118 +70,113 @@ final class LevelSystemTests: XCTestCase {
         XCTAssertEqual(StarGrader.stars(quality: 0.75), 2)
         XCTAssertEqual(StarGrader.stars(quality: 0.89), 2)
         XCTAssertEqual(StarGrader.stars(quality: 0.90), 3)
-        XCTAssertEqual(StarGrader.stars(quality: 1.0), 3)
     }
 
-    // MARK: Store: gating + frontier
+    // MARK: Independent tracks
 
-    func testUnlockRequiresPreviousPass() {
+    func testAdvancingEasyDoesNotAdvanceHard() {
         let store = LevelProgressStore()
-        XCTAssertTrue(store.isUnlocked(.colorClash, level: 1))
-        XCTAssertFalse(store.isUnlocked(.colorClash, level: 2))
-        store.recordAttempt(game: .colorClash, level: 1, stars: 1, quality: 0.65)
-        XCTAssertTrue(store.isUnlocked(.colorClash, level: 2))
-        XCTAssertEqual(store.frontier(for: .colorClash), 2)
-    }
-
-    func testPageGateBlocksUntilStarTotalMet() {
-        let store = LevelProgressStore()
-        // Pass all of page 1 with 1★ each = 10 stars < 18 gate.
-        for level in 1...10 {
-            store.recordAttempt(game: .echoGrid, level: level, stars: 1, quality: 0.65)
-        }
-        XCTAssertFalse(store.isPageUnlocked(.echoGrid, page: 1))
-        XCTAssertFalse(store.isUnlocked(.echoGrid, level: 11))
-        // Frontier is 11 but blocked → workout serves a consolidation replay
-        // from page 1 (the weakest-star level).
-        XCTAssertEqual(store.frontier(for: .echoGrid), 11)
-        XCTAssertLessThanOrEqual(store.workoutLevel(for: .echoGrid), 10)
-
-        // Upgrade eight levels to 2★ → 18 stars, gate opens.
         for level in 1...8 {
-            store.recordAttempt(game: .echoGrid, level: level, stars: 2, quality: 0.8)
+            store.recordAttempt(game: .blockEscape,
+                                difficulty: .easy,
+                                level: level,
+                                stars: 1,
+                                quality: 0.65)
         }
-        XCTAssertTrue(store.isPageUnlocked(.echoGrid, page: 1))
-        XCTAssertTrue(store.isUnlocked(.echoGrid, level: 11))
-        XCTAssertEqual(store.workoutLevel(for: .echoGrid), 11)
+
+        XCTAssertEqual(store.currentLevel(for: .blockEscape, difficulty: .easy), 9)
+        XCTAssertEqual(store.currentLevel(for: .blockEscape, difficulty: .hard), 1)
     }
 
-    func testStarsNeverGoDown() {
+    func testFailureDoesNotAdvanceTrack() {
         let store = LevelProgressStore()
-        store.recordAttempt(game: .blockEscape, level: 3, stars: 3, quality: 0.95)
-        let improved = store.recordAttempt(game: .blockEscape, level: 3, stars: 1, quality: 0.62)
-        XCTAssertFalse(improved)
-        XCTAssertEqual(store.stars(for: .blockEscape, level: 3), 3)
-        XCTAssertEqual(store.record(for: .blockEscape, level: 3)?.bestQuality, 0.95)
+        store.recordAttempt(game: .echoGrid,
+                            difficulty: .medium,
+                            level: 1,
+                            stars: 0,
+                            quality: 0.42)
+        XCTAssertEqual(store.currentLevel(for: .echoGrid, difficulty: .medium), 1)
     }
+
+    func testTrackHasNoFiniteLevelCeiling() {
+        let store = LevelProgressStore()
+        for level in 1...250 {
+            store.recordAttempt(game: .colorClash,
+                                difficulty: .extraHard,
+                                level: level,
+                                stars: 1,
+                                quality: 0.65)
+        }
+        XCTAssertEqual(store.currentLevel(for: .colorClash, difficulty: .extraHard), 251)
+    }
+
+    func testStarsAndQualityNeverGoDown() {
+        let store = LevelProgressStore()
+        store.recordAttempt(game: .pegSolitaire,
+                            difficulty: .hard,
+                            level: 1,
+                            stars: 3,
+                            quality: 0.95)
+        let improved = store.recordAttempt(game: .pegSolitaire,
+                                           difficulty: .hard,
+                                           level: 1,
+                                           stars: 1,
+                                           quality: 0.62)
+        XCTAssertFalse(improved)
+        XCTAssertEqual(store.stars(for: .pegSolitaire, difficulty: .hard, level: 1), 3)
+        XCTAssertEqual(store.record(for: .pegSolitaire,
+                                    difficulty: .hard,
+                                    level: 1)?.bestQuality, 0.95)
+    }
+
+    func testSelectionAndProgressPersist() {
+        var store: LevelProgressStore? = LevelProgressStore()
+        store?.select(.extraHard, for: .slidePuzzle)
+        store?.recordAttempt(game: .slidePuzzle,
+                             difficulty: .extraHard,
+                             level: 1,
+                             stars: 2,
+                             quality: 0.8)
+        store = nil
+
+        let reloaded = LevelProgressStore()
+        XCTAssertEqual(reloaded.selectedDifficulty(for: .slidePuzzle), .extraHard)
+        XCTAssertEqual(reloaded.currentLevel(for: .slidePuzzle, difficulty: .extraHard), 2)
+        XCTAssertEqual(reloaded.currentLevel(for: .slidePuzzle, difficulty: .easy), 1)
+    }
+
+    // MARK: Migration
+
+    func testAdaptiveMigrationSeedsOnlyTheMatchingTrack() {
+        var state = DifficultyState.seed(for: .lastSeen)
+        state.level = 6.5
+        state.sessionsPlayed = 12
+
+        let store = LevelProgressStore()
+        store.migrateIfNeeded(from: [.lastSeen: state])
+
+        XCTAssertEqual(store.selectedDifficulty(for: .lastSeen), .hard)
+        XCTAssertGreaterThan(store.currentLevel(for: .lastSeen, difficulty: .hard), 1)
+        XCTAssertEqual(store.currentLevel(for: .lastSeen, difficulty: .easy), 1)
+        XCTAssertEqual(store.currentLevel(for: .lastSeen, difficulty: .medium), 1)
+        XCTAssertEqual(store.currentLevel(for: .lastSeen, difficulty: .extraHard), 1)
+    }
+
+    // MARK: Split endless best
 
     func testMarathonBestTracksDepthThenScore() {
         let store = LevelProgressStore()
-        XCTAssertTrue(store.recordMarathon(game: .colorClash, depth: 8, score: 3000))
-        XCTAssertFalse(store.recordMarathon(game: .colorClash, depth: 6, score: 9000))
-        XCTAssertTrue(store.recordMarathon(game: .colorClash, depth: 8, score: 3500))
-        XCTAssertTrue(store.recordMarathon(game: .colorClash, depth: 9, score: 100))
-        XCTAssertEqual(store.marathonBest(for: .colorClash)?.depth, 9)
+        XCTAssertTrue(store.recordMarathon(game: .split, depth: 8, score: 3_000))
+        XCTAssertFalse(store.recordMarathon(game: .split, depth: 6, score: 9_000))
+        XCTAssertTrue(store.recordMarathon(game: .split, depth: 8, score: 3_500))
+        XCTAssertTrue(store.recordMarathon(game: .split, depth: 9, score: 100))
+        XCTAssertEqual(store.marathonBest(for: .split)?.depth, 9)
     }
-
-    // MARK: Seeding
-
-    func testSeedingUnlocksEquivalentFrontierWithOneStar() {
-        var difficulty: [GameID: DifficultyState] = [:]
-        var state = DifficultyState.seed(for: .colorClash)
-        state.level = 5.5   // mid-scale → mid-map frontier
-        state.sessionsPlayed = 12
-        difficulty[.colorClash] = state
-
-        let store = LevelProgressStore()
-        store.seedIfNeeded(from: difficulty)
-
-        let expectedFrontier = LevelLadder.nearestLevel(for: .colorClash, legacyDifficulty: 5.5)
-        XCTAssertGreaterThan(expectedFrontier, 1)
-        for level in 1..<expectedFrontier {
-            XCTAssertEqual(store.stars(for: .colorClash, level: level), 1, "level \(level) should be seeded 1★")
-        }
-        XCTAssertEqual(store.stars(for: .colorClash, level: expectedFrontier), 0)
-        // Gates must not strand a seeded user below their frontier.
-        XCTAssertEqual(store.workoutLevel(for: .colorClash), expectedFrontier)
-
-        // Seeding is one-time: a second call must not re-grant anything.
-        let second = LevelProgressStore()
-        var richer = state
-        richer.level = 9
-        second.seedIfNeeded(from: [.colorClash: richer])
-        XCTAssertEqual(second.stars(for: .colorClash, level: expectedFrontier), 0)
-    }
-
-    func testSeededFrontierAtPageBoundaryIsNotGateBlocked() {
-        // Frontier exactly at a page's first level: the gate must not bind.
-        var state = DifficultyState.seed(for: .echoGrid)
-        state.sessionsPlayed = 5
-        // echoGrid has 40 levels; difficulty for frontier 21 (page boundary).
-        state.level = LevelLadder.legacyDifficulty(for: .echoGrid, level: 21)
-        let store = LevelProgressStore()
-        store.seedIfNeeded(from: [.echoGrid: state])
-        XCTAssertEqual(store.frontier(for: .echoGrid), 21)
-        XCTAssertTrue(store.isUnlocked(.echoGrid, level: 21))
-        XCTAssertEqual(store.workoutLevel(for: .echoGrid), 21)
-    }
-
-    func testSeededUsersNeverPlayersWithoutHistoryUnaffected() {
-        let store = LevelProgressStore()
-        store.seedIfNeeded(from: [:])
-        for game in GameID.allCases {
-            XCTAssertEqual(store.frontier(for: game), 1)
-            XCTAssertEqual(store.totalStars(for: game), 0)
-        }
-    }
-
-    // MARK: Marathon math
 
     func testMarathonPointsScaleWithDepth() {
         let early = MarathonMath.points(level: 2, quality: 1.0)
         let late = MarathonMath.points(level: 30, quality: 0.7)
-        XCTAssertGreaterThan(late, early * 5, "late levels must dominate score")
+        XCTAssertGreaterThan(late, early * 5)
         XCTAssertEqual(MarathonMath.points(level: 10, quality: 0), 0)
     }
-
 }

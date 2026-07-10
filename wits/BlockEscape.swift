@@ -375,7 +375,8 @@ struct BlockEscapeScreen: View {
         self.cfg = cfg
         self.onResult = onResult
         self.level = cfg.difficulty.level
-        self.mapLevel = cfg.mapLevel ?? LevelLadder.nearestLevel(for: .blockEscape, legacyDifficulty: cfg.difficulty.level)
+        self.mapLevel = cfg.mapLevel ?? DifficultyScale.contentLevel(for: .blockEscape,
+                                                                     legacyDifficulty: cfg.difficulty.level)
     }
 
     /// Time budget prices in planning, not just execution — deep thought on a

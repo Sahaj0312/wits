@@ -14,7 +14,7 @@ import Observation
 // MARK: - Identity
 
 enum GameID: String, CaseIterable, Codable, Identifiable {
-    // star-map games (fixed exam levels + marathon)
+    // Difficulty-track games.
     case arrowStorm, crowdControl, echoGrid
     case colorClash, tileShift, lastSeen
     case slidePuzzle, blockEscape, pegSolitaire
@@ -23,7 +23,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable {
 
     var id: String { rawValue }
 
-    /// Star-map games (everything but the standalone survival modes).
+    /// Difficulty-track games (everything but the standalone survival modes).
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .tileShift, .lastSeen,
          .slidePuzzle, .blockEscape, .pegSolitaire]
@@ -570,12 +570,11 @@ struct GameConfig {
     var targetDurationSec: Double = 45
     var mode: GameMode = .workout
     var pauseController: GamePauseController?
-    /// Star-map level this run serves (nil = legacy adaptive run). The level's
-    /// frozen spec is already baked into `difficulty.level` via LevelLadder;
-    /// games that key on discrete ladders (e.g. Tower of Hanoi) read this.
+    /// Safe content-curve step derived from the selected difficulty and track
+    /// level. Procedural games that use discrete recipes read this value.
     var mapLevel: Int? = nil
-    /// This run is one link in a marathon chain (affects framing only).
-    var isMarathon: Bool = false
+    var difficultyTrack: ChallengeDifficulty? = nil
+    var trackLevel: Int? = nil
     /// Back-compat: existing call sites read `isFreePlay`.
     var isFreePlay: Bool { mode == .freePlay }
     var isSurvival: Bool { false }
@@ -588,19 +587,23 @@ struct GameConfig {
         GameConfig(difficulty: difficulty, mode: freePlay ? .freePlay : .workout, pauseController: pauseController)
     }
 
-    /// A fixed-exam run of a star-map level (design doc §1): the served spec
-    /// comes from the map ladder, not the user's adaptive state.
-    static func level(_ g: GameID,
-                      mapLevel: Int,
-                      persisted: DifficultyState,
-                      freePlay: Bool = true,
-                      marathon: Bool = false,
-                      pauseController: GamePauseController? = nil) -> GameConfig {
-        GameConfig(difficulty: LevelLadder.examDifficulty(for: g, level: mapLevel, persisted: persisted),
+    static func challenge(_ g: GameID,
+                          difficulty: ChallengeDifficulty,
+                          trackLevel: Int,
+                          persisted: DifficultyState,
+                          freePlay: Bool = true,
+                          pauseController: GamePauseController? = nil) -> GameConfig {
+        GameConfig(difficulty: DifficultyScale.gameDifficulty(for: g,
+                                                              difficulty: difficulty,
+                                                              trackLevel: trackLevel,
+                                                              persisted: persisted),
                    mode: freePlay ? .freePlay : .workout,
                    pauseController: pauseController,
-                   mapLevel: mapLevel,
-                   isMarathon: marathon)
+                   mapLevel: DifficultyScale.contentLevel(for: g,
+                                                          difficulty: difficulty,
+                                                          trackLevel: trackLevel),
+                   difficultyTrack: difficulty,
+                   trackLevel: trackLevel)
     }
 
     func pause() {

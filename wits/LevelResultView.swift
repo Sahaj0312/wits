@@ -2,23 +2,21 @@
 //  LevelResultView.swift
 //  wits
 //
-//  Post-run surfaces for the star-map system (design doc §4): self-comparison
-//  only. Exam runs show stars earned; marathon deaths show depth vs personal
-//  best with near-miss framing. No percentiles, no leaderboards here.
+//  Result surface for one difficulty-track level.
 //
 
 import SwiftUI
 
-struct LevelResultView: View {
+struct DifficultyLevelResultView: View {
     let game: GameID
+    let difficulty: ChallengeDifficulty
     let level: Int
     let stars: Int
     let quality: Double
     let improved: Bool
-    let nextUnlocked: Bool
     let onRetry: () -> Void
     let onNext: () -> Void
-    let onMap: () -> Void
+    let onSelector: () -> Void
 
     private var passed: Bool { stars >= 1 }
 
@@ -26,59 +24,90 @@ struct LevelResultView: View {
         VStack(spacing: 0) {
             Spacer()
 
-            Text(passed ? "level \(level) cleared" : "level \(level)")
-                .font(.witsDisplay(30))
-                .foregroundStyle(Color.witsInk)
+            Image(systemName: difficulty.symbol)
+                .font(.system(size: 30, weight: .black))
+                .foregroundStyle(.black.opacity(0.8))
+                .frame(width: 76, height: 76)
+                .background(difficulty.color, in: Circle())
                 .rise()
+
+            Text(difficulty.title)
+                .font(.witsLabel(13))
+                .foregroundStyle(difficulty.color)
+                .padding(.top, 14)
+                .rise(0.04)
+
+            Text(passed ? "level \(level) cleared" : "level \(level)")
+                .font(.witsDisplay(32))
+                .foregroundStyle(Color.witsInk)
+                .multilineTextAlignment(.center)
+                .padding(.top, 5)
+                .rise(0.08)
 
             Text(headline)
                 .font(.witsBody(15.5))
                 .foregroundStyle(Color.witsMuted)
+                .multilineTextAlignment(.center)
                 .padding(.top, 8)
-                .rise(0.06)
+                .rise(0.12)
 
             HStack(spacing: 10) {
-                ForEach(0..<3, id: \.self) { i in
-                    Image(systemName: i < stars ? "star.fill" : "star")
-                        .font(.system(size: 44, weight: .heavy))
-                        .foregroundStyle(i < stars ? Color.witsWarm : Color.witsFaint)
-                        .rise(0.12 + Double(i) * 0.1)
+                ForEach(0..<3, id: \.self) { index in
+                    Image(systemName: index < stars ? "star.fill" : "star")
+                        .font(.system(size: 42, weight: .heavy))
+                        .foregroundStyle(index < stars ? Color.witsWarm : Color.witsFaint)
+                        .rise(0.16 + Double(index) * 0.08)
                 }
             }
-            .padding(.top, 26)
+            .padding(.top, 24)
 
             Text("\(Int((quality * 100).rounded()))%")
                 .font(.system(size: 17, weight: .heavy, design: .rounded))
                 .foregroundStyle(Color.witsMuted)
                 .monospacedDigit()
-                .padding(.top, 14)
-                .rise(0.3)
+                .padding(.top, 13)
+                .rise(0.32)
 
             Spacer()
 
             VStack(spacing: 11) {
-                if passed && nextUnlocked {
-                    Cta(title: "next level", action: onNext)
+                if passed {
+                    Button(action: onNext) {
+                        Label("level \(level + 1)", systemImage: "arrow.right")
+                            .font(.system(size: 17, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 56)
+                            .background(difficulty.color,
+                                        in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    }
+                    .buttonStyle(PressScale())
                 }
+
                 Button(action: onRetry) {
-                    Text(passed ? (stars < 3 ? "replay for \(stars + 1)★" : "replay") : "try again")
+                    Text(passed ? "replay level" : "try again")
                         .font(.system(size: 16, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsInk)
                         .frame(maxWidth: .infinity)
                         .frame(height: 52)
-                        .background(Color.witsCard, in: Capsule())
-                        .overlay(Capsule().strokeBorder(Color.witsLine, lineWidth: 1.5))
+                        .background(Color.witsCard,
+                                    in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .strokeBorder(Color.witsLine, lineWidth: 1.5)
+                        )
                 }
                 .buttonStyle(PressScale())
-                Button(action: onMap) {
-                    Text("back to map")
+
+                Button(action: onSelector) {
+                    Text("change difficulty")
                         .font(.system(size: 14.5, weight: .bold, design: .rounded))
                         .foregroundStyle(Color.witsMuted)
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 2)
+                .padding(.top, 3)
             }
-            .rise(0.36)
+            .rise(0.38)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
         .padding(.vertical, 18)
@@ -93,105 +122,11 @@ struct LevelResultView: View {
 
     private var headline: String {
         switch (passed, stars, improved) {
-        case (false, _, _): "not this time — the level isn't going anywhere."
-        case (true, 3, true): "flawless. that's the whole star line."
-        case (true, _, true): "new best on this level."
+        case (false, _, _): "not this time. try the same level again."
+        case (true, 3, true): "perfect run. the next level is ready."
+        case (true, _, true): "new best. the next level is ready."
         case (true, 3, false): "still perfect."
-        default: "cleared — stars to spare up there."
+        default: "cleared. keep this track moving."
         }
-    }
-}
-
-// MARK: - Marathon death
-
-struct MarathonResultView: View {
-    let game: GameID
-    let depth: Int          // last level cleared this run
-    let score: Int
-    let best: MarathonBest?
-    let isNewBest: Bool
-    let onRunAgain: () -> Void
-    let onMap: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            Spacer()
-
-            Label("marathon", systemImage: "infinity")
-                .font(.witsLabel(13))
-                .foregroundStyle(game.domain.color)
-                .rise()
-
-            Text("level \(max(1, depth))")
-                .font(.witsDisplay(46))
-                .foregroundStyle(Color.witsInk)
-                .monospacedDigit()
-                .padding(.top, 6)
-                .rise(0.06)
-
-            Text(framing)
-                .font(.witsBody(15.5))
-                .foregroundStyle(isNewBest ? Color.witsAccent : Color.witsMuted)
-                .multilineTextAlignment(.center)
-                .padding(.top, 8)
-                .rise(0.12)
-
-            HStack(spacing: 12) {
-                statTile(value: "\(score)", label: "score")
-                if let best {
-                    statTile(value: "\(max(best.depth, depth))", label: "best level")
-                }
-            }
-            .padding(.top, 24)
-            .rise(0.2)
-
-            Spacer()
-
-            VStack(spacing: 11) {
-                Cta(title: "run it back", action: onRunAgain)
-                Button(action: onMap) {
-                    Text("back to map")
-                        .font(.system(size: 14.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
-                }
-                .buttonStyle(.plain)
-            }
-            .rise(0.3)
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 18)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.witsBg.ignoresSafeArea())
-        .overlay {
-            if isNewBest {
-                ConfettiBurst().ignoresSafeArea()
-            }
-        }
-    }
-
-    private var framing: String {
-        if isNewBest { return "new personal best." }
-        guard let best, best.depth > depth else {
-            return "the ramp always wins eventually."
-        }
-        let gap = best.depth - depth
-        return gap <= 3
-            ? "\(gap) \(gap == 1 ? "level" : "levels") short of your best."
-            : "your best is level \(best.depth). it's waiting."
-    }
-
-    private func statTile(value: String, label: String) -> some View {
-        VStack(spacing: 4) {
-            Text(value)
-                .font(.system(size: 26, weight: .heavy, design: .rounded))
-                .foregroundStyle(Color.witsInk)
-                .monospacedDigit()
-            Text(label)
-                .font(.witsLabel(12))
-                .foregroundStyle(Color.witsMuted)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 16)
-        .cardSurface()
     }
 }

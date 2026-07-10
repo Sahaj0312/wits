@@ -2,29 +2,87 @@
 //  LevelSystem.swift
 //  wits
 //
-//  Star-map progression core (docs/level-progression-redesign.md).
-//
-//  Every game is a paginated ladder of fixed levels. Level n of a game is
-//  identical for every player: its spec is derived by mapping the map level
-//  onto the game's existing 1...10 difficulty curves, frozen per level.
-//  Stars grade each run's policy `performance` quality; passing unlocks the
-//  next level; page boundaries gate on star totals. Marathon mode chains
-//  levels pass-to-continue until the first sub-pass run (the "death").
+//  Independent, unbounded difficulty tracks. Every game has four tracks and
+//  each track owns its own current level, so changing difficulty never moves
+//  another track's frontier.
 //
 
 import Foundation
 import SwiftUI
 
-// MARK: - Ladder
+// MARK: - Difficulty tracks
 
-enum LevelLadder {
-    static let pageSize = 10
-    /// Stars required from the previous page to enter a page (60% of 30).
-    static let pageGateStars = 18
+enum ChallengeDifficulty: String, CaseIterable, Codable, Identifiable, Sendable {
+    case easy
+    case medium
+    case hard
+    case extraHard
 
-    /// Map depth per game — set by how many perceptibly distinct difficulty
-    /// steps the game's curves support (see design doc §1).
-    static func levelCount(for game: GameID) -> Int {
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .easy: "easy"
+        case .medium: "medium"
+        case .hard: "hard"
+        case .extraHard: "extra hard"
+        }
+    }
+
+    var shortTitle: String {
+        switch self {
+        case .easy: "easy"
+        case .medium: "medium"
+        case .hard: "hard"
+        case .extraHard: "extra"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .easy: "face.smiling"
+        case .medium: "bolt.fill"
+        case .hard: "flame.fill"
+        case .extraHard: "burst.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .easy: Color(hexAny: 0x2DBE4E)
+        case .medium: Color(hexAny: 0xE5A62B)
+        case .hard: Color(hexAny: 0xE75545)
+        case .extraHard: Color(hexAny: 0x5965C9)
+        }
+    }
+
+    var ordinal: Int {
+        Self.allCases.firstIndex(of: self) ?? 0
+    }
+
+    init?(ordinal: Int) {
+        guard Self.allCases.indices.contains(ordinal) else { return nil }
+        self = Self.allCases[ordinal]
+    }
+}
+
+/// Maps an infinite track level into the bounded 1...10 tuning scale the game
+/// engines already understand. A track ramps within its own difficulty band
+/// and approaches the band's ceiling asymptotically, so very large levels stay
+/// valid while procedural games can continue producing fresh boards forever.
+enum DifficultyScale {
+    private static let bandWidth = 9.0 / Double(ChallengeDifficulty.allCases.count)
+    private static let rampLength = 9.0
+
+    static func legacyDifficulty(for difficulty: ChallengeDifficulty, level: Int) -> Double {
+        let lower = 1.0 + Double(difficulty.ordinal) * bandWidth
+        let progress = 1 - exp(-Double(max(1, level) - 1) / rampLength)
+        return DifficultyState.clamp(lower + bandWidth * progress)
+    }
+
+    /// Number of safe authored/tuned content steps behind a game's procedural
+    /// curve. This is a tuning range, not a player-facing level limit.
+    static func contentCeiling(for game: GameID) -> Int {
         switch game {
         case .arrowStorm, .colorClash, .tileShift:
             50
@@ -36,47 +94,40 @@ enum LevelLadder {
         }
     }
 
-    static func pageCount(for game: GameID) -> Int {
-        (levelCount(for: game) + pageSize - 1) / pageSize
+    static func contentLevel(for game: GameID,
+                             difficulty: ChallengeDifficulty,
+                             trackLevel: Int) -> Int {
+        contentLevel(for: game,
+                     legacyDifficulty: legacyDifficulty(for: difficulty, level: trackLevel))
     }
 
-    /// 0-indexed page containing a 1-indexed level.
-    static func page(of level: Int) -> Int {
-        max(0, (level - 1) / pageSize)
+    static func contentLevel(for game: GameID, legacyDifficulty: Double) -> Int {
+        let count = contentCeiling(for: game)
+        let value = DifficultyState.clamp(legacyDifficulty)
+        let level = 1 + Int((((value - 1) / 9) * Double(count - 1)).rounded())
+        return min(count, max(1, level))
     }
 
-    static func levels(inPage page: Int, of game: GameID) -> ClosedRange<Int> {
-        let lower = page * pageSize + 1
-        let upper = min(levelCount(for: game), (page + 1) * pageSize)
-        return lower...max(lower, upper)
+    static func gameDifficulty(for game: GameID,
+                               difficulty: ChallengeDifficulty,
+                               trackLevel: Int,
+                               persisted: DifficultyState) -> DifficultyState {
+        var state = persisted
+        state.level = legacyDifficulty(for: difficulty, level: trackLevel)
+        return state
     }
 
-    /// Freeze map level n onto the game's legacy 1...10 difficulty scale.
-    /// Games keep reading `cfg.difficulty.level`; this mapping is what makes
-    /// every existing tuning curve serve fixed exam specs without rewrites.
-    static func legacyDifficulty(for game: GameID, level: Int) -> Double {
-        let count = levelCount(for: game)
-        guard count > 1 else { return 1 }
-        let clamped = min(count, max(1, level))
-        return DifficultyState.clamp(1 + 9 * Double(clamped - 1) / Double(count - 1))
-    }
-
-    /// Inverse of `legacyDifficulty`: the map level whose spec is closest to
-    /// a legacy 1...10 difficulty. Used to seed existing users' frontiers.
-    static func nearestLevel(for game: GameID, legacyDifficulty value: Double) -> Int {
-        let count = levelCount(for: game)
-        let v = DifficultyState.clamp(value)
-        let n = 1 + Int(((v - 1) / 9 * Double(count - 1)).rounded())
-        return min(count, max(1, n))
-    }
-
-    /// A difficulty state whose `.level` carries the frozen exam spec. Mastery
-    /// bookkeeping fields come from the persisted state so WPI evolution
-    /// continues; only the served challenge is pinned to the map.
-    static func examDifficulty(for game: GameID, level: Int, persisted: DifficultyState) -> DifficultyState {
-        var d = persisted
-        d.level = legacyDifficulty(for: game, level: level)
-        return d
+    /// Best-effort conversion used only by the one-time star-map migration.
+    static func trackPosition(forLegacyDifficulty legacyDifficulty: Double) ->
+        (difficulty: ChallengeDifficulty, level: Int) {
+        let value = DifficultyState.clamp(legacyDifficulty)
+        let rawBand = Int((value - 1) / bandWidth)
+        let ordinal = min(ChallengeDifficulty.allCases.count - 1, max(0, rawBand))
+        let difficulty = ChallengeDifficulty(ordinal: ordinal) ?? .easy
+        let lower = 1.0 + Double(ordinal) * bandWidth
+        let ratio = min(0.98, max(0, (value - lower) / bandWidth))
+        let level = 1 + Int((-rampLength * log(1 - ratio)).rounded())
+        return (difficulty, max(1, level))
     }
 }
 
@@ -96,8 +147,6 @@ enum StarGrader {
         }
     }
 
-    /// Grade a scored run. Prefers the scoring pipeline's difficulty-normalized
-    /// quality; falls back to raw accuracy for results that bypassed scoring.
     static func stars(for result: GameResult) -> Int {
         stars(quality: result.performanceQuality ?? result.accuracy)
     }
@@ -110,25 +159,27 @@ struct LevelRecord: Codable, Equatable {
     var bestQuality: Double
 }
 
+struct DifficultyTrackProgress: Codable, Equatable {
+    var unlockedLevel: Int = 1
+    var records: [Int: LevelRecord] = [:]
+}
+
 struct MarathonBest: Codable, Equatable {
     var depth: Int
     var score: Int
 }
 
-/// Local-first persistence for map progress; UserDefaults is the source of
-/// truth on device. Game Center mirrors bests/achievements best-effort.
 @MainActor
 @Observable
 final class LevelProgressStore {
-    private(set) var records: [GameID: [Int: LevelRecord]] = [:]
+    private(set) var tracks: [GameID: [ChallengeDifficulty: DifficultyTrackProgress]] = [:]
+    private(set) var selections: [GameID: ChallengeDifficulty] = [:]
+    /// Retained for Split, the app's standalone endless mode.
     private(set) var marathonBests: [GameID: MarathonBest] = [:]
-    /// Highest level granted by the one-time adaptive-difficulty migration.
-    /// Gates never apply at or below `seededThrough + 1` — a converted user
-    /// must be able to play their frontier on day one.
-    private(set) var seededThrough: [GameID: Int] = [:]
 
-    private static let storageKey = "wits.levelProgress.v1"
-    private static let seededKey = "wits.levelProgress.seeded.v1"
+    private static let storageKey = "wits.difficultyProgress.v2"
+    private static let migrationKey = "wits.difficultyProgress.migrated.v2"
+    private static let legacyStorageKey = "wits.levelProgress.v1"
 
     init() {
         load()
@@ -136,65 +187,42 @@ final class LevelProgressStore {
 
     // MARK: Queries
 
-    func record(for game: GameID, level: Int) -> LevelRecord? {
-        records[game]?[level]
+    func selectedDifficulty(for game: GameID) -> ChallengeDifficulty {
+        selections[game] ?? .easy
     }
 
-    func stars(for game: GameID, level: Int) -> Int {
-        records[game]?[level]?.stars ?? 0
+    func currentLevel(for game: GameID, difficulty: ChallengeDifficulty) -> Int {
+        max(1, tracks[game]?[difficulty]?.unlockedLevel ?? 1)
     }
 
-    func isPassed(_ game: GameID, level: Int) -> Bool {
-        stars(for: game, level: level) >= 1
+    func record(for game: GameID,
+                difficulty: ChallengeDifficulty,
+                level: Int) -> LevelRecord? {
+        tracks[game]?[difficulty]?.records[level]
     }
 
-    func starsInPage(_ game: GameID, page: Int) -> Int {
-        LevelLadder.levels(inPage: page, of: game).reduce(0) { $0 + stars(for: game, level: $1) }
+    func stars(for game: GameID,
+               difficulty: ChallengeDifficulty,
+               level: Int) -> Int {
+        record(for: game, difficulty: difficulty, level: level)?.stars ?? 0
     }
 
     func totalStars(for game: GameID) -> Int {
-        records[game]?.values.reduce(0) { $0 + $1.stars } ?? 0
+        tracks[game]?.values.reduce(0) { total, track in
+            total + track.records.values.reduce(0) { $0 + $1.stars }
+        } ?? 0
     }
 
-    /// A page is open when the previous page has met the star gate — or when
-    /// the page already holds progress, or sits inside seeded territory
-    /// (past play and migrated frontiers never get retroactively locked out;
-    /// gates only bar first entry).
-    func isPageUnlocked(_ game: GameID, page: Int) -> Bool {
-        guard page > 0 else { return true }
-        let range = LevelLadder.levels(inPage: page, of: game)
-        if range.lowerBound <= (seededThrough[game] ?? 0) + 1 { return true }
-        if range.contains(where: { isPassed(game, level: $0) }) { return true }
-        return starsInPage(game, page: page - 1) >= LevelLadder.pageGateStars
+    func totalClears(for game: GameID) -> Int {
+        tracks[game]?.values.reduce(0) { total, track in
+            total + track.records.values.filter { $0.stars >= 1 }.count
+        } ?? 0
     }
 
-    /// Level 1 is always open; otherwise the previous level must be passed and
-    /// the level's page gate met.
-    func isUnlocked(_ game: GameID, level: Int) -> Bool {
-        guard level > 1 else { return true }
-        guard level <= LevelLadder.levelCount(for: game) else { return false }
-        return isPassed(game, level: level - 1) && isPageUnlocked(game, page: LevelLadder.page(of: level))
-    }
-
-    /// Lowest unpassed level (the "next up" tile), ignoring gates.
-    func frontier(for game: GameID) -> Int {
-        let count = LevelLadder.levelCount(for: game)
-        for level in 1...count where !isPassed(game, level: level) {
-            return level
-        }
-        return count
-    }
-
-    /// The level a workout serves: the frontier when it is actually playable;
-    /// when a page gate blocks it, the weakest-star passed level in the
-    /// previous page (consolidation replay that also earns the gate stars).
-    func workoutLevel(for game: GameID) -> Int {
-        let frontier = frontier(for: game)
-        if isUnlocked(game, level: frontier) { return frontier }
-        let page = LevelLadder.page(of: frontier)
-        guard page > 0 else { return 1 }
-        let previous = LevelLadder.levels(inPage: page - 1, of: game)
-        return previous.min { stars(for: game, level: $0) < stars(for: game, level: $1) } ?? frontier
+    func hasThreeStarLevel(for game: GameID) -> Bool {
+        tracks[game]?.values.contains { track in
+            track.records.values.contains { $0.stars >= 3 }
+        } ?? false
     }
 
     func marathonBest(for game: GameID) -> MarathonBest? {
@@ -203,23 +231,38 @@ final class LevelProgressStore {
 
     // MARK: Mutations
 
-    /// Record a level attempt. Stars only ever go up. Returns true when the
-    /// attempt improved the stored stars.
+    func select(_ difficulty: ChallengeDifficulty, for game: GameID) {
+        guard selections[game] != difficulty else { return }
+        selections[game] = difficulty
+        save()
+    }
+
+    /// Saves the best result for this track level. A pass advances only this
+    /// difficulty's frontier; attempts on every other track remain untouched.
     @discardableResult
-    func recordAttempt(game: GameID, level: Int, stars: Int, quality: Double) -> Bool {
-        var perGame = records[game] ?? [:]
-        let existing = perGame[level]
-        let improved = stars > (existing?.stars ?? 0)
-        perGame[level] = LevelRecord(
+    func recordAttempt(game: GameID,
+                       difficulty: ChallengeDifficulty,
+                       level: Int,
+                       stars: Int,
+                       quality: Double) -> Bool {
+        let safeLevel = max(1, level)
+        var perGame = tracks[game] ?? [:]
+        var track = perGame[difficulty] ?? DifficultyTrackProgress()
+        let existing = track.records[safeLevel]
+        let improved = stars > (existing?.stars ?? 0) || quality > (existing?.bestQuality ?? 0)
+        track.records[safeLevel] = LevelRecord(
             stars: max(stars, existing?.stars ?? 0),
             bestQuality: max(quality, existing?.bestQuality ?? 0)
         )
-        records[game] = perGame
+        if stars >= 1, safeLevel >= track.unlockedLevel, safeLevel < Int.max {
+            track.unlockedLevel = safeLevel + 1
+        }
+        perGame[difficulty] = track
+        tracks[game] = perGame
         save()
         return improved
     }
 
-    /// Record a marathon run. Returns true on a new best depth.
     @discardableResult
     func recordMarathon(game: GameID, depth: Int, score: Int) -> Bool {
         let current = marathonBests[game]
@@ -232,65 +275,136 @@ final class LevelProgressStore {
         return newBest
     }
 
-    // MARK: Migration seeding
+    // MARK: Migration
 
-    /// One-time conversion for existing users: unlock the map up to the level
-    /// equivalent to their old adaptive difficulty, granting 1★ per level so
-    /// nobody replays trivial content (no stars gifted above 1★ — see doc §8).
-    func seedIfNeeded(from difficulty: [GameID: DifficultyState]) {
-        guard !UserDefaults.standard.bool(forKey: Self.seededKey) else { return }
-        UserDefaults.standard.set(true, forKey: Self.seededKey)
-        for (game, state) in difficulty where state.sessionsPlayed > 0 {
-            let frontier = LevelLadder.nearestLevel(for: game, legacyDifficulty: state.level)
-            guard frontier > 1 else { continue }
-            var perGame = records[game] ?? [:]
-            for level in 1..<frontier where perGame[level] == nil {
-                perGame[level] = LevelRecord(stars: 1, bestQuality: StarGrader.passQuality)
+    /// Imports the old finite star map once. Old levels are projected onto the
+    /// nearest new difficulty track; untouched tracks still begin at level 1.
+    func migrateIfNeeded(from adaptiveDifficulty: [GameID: DifficultyState]) {
+        guard !UserDefaults.standard.bool(forKey: Self.migrationKey) else { return }
+
+        if let data = UserDefaults.standard.data(forKey: Self.legacyStorageKey),
+           let legacy = try? JSONDecoder().decode(LegacySnapshot.self, from: data) {
+            migrate(legacy)
+        } else {
+            for (game, state) in adaptiveDifficulty where state.sessionsPlayed > 0 {
+                let position = DifficultyScale.trackPosition(forLegacyDifficulty: state.level)
+                var perGame = tracks[game] ?? [:]
+                var track = perGame[position.difficulty] ?? DifficultyTrackProgress()
+                track.unlockedLevel = max(track.unlockedLevel, position.level)
+                perGame[position.difficulty] = track
+                tracks[game] = perGame
+                selections[game] = position.difficulty
             }
-            records[game] = perGame
-            seededThrough[game] = frontier - 1
         }
+
+        UserDefaults.standard.set(true, forKey: Self.migrationKey)
         save()
     }
 
-    // MARK: Persistence
-
-    private struct Snapshot: Codable {
+    private struct LegacySnapshot: Codable {
         var records: [String: [Int: LevelRecord]]
         var marathon: [String: MarathonBest]?
         var seededThrough: [String: Int]?
     }
 
+    private func migrate(_ legacy: LegacySnapshot) {
+        for (key, oldRecords) in legacy.records {
+            guard let game = GameID(rawValue: key) else { continue }
+            var perGame = tracks[game] ?? [:]
+            var furthest: (difficulty: ChallengeDifficulty, level: Int)?
+
+            for (oldLevel, record) in oldRecords {
+                let ceiling = DifficultyScale.contentCeiling(for: game)
+                let bounded = min(ceiling, max(1, oldLevel))
+                let legacyDifficulty = 1 + 9 * Double(bounded - 1) / Double(max(1, ceiling - 1))
+                let position = DifficultyScale.trackPosition(forLegacyDifficulty: legacyDifficulty)
+                var track = perGame[position.difficulty] ?? DifficultyTrackProgress()
+                let existing = track.records[position.level]
+                track.records[position.level] = LevelRecord(
+                    stars: max(record.stars, existing?.stars ?? 0),
+                    bestQuality: max(record.bestQuality, existing?.bestQuality ?? 0)
+                )
+                if record.stars >= 1 {
+                    track.unlockedLevel = max(track.unlockedLevel, position.level + 1)
+                }
+                perGame[position.difficulty] = track
+                if furthest == nil || oldLevel > (furthest?.level ?? 0) {
+                    furthest = (position.difficulty, oldLevel)
+                }
+            }
+
+            tracks[game] = perGame
+            if let furthest { selections[game] = furthest.difficulty }
+        }
+
+        for (key, best) in legacy.marathon ?? [:] {
+            if let game = GameID(rawValue: key) { marathonBests[game] = best }
+        }
+    }
+
+    // MARK: Persistence
+
+    private struct StoredTrack: Codable {
+        var game: GameID
+        var difficulty: ChallengeDifficulty
+        var progress: DifficultyTrackProgress
+    }
+
+    private struct StoredSelection: Codable {
+        var game: GameID
+        var difficulty: ChallengeDifficulty
+    }
+
+    private struct StoredMarathon: Codable {
+        var game: GameID
+        var best: MarathonBest
+    }
+
+    private struct Snapshot: Codable {
+        var tracks: [StoredTrack]
+        var selections: [StoredSelection]
+        var marathon: [StoredMarathon]
+    }
+
     private func load() {
         guard let data = UserDefaults.standard.data(forKey: Self.storageKey),
-              let snap = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
-        for (key, value) in snap.records {
-            if let game = GameID(rawValue: key) { records[game] = value }
+              let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) else { return }
+
+        for entry in snapshot.tracks {
+            var perGame = tracks[entry.game] ?? [:]
+            perGame[entry.difficulty] = entry.progress
+            tracks[entry.game] = perGame
         }
-        for (key, value) in snap.marathon ?? [:] {
-            if let game = GameID(rawValue: key) { marathonBests[game] = value }
+        for entry in snapshot.selections {
+            selections[entry.game] = entry.difficulty
         }
-        for (key, value) in snap.seededThrough ?? [:] {
-            if let game = GameID(rawValue: key) { seededThrough[game] = value }
+        for entry in snapshot.marathon {
+            marathonBests[entry.game] = entry.best
         }
     }
 
     private func save() {
-        var snap = Snapshot(records: [:], marathon: [:], seededThrough: [:])
-        for (game, value) in records { snap.records[game.rawValue] = value }
-        for (game, value) in marathonBests { snap.marathon?[game.rawValue] = value }
-        for (game, value) in seededThrough { snap.seededThrough?[game.rawValue] = value }
-        if let data = try? JSONEncoder().encode(snap) {
+        var snapshot = Snapshot(tracks: [], selections: [], marathon: [])
+        for (game, values) in tracks {
+            for (difficulty, progress) in values {
+                snapshot.tracks.append(StoredTrack(game: game,
+                                                   difficulty: difficulty,
+                                                   progress: progress))
+            }
+        }
+        for (game, difficulty) in selections {
+            snapshot.selections.append(StoredSelection(game: game, difficulty: difficulty))
+        }
+        for (game, best) in marathonBests {
+            snapshot.marathon.append(StoredMarathon(game: game, best: best))
+        }
+        if let data = try? JSONEncoder().encode(snapshot) {
             UserDefaults.standard.set(data, forKey: Self.storageKey)
         }
     }
 }
 
-// MARK: - Marathon scoring
-
 enum MarathonMath {
-    /// Clearing level n pays 100·n·quality — cumulative total grows
-    /// quadratically with depth so late levels dominate (no farming).
     static func points(level: Int, quality: Double) -> Int {
         Int((100 * Double(level) * max(0, min(1.5, quality))).rounded())
     }

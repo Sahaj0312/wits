@@ -325,7 +325,8 @@ struct PegSolitaireScreen: View {
         self.cfg = cfg
         self.onResult = onResult
         self.level = cfg.difficulty.level
-        self.mapLevel = cfg.mapLevel ?? LevelLadder.nearestLevel(for: .pegSolitaire, legacyDifficulty: cfg.difficulty.level)
+        self.mapLevel = cfg.mapLevel ?? DifficultyScale.contentLevel(for: .pegSolitaire,
+                                                                     legacyDifficulty: cfg.difficulty.level)
     }
 
     private var pegsLeft: Int { puzzle.pegs.count }

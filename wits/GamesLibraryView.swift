@@ -2,7 +2,7 @@
 //  GamesLibraryView.swift
 //  wits
 //
-//  The home screen: every game as a card with its star progress, the daily
+//  The home screen: every game as a card with its selected difficulty progress, the daily
 //  streak flame, and the settings sheet.
 //
 
@@ -137,11 +137,11 @@ struct GamesLibraryView: View {
         .accessibilityLabel(Text("\(g.displayName). \(g.tagline)"))
     }
 
-    /// One quiet line of progression per card: star total for map games,
+    /// One quiet line of progression per card: selected track for regular games,
     /// best level for split.
     private func progressPill(_ g: GameID) -> some View {
         HStack(spacing: 4) {
-            Image(systemName: g.isStandalone ? "trophy.fill" : "star.fill")
+            Image(systemName: g.isStandalone ? "trophy.fill" : "flag.fill")
                 .font(.system(size: 10, weight: .heavy))
                 .foregroundStyle(Color.witsGold)
             Text(progressLabel(g))
@@ -159,7 +159,9 @@ struct GamesLibraryView: View {
             let best = app.levels.marathonBest(for: g)?.depth ?? 0
             return best > 0 ? "best \(best)" : "no runs yet"
         }
-        return "\(app.levels.totalStars(for: g))/\(3 * LevelLadder.levelCount(for: g))"
+        let difficulty = app.levels.selectedDifficulty(for: g)
+        let level = app.levels.currentLevel(for: g, difficulty: difficulty)
+        return "\(difficulty.title) · level \(level)"
     }
 
     /// Tilted sticker in the reference-app spirit — marks split as the one
@@ -177,47 +179,36 @@ struct GamesLibraryView: View {
     }
 }
 
-/// Pre-game chooser: the star map, then exam or marathon runs in a
-/// full-screen cover (design doc §1/§4).
+/// Pre-game difficulty selector followed by one unbounded track level.
 private struct GameLauncher: View {
     let game: GameID
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
-    @State private var phase: Phase = .map
+    @State private var phase: Phase = .selector
+    @State private var playDifficulty: ChallengeDifficulty = .easy
     @State private var playLevel = 1
-    @State private var marathonActive = false
-    @State private var marathonDepth = 0     // last level cleared this run
-    @State private var marathonScore = 0
-    @State private var marathonNewBest = false
     @State private var lastStars = 0
     @State private var lastQuality = 0.0
     @State private var lastImproved = false
     @State private var attempt = 0   // bump to force a fresh game instance
     @State private var pauseController = GamePauseController()
 
-    private enum Phase { case map, tutorial, playing, levelResult, marathonResult }
+    private enum Phase { case selector, tutorial, playing, levelResult }
 
     var body: some View {
         switch phase {
-        case .map:
+        case .selector:
             if game == .split {
-                // Split is survival-only: no star map to show, and its screen
+                // Split is survival-only: no selector to show, and its screen
                 // carries its own intro/game-over chrome — go straight there.
                 Color.witsBg.ignoresSafeArea()
                     .onAppear { startRun() }
             } else {
-                LevelMapView(
+                DifficultySelectView(
                     game: game,
-                    onPlayLevel: { level in
-                        marathonActive = false
+                    onPlay: { difficulty, level in
+                        playDifficulty = difficulty
                         playLevel = level
-                        startRun()
-                    },
-                    onPlayMarathon: {
-                        marathonActive = true
-                        marathonDepth = 0
-                        marathonScore = 0
-                        playLevel = 1
                         startRun()
                     },
                     onClose: { dismiss() }
@@ -236,7 +227,7 @@ private struct GameLauncher: View {
                     if game == .split {
                         dismiss()   // no map page behind split's tutorial
                     } else {
-                        withAnimation(.easeOut(duration: 0.2)) { phase = .map }
+                        withAnimation(.easeOut(duration: 0.2)) { phase = .selector }
                     }
                 }
             )
@@ -258,12 +249,12 @@ private struct GameLauncher: View {
                         // Full-bleed stage matching the game's surface, so no
                         // app-background band shows in the safe areas.
                         GameStageBackground(game: game)
-                        makeGameView(game, config: .level(game,
-                                                          mapLevel: playLevel,
-                                                          persisted: app.difficultyFor(game),
-                                                          freePlay: true,
-                                                          marathon: marathonActive,
-                                                          pauseController: pauseController)) { r in
+                        makeGameView(game, config: .challenge(game,
+                                                              difficulty: playDifficulty,
+                                                              trackLevel: playLevel,
+                                                              persisted: app.difficultyFor(game),
+                                                              freePlay: true,
+                                                              pauseController: pauseController)) { r in
                             handle(r)
                         }
                         .id(attempt)
@@ -275,11 +266,6 @@ private struct GameLauncher: View {
                         .padding(.bottom, game.ownsSafeAreaSurface ? 0 : 8)
                         .allowsHitTesting(!pauseController.isPaused)
                         .clipped()
-                    }
-                    .overlay(alignment: .top) {
-                        if marathonActive {
-                            marathonBanner
-                        }
                     }
                     .overlay {
                         if !game.usesEmbeddedQuitControl, !pauseController.isPaused {
@@ -294,11 +280,7 @@ private struct GameLauncher: View {
                                               controller: pauseController,
                                               onQuit: {
                                                   pauseController.reset()
-                                                  if marathonActive, marathonDepth >= 1 {
-                                                      endMarathon()
-                                                  } else {
-                                                      withAnimation { phase = .map }
-                                                  }
+                                                  withAnimation { phase = .selector }
                                               })
                         }
                     }
@@ -310,50 +292,21 @@ private struct GameLauncher: View {
                 }
             }
         case .levelResult:
-            LevelResultView(
+            DifficultyLevelResultView(
                 game: game,
+                difficulty: playDifficulty,
                 level: playLevel,
                 stars: lastStars,
                 quality: lastQuality,
                 improved: lastImproved,
-                nextUnlocked: playLevel < LevelLadder.levelCount(for: game)
-                    && app.levels.isUnlocked(game, level: playLevel + 1),
                 onRetry: { startRun() },
                 onNext: {
-                    playLevel += 1
+                    playLevel = app.levels.currentLevel(for: game, difficulty: playDifficulty)
                     startRun()
                 },
-                onMap: { withAnimation(.easeOut(duration: 0.2)) { phase = .map } }
-            )
-        case .marathonResult:
-            MarathonResultView(
-                game: game,
-                depth: marathonDepth,
-                score: marathonScore,
-                best: app.levels.marathonBest(for: game),
-                isNewBest: marathonNewBest,
-                onRunAgain: {
-                    marathonDepth = 0
-                    marathonScore = 0
-                    playLevel = 1
-                    startRun()
-                },
-                onMap: { withAnimation(.easeOut(duration: 0.2)) { phase = .map } }
+                onSelector: { withAnimation(.easeOut(duration: 0.2)) { phase = .selector } }
             )
         }
-    }
-
-    /// A quiet strip so a marathon run always shows where the chain stands.
-    private var marathonBanner: some View {
-        Label("marathon · level \(playLevel)", systemImage: "infinity")
-            .font(.system(size: 12, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white)
-            .monospacedDigit()
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.black.opacity(0.35), in: Capsule())
-            .padding(.top, 6)
-            .allowsHitTesting(false)
     }
 
     private func startRun() {
@@ -366,43 +319,23 @@ private struct GameLauncher: View {
     private func handle(_ result: GameResult) {
         pauseController.reset()
         // Snapshot before recording — recordGameResult merges this run in.
-        let starsBefore = app.levels.stars(for: game, level: playLevel)
-        let qualityBefore = app.levels.record(for: game, level: playLevel)?.bestQuality ?? 0
+        let starsBefore = app.levels.stars(for: game,
+                                           difficulty: playDifficulty,
+                                           level: playLevel)
+        let qualityBefore = app.levels.record(for: game,
+                                              difficulty: playDifficulty,
+                                              level: playLevel)?.bestQuality ?? 0
         var tagged = result
-        tagged.raw["mapLevel"] = Double(playLevel)
-        if marathonActive { tagged.raw["marathon"] = 1 }
+        tagged.raw["trackLevel"] = Double(playLevel)
+        tagged.raw["difficultyTrack"] = Double(playDifficulty.ordinal)
         let scored = app.recordGameResult(tagged)
         let quality = scored.performanceQuality ?? scored.accuracy
         let stars = StarGrader.stars(quality: quality)
-
-        if marathonActive {
-            if stars >= 1 {
-                marathonScore += MarathonMath.points(level: playLevel, quality: quality)
-                marathonDepth = playLevel
-                if playLevel >= LevelLadder.levelCount(for: game) {
-                    endMarathon()   // cleared the whole map — go out on top
-                } else {
-                    playLevel += 1
-                    attempt += 1    // next link, fresh instance
-                }
-            } else {
-                endMarathon()
-            }
-            return
-        }
 
         lastStars = stars
         lastQuality = quality
         lastImproved = stars > starsBefore || (stars >= 1 && quality > qualityBefore)
         withAnimation(.easeOut(duration: 0.2)) { phase = .levelResult }
-        AdManager.shared.gameCompleted()
-        AdManager.shared.maybeShowInterstitial()
-    }
-
-    private func endMarathon() {
-        marathonNewBest = marathonDepth >= 1
-            && app.recordMarathon(game: game, depth: marathonDepth, score: marathonScore)
-        withAnimation(.easeOut(duration: 0.2)) { phase = .marathonResult }
         AdManager.shared.gameCompleted()
         AdManager.shared.maybeShowInterstitial()
     }

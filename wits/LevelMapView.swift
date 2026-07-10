@@ -2,448 +2,301 @@
 //  LevelMapView.swift
 //  wits
 //
-//  The star map: a game's pregame surface (design doc §4). Marathon card
-//  pinned on top, then paginated pages of 10 level tiles with star grades,
-//  locks, and page gates. Replaces the old GameCard detail sheet in the
-//  library.
+//  Pre-game difficulty selector. Each difficulty owns an independent,
+//  unbounded level track.
 //
 
 import SwiftUI
 
-struct LevelMapView: View {
+struct DifficultySelectView: View {
     let game: GameID
-    var onPlayLevel: (Int) -> Void
-    var onPlayMarathon: () -> Void   // marathon always starts at level 1
+    var onPlay: (ChallengeDifficulty, Int) -> Void
     var onClose: () -> Void
 
-    private struct SelectedLevel: Identifiable {
-        let level: Int
-        var id: Int { level }
-    }
-
     @Environment(AppModel.self) private var app
-    @State private var page: Int
-    @State private var selectedLevel: SelectedLevel?
+    @State private var difficulty: ChallengeDifficulty = .easy
+    @State private var showHelp = false
 
-    init(game: GameID,
-         onPlayLevel: @escaping (Int) -> Void,
-         onPlayMarathon: @escaping () -> Void,
-         onClose: @escaping () -> Void) {
-        self.game = game
-        self.onPlayLevel = onPlayLevel
-        self.onPlayMarathon = onPlayMarathon
-        self.onClose = onClose
-        _page = State(initialValue: 0)
+    private var level: Int {
+        app.levels.currentLevel(for: game, difficulty: difficulty)
     }
-
-    private var levelCount: Int { LevelLadder.levelCount(for: game) }
-    private var frontier: Int { app.levels.frontier(for: game) }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
+        GeometryReader { proxy in
+            let heroHeight = min(350, max(285, proxy.size.height * 0.37))
             ScrollView(showsIndicators: false) {
-                VStack(spacing: 14) {
-                    marathonCard
-                    pageStrip
-                    levelGrid
-                    gateFooter
+                VStack(spacing: 0) {
+                    hero
+                        .frame(height: heroHeight)
+
+                    selector
+                        .frame(minHeight: max(430, proxy.size.height - heroHeight))
                 }
-                .padding(.horizontal, WitsMetrics.screenPadding)
-                .padding(.top, 6)
-                .padding(.bottom, 16)
+                .frame(minHeight: proxy.size.height)
             }
-            footer
+            .background(Color.witsBg)
         }
-        .background(Color.witsBg.ignoresSafeArea())
+        .ignoresSafeArea(edges: .bottom)
         .onAppear {
-            page = LevelLadder.page(of: min(frontier, levelCount))
+            difficulty = app.levels.selectedDifficulty(for: game)
         }
-        .sheet(item: $selectedLevel) { selected in
-            LevelDetailSheet(
-                game: game,
-                level: selected.level,
-                record: app.levels.record(for: game, level: selected.level),
-                unlocked: app.levels.isUnlocked(game, level: selected.level),
-                onPlay: {
-                    selectedLevel = nil
-                    onPlayLevel(selected.level)
-                }
-            )
+        .onChange(of: difficulty) { _, value in
+            app.levels.select(value, for: game)
+        }
+        .sheet(isPresented: $showHelp) {
+            GameHelpSheet(game: game)
         }
     }
 
-    // MARK: Header
+    private var hero: some View {
+        ZStack {
+            game.posterBackground
+            GamePosterArt(game: game)
+                .scaleEffect(1.22)
+                .opacity(0.62)
+            Color.black.opacity(0.24)
 
-    private var header: some View {
-        HStack(spacing: 12) {
-            Image(systemName: game.symbol)
-                .font(.system(size: 19, weight: .heavy))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(
-                    LinearGradient(colors: [game.domain.color, game.domain.heroTopColor],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing),
-                    in: RoundedRectangle(cornerRadius: WitsMetrics.chipRadius, style: .continuous)
-                )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(game.displayName)
-                    .font(.witsDisplay(24))
-                    .foregroundStyle(Color.witsInk)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                HStack(spacing: 5) {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 10, weight: .heavy))
-                        .foregroundStyle(Color.witsWarm)
-                    Text("\(app.levels.totalStars(for: game)) / \(levelCount * 3)")
-                        .font(.witsLabel(12))
-                        .foregroundStyle(Color.witsMuted)
-                        .monospacedDigit()
-                    Text("·")
-                        .foregroundStyle(Color.witsFaint)
-                    Text(game.subskill)
-                        .font(.witsLabel(12))
-                        .foregroundStyle(game.domain.color)
-                        .lineLimit(1)
+            VStack(spacing: 0) {
+                HStack {
+                    circleButton(symbol: "chevron.left", label: "Close", action: onClose)
+                    Spacer()
+                    circleButton(symbol: "questionmark", label: "How to play") {
+                        showHelp = true
+                    }
                 }
-            }
-            Spacer()
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .heavy))
-                    .foregroundStyle(Color.witsMuted)
-                    .frame(width: 40, height: 40)
-                    .background(Color.witsCard, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("close")
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.top, 12)
-        .padding(.bottom, 10)
-    }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
 
-    // MARK: Marathon
+                Spacer(minLength: 12)
 
-    private var marathonCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label("marathon", systemImage: "infinity")
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                Text(game.displayName.uppercased())
+                    .font(.system(size: 36, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                Spacer()
-                if let best = app.levels.marathonBest(for: game) {
-                    Text("best: level \(best.depth)")
-                        .font(.witsLabel(12))
-                        .foregroundStyle(.white.opacity(0.85))
-                        .monospacedDigit()
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.72)
+
+                Text(game.cardHow)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.94))
+                    .multilineTextAlignment(.center)
+                    .lineLimit(4)
+                    .minimumScaleFactor(0.82)
+                    .padding(.horizontal, 34)
+                    .padding(.top, 12)
+
+                Spacer(minLength: 28)
+            }
+        }
+        .clipped()
+    }
+
+    private var selector: some View {
+        VStack(spacing: 0) {
+            DifficultyFace(difficulty: difficulty)
+                .padding(.top, 22)
+
+            Text(difficulty.title.uppercased())
+                .font(.system(size: 34, weight: .black, design: .rounded))
+                .foregroundStyle(difficulty.color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .padding(.top, 16)
+
+            DifficultySlider(selection: $difficulty)
+                .padding(.horizontal, 28)
+                .padding(.top, 18)
+
+            HStack(spacing: 0) {
+                ForEach(ChallengeDifficulty.allCases) { option in
+                    Text(option.shortTitle)
+                        .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(option == difficulty ? option.color : Color.witsFaint)
+                        .frame(maxWidth: .infinity)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
                 }
             }
-            Text("everyone starts at level 1 — climb until you break.")
-                .font(.witsBody(13.5))
-                .foregroundStyle(.white.opacity(0.8))
+            .padding(.horizontal, 26)
+            .padding(.top, 2)
 
-            Button(action: onPlayMarathon) {
-                Text("run")
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
-                    .foregroundStyle(game.domain.color)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(.white, in: Capsule())
+            Spacer(minLength: 28)
+
+            Button {
+                onPlay(difficulty, level)
+            } label: {
+                VStack(spacing: 1) {
+                    Text("PLAY")
+                        .font(.system(size: 30, weight: .black, design: .rounded))
+                    Text("Level \(level)")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 78)
+                .background(difficulty.color,
+                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .shadow(color: difficulty.color.opacity(0.28), radius: 10, y: 6)
             }
             .buttonStyle(PressScale())
+            .padding(.horizontal, 42)
+
+            Spacer(minLength: 26)
         }
-        .padding(16)
-        .background(
-            LinearGradient(colors: [game.domain.color, game.domain.heroTopColor],
-                           startPoint: .topLeading, endPoint: .bottomTrailing),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
+        .background(Color.witsBg)
     }
 
-    // MARK: Pages
-
-    private var pageStrip: some View {
-        HStack(spacing: 8) {
-            ForEach(0..<LevelLadder.pageCount(for: game), id: \.self) { p in
-                let unlocked = app.levels.isPageUnlocked(game, page: p)
-                Button {
-                    withAnimation(.easeOut(duration: 0.18)) { page = p }
-                } label: {
-                    HStack(spacing: 4) {
-                        if !unlocked {
-                            Image(systemName: "lock.fill")
-                                .font(.system(size: 9, weight: .heavy))
-                        }
-                        Text("\(p + 1)")
-                            .font(.system(size: 13.5, weight: .heavy, design: .rounded))
-                            .monospacedDigit()
-                    }
-                    .foregroundStyle(page == p ? .white : unlocked ? Color.witsInk : Color.witsFaint)
-                    .frame(minWidth: 40)
-                    .padding(.vertical, 8)
-                    .background(page == p ? game.domain.color : Color.witsCard, in: Capsule())
-                    .overlay(Capsule().strokeBorder(page == p ? .clear : Color.witsLine, lineWidth: 1.5))
-                }
-                .buttonStyle(.plain)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    private var levelGrid: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 2), spacing: 12) {
-            ForEach(Array(LevelLadder.levels(inPage: page, of: game)), id: \.self) { level in
-                LevelTile(
-                    level: level,
-                    stars: app.levels.stars(for: game, level: level),
-                    unlocked: app.levels.isUnlocked(game, level: level),
-                    isFrontier: level == frontier,
-                    tint: game.domain.color
-                ) {
-                    if app.levels.isUnlocked(game, level: level) {
-                        selectedLevel = SelectedLevel(level: level)
-                    }
-                }
-            }
-        }
-        .animation(.easeOut(duration: 0.15), value: page)
-    }
-
-    @ViewBuilder
-    private var gateFooter: some View {
-        if !app.levels.isPageUnlocked(game, page: page) {
-            let have = app.levels.starsInPage(game, page: page - 1)
-            Label("earn \(LevelLadder.pageGateStars - have) more ★ on page \(page) to unlock",
-                  systemImage: "lock.fill")
-                .font(.witsLabel(12))
-                .foregroundStyle(Color.witsMuted)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-    }
-
-    private var footer: some View {
-        VStack(spacing: 0) {
-            Cta(title: frontier <= levelCount && app.levels.isUnlocked(game, level: frontier)
-                ? "play level \(frontier)"
-                : "replay for stars") {
-                onPlayLevel(app.levels.workoutLevel(for: game))
-            }
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.top, 8)
-        .padding(.bottom, 14)
-    }
-}
-
-// MARK: - Tile
-
-private struct LevelTile: View {
-    let level: Int
-    let stars: Int
-    let unlocked: Bool
-    let isFrontier: Bool
-    let tint: Color
-    let action: () -> Void
-
-    var body: some View {
+    private func circleButton(symbol: String,
+                              label: String,
+                              action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
-                Text("\(level)")
-                    .font(.system(size: 24, weight: .heavy, design: .rounded))
-                    .foregroundStyle(unlocked ? (isFrontier ? .white : Color.witsInk) : Color.witsFaint)
-                    .monospacedDigit()
-                    .frame(minWidth: 34, alignment: .leading)
-                Spacer(minLength: 0)
-                if unlocked {
-                    HStack(spacing: 3) {
-                        ForEach(0..<3, id: \.self) { i in
-                            Image(systemName: i < stars ? "star.fill" : "star")
-                                .font(.system(size: 14, weight: .heavy))
-                                .foregroundStyle(i < stars
-                                                 ? (isFrontier ? .white : Color.witsWarm)
-                                                 : (isFrontier ? .white.opacity(0.45) : Color.witsFaint))
-                        }
-                    }
-                } else {
-                    Image(systemName: "lock.fill")
-                        .font(.system(size: 16, weight: .heavy))
-                        .foregroundStyle(Color.witsFaint)
-                }
-            }
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, minHeight: 66)
-            .background(isFrontier ? tint : Color.witsCard,
-                        in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(isFrontier ? .clear : Color.witsLine, lineWidth: 1.5)
-            )
-            .opacity(unlocked ? 1 : 0.55)
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .black))
+                .foregroundStyle(.white)
+                .frame(width: 52, height: 52)
+                .background(Color.black.opacity(0.64), in: Circle())
         }
         .buttonStyle(PressScale())
-        .disabled(!unlocked)
-        .accessibilityLabel("level \(level)")
-        .accessibilityValue(unlocked ? "\(stars) of 3 stars" : "locked")
+        .accessibilityLabel(label)
     }
 }
 
-// MARK: - Level detail card
-
-private struct LevelDetailSheet: View {
-    let game: GameID
-    let level: Int
-    let record: LevelRecord?
-    let unlocked: Bool
-    let onPlay: () -> Void
-
-    @State private var contentHeight: CGFloat = 300
+private struct DifficultyFace: View {
+    let difficulty: ChallengeDifficulty
 
     var body: some View {
-        LevelDetailCard(game: game,
-                        level: level,
-                        record: record,
-                        unlocked: unlocked,
-                        onPlay: onPlay)
-            .background {
-                GeometryReader { proxy in
-                    Color.clear.preference(key: LevelDetailSheetHeightKey.self,
-                                           value: ceil(proxy.size.height))
-                }
-            }
-            .onPreferenceChange(LevelDetailSheetHeightKey.self) { height in
-                contentHeight = max(260, height)
-            }
-            .presentationDetents([.height(contentHeight)])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(Color.witsBg)
-            .presentationCornerRadius(WitsMetrics.panelRadius)
+        ZStack {
+            Circle()
+                .fill(Color(hexAny: 0x3A3A3D))
+            Circle()
+                .fill(.black)
+                .padding(10)
+            Circle()
+                .fill(difficulty.color)
+                .padding(22)
+            Image(systemName: difficulty.symbol)
+                .font(.system(size: 39, weight: .black))
+                .foregroundStyle(.black.opacity(0.88))
+        }
+        .frame(width: 116, height: 116)
+        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: difficulty)
+        .accessibilityHidden(true)
     }
 }
 
-private struct LevelDetailCard: View {
-    let game: GameID
-    let level: Int
-    let record: LevelRecord?
-    let unlocked: Bool
-    let onPlay: () -> Void
+private struct DifficultySlider: View {
+    @Binding var selection: ChallengeDifficulty
 
-    private var earnedStars: Int { record?.stars ?? 0 }
-    private var bestPercent: Int? {
-        guard let record, record.bestQuality > 0 else { return nil }
-        return Int((record.bestQuality * 100).rounded())
+    var body: some View {
+        GeometryReader { proxy in
+            let thumb: CGFloat = 58
+            let inset = thumb / 2
+            let usable = max(1, proxy.size.width - thumb)
+            let step = usable / CGFloat(max(1, ChallengeDifficulty.allCases.count - 1))
+            let x = inset + CGFloat(selection.ordinal) * step
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color(hexAny: 0x3A3A3D))
+                    .frame(height: 30)
+
+                Capsule()
+                    .fill(
+                        LinearGradient(colors: ChallengeDifficulty.allCases.map(\.color),
+                                       startPoint: .leading,
+                                       endPoint: .trailing)
+                    )
+                    .frame(height: 18)
+                    .padding(.horizontal, 6)
+
+                ForEach(ChallengeDifficulty.allCases) { option in
+                    Circle()
+                        .fill(.white.opacity(option == selection ? 0 : 0.72))
+                        .frame(width: 5, height: 5)
+                        .position(x: inset + CGFloat(option.ordinal) * step,
+                                  y: proxy.size.height / 2)
+                }
+
+                Circle()
+                    .fill(.white)
+                    .frame(width: thumb, height: thumb)
+                    .overlay(Circle().fill(selection.color).padding(15))
+                    .shadow(color: .black.opacity(0.2), radius: 5, y: 3)
+                    .position(x: x, y: proxy.size.height / 2)
+            }
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let raw = (gesture.location.x - inset) / usable
+                        let ordinal = Int((raw * CGFloat(ChallengeDifficulty.allCases.count - 1)).rounded())
+                        let clamped = min(ChallengeDifficulty.allCases.count - 1, max(0, ordinal))
+                        if let next = ChallengeDifficulty(ordinal: clamped), next != selection {
+                            withAnimation(.spring(response: 0.22, dampingFraction: 0.78)) {
+                                selection = next
+                            }
+                        }
+                    }
+            )
+        }
+        .frame(height: 68)
+        .accessibilityElement()
+        .accessibilityLabel("Difficulty")
+        .accessibilityValue(selection.title)
+        .accessibilityAdjustableAction { direction in
+            let delta = direction == .increment ? 1 : -1
+            let ordinal = min(ChallengeDifficulty.allCases.count - 1,
+                              max(0, selection.ordinal + delta))
+            if let next = ChallengeDifficulty(ordinal: ordinal) { selection = next }
+        }
     }
+}
+
+private struct GameHelpSheet: View {
+    let game: GameID
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            HStack(alignment: .center, spacing: 14) {
-                Text("\(level)")
-                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+            HStack {
+                Image(systemName: game.symbol)
+                    .font(.system(size: 19, weight: .heavy))
                     .foregroundStyle(.white)
-                    .monospacedDigit()
-                    .frame(width: 52, height: 52)
-                    .background(
-                        LinearGradient(colors: [game.domain.color, game.domain.heroTopColor],
-                                       startPoint: .topLeading,
-                                       endPoint: .bottomTrailing),
-                        in: RoundedRectangle(cornerRadius: WitsMetrics.chipRadius, style: .continuous)
-                    )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("level \(level)")
-                        .font(.witsDisplay(26))
-                        .foregroundStyle(Color.witsInk)
-                    Text("difficulty \(level) of \(LevelLadder.levelCount(for: game))")
-                        .font(.witsBody(13.5))
+                    .frame(width: 44, height: 44)
+                    .background(game.domain.color,
+                                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                Text(game.displayName)
+                    .font(.witsDisplay(26))
+                    .foregroundStyle(Color.witsInk)
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 15, weight: .heavy))
                         .foregroundStyle(Color.witsMuted)
-                        .monospacedDigit()
+                        .frame(width: 40, height: 40)
+                        .background(Color.witsCard, in: Circle())
                 }
-
-                Spacer(minLength: 0)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close")
             }
 
-            HStack(spacing: 10) {
-                HStack(spacing: 7) {
-                    ForEach(0..<3, id: \.self) { i in
-                        Image(systemName: i < earnedStars ? "star.fill" : "star")
-                            .font(.system(size: 27, weight: .heavy))
-                            .foregroundStyle(i < earnedStars ? Color.witsWarm : Color.witsFaint)
-                    }
-                }
-                Spacer(minLength: 0)
-                Text("\(earnedStars) / 3")
-                    .font(.witsLabel(12.5))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(Color.witsTint, in: Capsule())
-            }
-            .padding(14)
-            .background(Color.witsCard, in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-                    .strokeBorder(Color.witsLine, lineWidth: 1)
-            )
+            Text(game.cardHow)
+                .font(.witsBody(15.5, weight: .semibold))
+                .foregroundStyle(Color.witsInk)
 
-            if let bestPercent {
-                Label("best run \(bestPercent)%", systemImage: "chart.line.uptrend.xyaxis")
-                    .font(.witsBody(13.5, weight: .semibold))
-                    .foregroundStyle(Color.witsMuted)
-                    .monospacedDigit()
-            } else {
-                Label("first clear earns a star", systemImage: "sparkle")
-                    .font(.witsBody(13.5, weight: .semibold))
-                    .foregroundStyle(Color.witsMuted)
-            }
+            Text(game.cardAbout)
+                .font(.witsBody(14.5))
+                .foregroundStyle(Color.witsMuted)
 
-            LevelDetailButton(title: earnedStars > 0 ? "replay" : "play",
-                              tint: game.domain.color,
-                              action: onPlay)
-                .padding(.top, 2)
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.top, 32)
-        .padding(.bottom, 20)
-        .background(Color.witsBg)
-    }
-}
-
-private struct LevelDetailButton: View {
-    let title: String
-    let tint: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 16.5, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-                .background(
-                    LinearGradient(colors: [tint.opacity(0.88), tint],
-                                   startPoint: .top,
-                                   endPoint: .bottom),
-                    in: RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-                        .strokeBorder(.white.opacity(0.16), lineWidth: 1)
-                )
-        }
-        .buttonStyle(PressScale())
-        .shadow(color: tint.opacity(0.22), radius: 7, y: 4)
-    }
-}
-
-private struct LevelDetailSheetHeightKey: PreferenceKey {
-    static var defaultValue: CGFloat = 300
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = nextValue()
+        .padding(22)
+        .background(Color.witsBg.ignoresSafeArea())
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.visible)
     }
 }

@@ -28,10 +28,7 @@ struct TrackerScreen: View {
 
     private var startedAt = Date()
 
-    // (targets, dots, unit speed) per scored round
-    private static let rounds: [(targets: Int, dots: Int, speed: Double)] = [
-        (3, 9, 0.22), (4, 9, 0.26), (4, 9, 0.30), (5, 9, 0.34),
-    ]
+    private static let roundCount = 4
     private static let markSeconds = 1.5
     private static let moveSeconds = 6.5
     private static let margin = 0.08
@@ -59,7 +56,12 @@ struct TrackerScreen: View {
     @State private var boardSize: CGSize = .zero
 
     private var config: (targets: Int, dots: Int, speed: Double) {
-        Self.rounds[min(round, Self.rounds.count - 1)]
+        let level = cfg.difficulty.level
+        let baseTargets = 2 + Int(ceil(level / 2.5))
+        let targets = min(6, baseTargets + round / 2)
+        let dots = min(12, max(targets + 4, 8 + Int(level / 3)))
+        let speed = min(0.44, 0.18 + level * 0.018 + Double(round) * 0.016)
+        return (targets, dots, speed)
     }
 
     private var statusLine: String {
@@ -76,7 +78,7 @@ struct TrackerScreen: View {
         VStack(spacing: 12) {
             if !cfg.isSurvival {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("round \(Text("\(min(round + 1, Self.rounds.count))").foregroundStyle(Color.witsAccent)) of \(Self.rounds.count)")
+                    Text("round \(Text("\(min(round + 1, Self.roundCount))").foregroundStyle(Color.witsAccent)) of \(Self.roundCount)")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
                         .foregroundStyle(Color.witsInk)
                         .monospacedDigit()
@@ -86,7 +88,7 @@ struct TrackerScreen: View {
                         .foregroundStyle(Color.witsMuted)
                         .monospacedDigit()
                 }
-                ProgressTrack(fraction: Double(round) / Double(Self.rounds.count), animated: true)
+                ProgressTrack(fraction: Double(round) / Double(Self.roundCount), animated: true)
             }
             GeometryReader { geo in
                 let size = geo.size
@@ -171,10 +173,10 @@ struct TrackerScreen: View {
         Task {
             try? await Task.sleep(for: .milliseconds(1400))
             guard gen == generation else { return }
-            if !cfg.isSurvival && round + 1 >= Self.rounds.count {
+            if !cfg.isSurvival && round + 1 >= Self.roundCount {
                 finish()
             } else {
-                round = (round + 1) % Self.rounds.count   // cycle rounds endlessly in survival
+                round = (round + 1) % Self.roundCount   // cycle rounds endlessly in survival
                 startRound()
             }
         }

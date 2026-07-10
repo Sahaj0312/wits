@@ -2,18 +2,15 @@
 //  GameCenterManager.swift
 //  wits
 //
-//  Game Center: sign-in, per-game marathon leaderboards, a total-stars
-//  leaderboard, and star/streak achievements. Everything degrades silently
+//  Game Center: sign-in, Split's endless leaderboard, a total-stars
+//  leaderboard, and run/streak achievements. Everything degrades silently
 //  when the player is not signed in — the app never blocks on Game Center.
 //
 //  Leaderboard IDs (create these in App Store Connect; immutable once live):
-//    wits.marathon.<gameID>   marathon best score, one per star-map game
 //    wits.split.survival      split's best level reached
 //    wits.stars.total         total stars across all games
 //  Achievement IDs:
 //    wits.ach.first3star                  first 3★ on any level
-//    wits.ach.map.<gameID>                every level of a game's map passed
-//    wits.ach.perfect.<gameID>            3★ on every level of a game's map
 //    wits.ach.stars.50 / .150 / .300      star-total milestones
 //    wits.ach.streak.7 / .30              longest-streak milestones
 //
@@ -80,8 +77,8 @@ final class GameCenterManager {
 
     func submitMarathonBest(game: GameID, levels: LevelProgressStore) {
         guard isAuthenticated, let best = levels.marathonBest(for: game) else { return }
-        // Split's headline number is the level reached; map games rank on the
-        // quadratic marathon score (more differentiating than depth).
+        // Split's headline number is the level reached. The non-Split branch
+        // remains for decoding leaderboard bests created by older app builds.
         submit(game == .split ? best.depth : best.score, to: Self.leaderboardID(for: game))
     }
 
@@ -102,20 +99,8 @@ final class GameCenterManager {
 
         var earned: [String] = []
 
-        if GameID.live.contains(where: { game in
-            levels.records[game]?.values.contains { $0.stars >= 3 } ?? false
-        }) {
+        if GameID.live.contains(where: { levels.hasThreeStarLevel(for: $0) }) {
             earned.append("wits.ach.first3star")
-        }
-
-        for game in GameID.live {
-            let count = LevelLadder.levelCount(for: game)
-            if (1...count).allSatisfy({ levels.isPassed(game, level: $0) }) {
-                earned.append("wits.ach.map.\(game.rawValue)")
-            }
-            if levels.totalStars(for: game) >= 3 * count {
-                earned.append("wits.ach.perfect.\(game.rawValue)")
-            }
         }
 
         for milestone in [50, 150, 300] where totalStars >= milestone {

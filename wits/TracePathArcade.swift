@@ -67,9 +67,7 @@ final class TracePathArcade: ArcadeGame {
     }
 
     func seed(level: Double, survival: Bool) -> Spawner {
-        // legacyDifficulty(mapLevel) → nearestLevel roundtrips exactly, so the
-        // 1...10 level the host hands us recovers the served map level.
-        let mapLevel = LevelLadder.nearestLevel(for: id, legacyDifficulty: level)
+        let mapLevel = DifficultyScale.contentLevel(for: id, legacyDifficulty: level)
         let s = Self.spec(for: id, mapLevel: mapLevel)
         grid = s.grid; span = s.span; showStep = s.step; roundsTotal = s.rounds
         stepX = grid <= 3 ? 0.30 : grid == 4 ? 0.24 : 0.19

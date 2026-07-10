@@ -3,7 +3,7 @@
 //  wits
 //
 //  Root state for the app: the daily streak, per-game difficulty bookkeeping,
-//  lifetime game stats, and the star-map progression. Everything persists
+//  lifetime game stats, and independent difficulty-track progress. Everything persists
 //  locally (UserDefaults); Game Center carries leaderboards and achievements.
 //
 
@@ -16,16 +16,14 @@ final class AppModel {
     var streak = StreakState.empty
     var difficulty: [GameID: DifficultyState] = [:]
     var gameStats: [GameID: GameStats] = [:]
-    /// Star-map progression (stars per game/level, marathon bests).
+    /// Independent Easy/Medium/Hard/Extra Hard progression.
     let levels = LevelProgressStore()
 
     private let cacheKey = "wits.appstate.v1"
 
     init() {
         loadCache()
-        // One-time star-map migration: unlock levels equivalent to the old
-        // adaptive difficulty so existing users keep their frontier.
-        levels.seedIfNeeded(from: difficulty)
+        levels.migrateIfNeeded(from: difficulty)
     }
 
     // MARK: Lifecycle
@@ -50,7 +48,7 @@ final class AppModel {
     // MARK: Game events
 
     /// Called as each game finishes: score the run, advance the game's mastery
-    /// bookkeeping, award map stars, tick the streak, and refresh achievements.
+    /// bookkeeping and selected difficulty track, then refresh achievements.
     @discardableResult
     func recordGameResult(_ result: GameResult) -> GameResult {
         let id = result.game
@@ -58,21 +56,29 @@ final class AppModel {
             return recordStandaloneGameResult(result)
         }
         let current = id.difficultyState(from: difficulty[id])
-        // Star-map runs are served at the level's frozen spec, so score the run
-        // against that challenge, not the drifting adaptive level.
-        let mapLevel = result.raw["mapLevel"].map { Int($0) }
-        let previous = mapLevel.map { LevelLadder.examDifficulty(for: id, level: $0, persisted: current) } ?? current
+        let trackLevel = result.raw["trackLevel"].map { Int($0) }
+        let trackDifficulty = result.raw["difficultyTrack"]
+            .flatMap { ChallengeDifficulty(ordinal: Int($0)) }
+        let previous: DifficultyState
+        if let trackLevel, let trackDifficulty {
+            previous = DifficultyScale.gameDifficulty(for: id,
+                                                      difficulty: trackDifficulty,
+                                                      trackLevel: trackLevel,
+                                                      persisted: current)
+        } else {
+            previous = current
+        }
         let scored = ScoringEngine.score(result, previous: previous)
         difficulty[id] = scored.next
         let r = scored.result
 
         recordStats(for: r)
 
-        // Marathon links score normally but never award map stars.
-        let recordsStars = mapLevel != nil && result.raw["marathon"] == nil
-        if let mapLevel, recordsStars {
+        if let trackLevel, let trackDifficulty {
             let quality = r.performanceQuality ?? r.accuracy
-            levels.recordAttempt(game: id, level: mapLevel,
+            levels.recordAttempt(game: id,
+                                 difficulty: trackDifficulty,
+                                 level: trackLevel,
                                  stars: StarGrader.stars(quality: quality), quality: quality)
         }
 
