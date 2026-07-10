@@ -57,6 +57,7 @@ struct ColorClashScreen: View {
 
     private var pIncongruent: Double { min(0.85, 0.4 + cfg.difficulty.level * 0.04) }
     private var multiplier: Int { min(5, 1 + streak / 3) }
+    private var world: GameWorld { GameID.colorClash.world }
 
     private static func makeTrial(pIncongruent: Double) -> Trial {
         let word = StroopColor.allCases.randomElement()!
@@ -71,24 +72,25 @@ struct ColorClashScreen: View {
         VStack(spacing: 12) {
             if !cfg.isSurvival {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                    Text("\(Text("\(score)").foregroundStyle(world.accent)) pts")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsInk)
+                        .foregroundStyle(world.ink)
                         .monospacedDigit()
                     if multiplier > 1 {
                         Text("×\(multiplier)")
                             .font(.system(size: 12, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.witsAccent)
+                            .foregroundStyle(world.accent)
                             .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                            .background(world.accent.opacity(0.15), in: Capsule())
                     }
                     Spacer()
                     Text("\(Int(ceil(timeLeft)))s")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
+                        .foregroundStyle(world.muted)
                         .monospacedDigit()
                 }
-                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false,
+                              tint: world.accent, track: world.raised)
             }
             Spacer()
             if let trial {
@@ -98,24 +100,25 @@ struct ColorClashScreen: View {
                         .foregroundStyle(trial.ink.color)
                         .frame(maxWidth: .infinity)
                         .frame(height: 150)
-                        .cardSurface()
+                        .background(world.surface, in: RoundedRectangle(cornerRadius: 7))
+                        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(world.ink.opacity(0.12), lineWidth: 1))
                         .id(trial.id)
                         .transition(.scale(scale: 0.92).combined(with: .opacity))
                         .overlay(
-                            RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-                                .strokeBorder(feedback == true ? Color.witsAccent : feedback == false ? Color.witsWarm : .clear, lineWidth: 2.5)
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .strokeBorder(feedback == true ? world.secondary : feedback == false ? world.accent : .clear, lineWidth: 2.5)
                                 .padding(-14)
                         )
                     Text("TAP THE COLOUR, NOT THE WORD")
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .kerning(0.7)
-                        .foregroundStyle(Color.witsFaint)
+                        .foregroundStyle(world.muted)
                 }
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.witsLine)
+                    Capsule().fill(world.raised)
                     GeometryReader { geo in
                         Capsule()
-                            .fill(windowFrac < 0.35 ? Color.witsWarm : Color.witsMuted)
+                            .fill(windowFrac < 0.35 ? world.accent : world.muted)
                             .frame(width: max(0, geo.size.width * windowFrac))
                     }
                 }
@@ -141,7 +144,7 @@ struct ColorClashScreen: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 18)
-                        .background(c.color, in: Capsule())
+                        .background(c.color, in: RoundedRectangle(cornerRadius: 7))
                 }
                 .buttonStyle(.plain)
             }

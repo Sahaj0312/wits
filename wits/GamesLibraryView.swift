@@ -25,10 +25,12 @@ struct GamesLibraryView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .center, spacing: 10) {
                     VStack(alignment: .leading, spacing: 2) {
-                        WitsBrandMark()
-                        Text("games")
-                            .font(.witsDisplay(30))
-                            .foregroundStyle(Color.witsInk)
+                        Text("WITS")
+                            .font(.system(size: 13, weight: .black, design: .monospaced))
+                            .foregroundStyle(Color(hexAny: 0xFF4E77))
+                        Text("choose a game")
+                            .font(.system(size: 29, weight: .black, design: .default))
+                            .foregroundStyle(.white)
                     }
                     Spacer()
                     StreakPill(count: app.streak.current)
@@ -47,7 +49,7 @@ struct GamesLibraryView: View {
             .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.bottom, 24)
         }
-        .background(Color.witsBg.ignoresSafeArea())
+        .background(Color(hexAny: 0x09090B).ignoresSafeArea())
         .fullScreenCover(item: $launch) { g in
             GameLauncher(game: g)
         }
@@ -69,10 +71,10 @@ struct GamesLibraryView: View {
         } label: {
             Image(systemName: "shuffle")
                 .font(.system(size: 16, weight: .heavy))
-                .foregroundStyle(Color.witsInk)
+                .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(Color.witsCard, in: Circle())
-                .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1.5))
+                .background(Color(hexAny: 0x1B1B20), in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 1))
         }
         .buttonStyle(PressScale())
         .accessibilityLabel("Open a random game")
@@ -84,10 +86,10 @@ struct GamesLibraryView: View {
         } label: {
             Image(systemName: "gearshape.fill")
                 .font(.system(size: 16, weight: .heavy))
-                .foregroundStyle(Color.witsInk)
+                .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(Color.witsCard, in: Circle())
-                .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1.5))
+                .background(Color(hexAny: 0x1B1B20), in: Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 1))
         }
         .buttonStyle(PressScale())
         .accessibilityLabel("Settings")
@@ -100,33 +102,31 @@ struct GamesLibraryView: View {
             launch = g
         } label: {
             ZStack(alignment: .topLeading) {
-                g.posterBackground
+                GameWorldBackdrop(game: g, patternOpacity: 0.85)
                 GamePosterArt(game: g)
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(g.displayName)
-                        .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(g.posterAccent)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                    Capsule()
-                        .fill(g.posterAccent)
-                        .frame(width: 32, height: 3.5)
+                    Text(g.worldTitle())
+                        .font(.system(size: 17, weight: .black, design: g.world.titleDesign))
+                        .foregroundStyle(g.world.ink)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.68)
+                    Rectangle()
+                        .fill(g.world.accent)
+                        .frame(width: 30, height: 4)
                 }
                 .padding(.horizontal, 14)
                 .padding(.top, 13)
             }
             .aspectRatio(0.74, contentMode: .fit)
-            .clipShape(RoundedRectangle(cornerRadius: 21, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay(alignment: .bottomLeading) {
                 progressPill(g).padding(9)
             }
-            .padding(4)
-            .background(Color.witsCard, in: RoundedRectangle(cornerRadius: 25, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 25, style: .continuous)
-                    .strokeBorder(Color.witsLine, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(g.world.accent.opacity(0.5), lineWidth: 1)
             )
-            .shadow(color: .witsShadow, radius: 10, y: 5)
+            .shadow(color: g.world.accent.opacity(0.16), radius: 12, y: 6)
             .overlay(alignment: .topTrailing) {
                 if g.isStandalone {
                     survivalSticker.offset(x: 5, y: -5)
@@ -143,15 +143,16 @@ struct GamesLibraryView: View {
         HStack(spacing: 4) {
             Image(systemName: g.isStandalone ? "trophy.fill" : "flag.fill")
                 .font(.system(size: 10, weight: .heavy))
-                .foregroundStyle(Color.witsGold)
+                .foregroundStyle(g.world.accent)
             Text(progressLabel(g))
                 .font(.system(size: 11.5, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
+                .foregroundStyle(g.world.ink)
                 .monospacedDigit()
         }
         .padding(.horizontal, 9)
         .padding(.vertical, 5)
-        .background(.black.opacity(0.35), in: Capsule())
+        .background(g.world.surface.opacity(0.92), in: Capsule())
+        .overlay(Capsule().strokeBorder(g.world.ink.opacity(0.12), lineWidth: 1))
     }
 
     private func progressLabel(_ g: GameID) -> String {
@@ -201,7 +202,7 @@ private struct GameLauncher: View {
             if game == .split {
                 // Split is survival-only: no selector to show, and its screen
                 // carries its own intro/game-over chrome — go straight there.
-                Color.witsBg.ignoresSafeArea()
+                GameWorldBackdrop(game: .split)
                     .onAppear { startRun() }
             } else {
                 DifficultySelectView(
@@ -269,7 +270,7 @@ private struct GameLauncher: View {
                     }
                     .overlay {
                         if !game.usesEmbeddedQuitControl, !pauseController.isPaused {
-                            GamePauseButtonLayer {
+                            GamePauseButtonLayer(game: game) {
                                 pauseController.pause()
                             }
                         }

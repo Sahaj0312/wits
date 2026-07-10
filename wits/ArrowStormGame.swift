@@ -62,6 +62,7 @@ struct FlankerScreen: View {
     @State private var finished = false
 
     private var multiplier: Int { min(5, 1 + streak / 3) }
+    private var world: GameWorld { GameID.arrowStorm.world }
 
     var body: some View {
         VStack(spacing: 12) {
@@ -70,10 +71,11 @@ struct FlankerScreen: View {
                     Spacer()
                     Text("\(Int(ceil(timeLeft)))s")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
+                        .foregroundStyle(world.muted)
                         .monospacedDigit()
                 }
-                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false,
+                              tint: world.accent, track: world.surface)
             }
             Spacer()
             if let trial {
@@ -81,19 +83,19 @@ struct FlankerScreen: View {
                     .id(trial.id)
                     .transition(.scale(scale: 0.92).combined(with: .opacity))
                     .overlay(
-                        RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
+                        RoundedRectangle(cornerRadius: 5, style: .continuous)
                             .strokeBorder(
-                                feedback == true ? Color.witsAccent : feedback == false ? Color.witsWarm : .clear,
+                                feedback == true ? world.accent : feedback == false ? world.secondary : .clear,
                                 lineWidth: 2.5
                             )
                             .padding(-14)
                     )
                 // per-trial deadline
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.witsLine)
+                    Capsule().fill(world.surface)
                     GeometryReader { geo in
                         Capsule()
-                            .fill(windowFrac < 0.35 ? Color.witsWarm : Color.witsMuted)
+                            .fill(windowFrac < 0.35 ? world.secondary : world.muted)
                             .frame(width: max(0, geo.size.width * windowFrac))
                     }
                 }
@@ -119,7 +121,7 @@ struct FlankerScreen: View {
                 let pointsRight = isCenter ? right : (congruent ? right : !right)
                 Image(systemName: pointsRight ? "arrowtriangle.right.fill" : "arrowtriangle.left.fill")
                     .font(.system(size: size, weight: .heavy))
-                    .foregroundStyle(Color.witsInk)
+                    .foregroundStyle(world.ink)
             }
         }
     }
@@ -130,11 +132,12 @@ struct FlankerScreen: View {
                 .offset(y: t.yShift)
                 .frame(maxWidth: .infinity)
                 .frame(height: 150)
-                .cardSurface()
+                .background(world.surface, in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 5).strokeBorder(world.ink.opacity(0.12), lineWidth: 1))
             Text("THE MIDDLE ONE")
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .kerning(0.7)
-                .foregroundStyle(Color.witsFaint)
+                .foregroundStyle(world.muted)
         }
     }
 
@@ -143,19 +146,19 @@ struct FlankerScreen: View {
             Button { act(false) } label: {
                 Image(systemName: "arrowtriangle.left.fill")
                     .font(.system(size: 18, weight: .heavy))
-                    .foregroundStyle(Color.witsInk)
+                    .foregroundStyle(world.ink)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 17)
-                    .background(Color.witsTint, in: Capsule())
+                    .background(world.surface, in: RoundedRectangle(cornerRadius: 5))
             }
             .buttonStyle(.plain)
             Button { act(true) } label: {
                 Image(systemName: "arrowtriangle.right.fill")
                     .font(.system(size: 18, weight: .heavy))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(world.background)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 17)
-                    .background(Color.witsAccent, in: Capsule())
+                    .background(world.accent, in: RoundedRectangle(cornerRadius: 5))
             }
             .buttonStyle(.plain)
         }

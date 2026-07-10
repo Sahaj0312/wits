@@ -27,6 +27,7 @@ struct TrackerScreen: View {
     }
 
     private var startedAt = Date()
+    private var world: GameWorld { GameID.crowdControl.world }
 
     private static let roundCount = 4
     private static let markSeconds = 1.5
@@ -78,30 +79,31 @@ struct TrackerScreen: View {
         VStack(spacing: 12) {
             if !cfg.isSurvival {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("round \(Text("\(min(round + 1, Self.roundCount))").foregroundStyle(Color.witsAccent)) of \(Self.roundCount)")
+                    Text("round \(Text("\(min(round + 1, Self.roundCount))").foregroundStyle(world.accent)) of \(Self.roundCount)")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsInk)
+                        .foregroundStyle(world.ink)
                         .monospacedDigit()
                     Spacer()
                     Text("\(stats.correctPicks) of \(stats.totalTargets) held")
                         .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(Color.witsMuted)
+                        .foregroundStyle(world.muted)
                         .monospacedDigit()
                 }
-                ProgressTrack(fraction: Double(round) / Double(Self.roundCount), animated: true)
+                ProgressTrack(fraction: Double(round) / Double(Self.roundCount), animated: true,
+                              tint: world.accent, track: world.surface)
             }
             GeometryReader { geo in
                 let size = geo.size
                 ZStack {
-                    RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-                        .fill(Color.witsCard)
-                        .shadow(color: .witsShadow, radius: 10, y: 6)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(world.surface)
+                        .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(world.accent.opacity(0.22), lineWidth: 1))
                     ForEach(dots) { dot in
                         dotView(dot)
                             .position(x: dot.pos.x * size.width, y: dot.pos.y * size.height)
                     }
                 }
-                .contentShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 .onAppear {
                     boardSize = size
                 }
@@ -113,8 +115,8 @@ struct TrackerScreen: View {
                 }
             }
             Text(statusLine)
-                .font(.witsBody(12.5))
-                .foregroundStyle(Color.witsFaint)
+                .font(.system(size: 12.5, weight: .semibold, design: world.bodyDesign))
+                .foregroundStyle(world.muted)
                 .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, WitsMetrics.screenPadding)
@@ -126,16 +128,16 @@ struct TrackerScreen: View {
     private func dotView(_ dot: Dot) -> some View {
         let showTarget = roundPhase == .mark && dot.isTarget
         let missed = roundPhase == .reveal && dot.isTarget && !dot.picked
-        let fill: Color = showTarget ? .witsAccent
-            : dot.picked ? (roundPhase == .reveal && !dot.isTarget ? Color.witsWarm : Color.witsAccent.opacity(0.85))
-            : Color.witsInk.opacity(0.32)
+        let fill: Color = showTarget ? world.accent
+            : dot.picked ? (roundPhase == .reveal && !dot.isTarget ? world.secondary : world.accent.opacity(0.85))
+            : world.ink.opacity(0.32)
         return Circle()
             .fill(fill)
             .frame(width: Self.dotDiameter, height: Self.dotDiameter)
             .scaleEffect(showTarget && pulse ? 1.18 : 1)
             .overlay(
                 Circle()
-                    .strokeBorder(missed ? Color.witsAccent : .clear, lineWidth: 3)
+                    .strokeBorder(missed ? world.secondary : .clear, lineWidth: 3)
                     .padding(-5)
             )
             .animation(.easeInOut(duration: 0.45), value: pulse)

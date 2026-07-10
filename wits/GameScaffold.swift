@@ -21,25 +21,7 @@ struct GameStageBackground: View {
     let game: GameID
 
     var body: some View {
-        switch game {
-        case .slidePuzzle:
-            LinearGradient(colors: [Color(light: 0x4A3A22, dark: 0x33270F),
-                                    Color(light: 0x392C18, dark: 0x261C0B)],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        case .blockEscape:
-            LinearGradient(colors: [Color(light: 0x3A3357, dark: 0x2A2542),
-                                    Color(light: 0x2C2745, dark: 0x1F1B33)],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        case .pegSolitaire:
-            LinearGradient(colors: [Color(light: 0x2C5643, dark: 0x1F3F31),
-                                    Color(light: 0x224536, dark: 0x183227)],
-                           startPoint: .top, endPoint: .bottom)
-                .ignoresSafeArea()
-        default:
-            Color.witsBg.ignoresSafeArea()
-        }
+        GameWorldBackdrop(game: game, patternOpacity: 0.48)
     }
 }
 
@@ -205,119 +187,121 @@ struct FirstPlayTutorial: View {
     var onStart: () -> Void
     var onBack: (() -> Void)? = nil
 
+    private var world: GameWorld { game.world }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if let accessory {
-                accessory
-                    .padding(.bottom, 10)
-            }
-            GameTopTag(text: "first play tutorial")
-                .padding(.bottom, 18)
-            ZStack {
-                GameHeroArt(game: game, patternOpacity: 0.45)
-                GameTutorialHero(game: game)
-            }
-            .frame(height: 195)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous))
-            .shadow(color: .witsShadow, radius: 10, y: 6)
+        ZStack {
+            GameWorldBackdrop(game: game)
+
             ScrollView(showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("how to play \(game.displayName)")
-                        .font(.witsDisplay(30))
-                        .foregroundStyle(Color.witsInk)
-                        .rise(0.08)
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack {
+                        if let onBack {
+                            Button(action: onBack) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 17, weight: .black))
+                                    .foregroundStyle(world.ink)
+                                    .frame(width: 44, height: 44)
+                                    .background(world.surface, in: Circle())
+                            }
+                            .buttonStyle(PressScale())
+                            .accessibilityLabel("Back")
+                        }
+                        Spacer()
+                        Text("FIRST PLAY")
+                            .font(.system(size: 10.5, weight: .black, design: .monospaced))
+                            .foregroundStyle(world.muted)
+                    }
+
+                    if let accessory {
+                        accessory.padding(.top, 10)
+                    }
+
+                    GamePosterArt(game: game)
+                        .frame(height: 190)
+                        .frame(maxWidth: 430)
+                        .frame(maxWidth: .infinity)
+
+                    Text(game.worldTitle("how to play"))
+                        .font(.system(size: 31, weight: .black, design: world.titleDesign))
+                        .foregroundStyle(world.ink)
+                        .padding(.top, 2)
+
                     Text(game.cardHow)
-                        .font(.witsBody(15.5))
-                        .foregroundStyle(Color.witsMuted)
-                        .rise(0.14)
-                    VStack(spacing: 10) {
+                        .font(.system(size: 15, weight: .semibold, design: world.bodyDesign))
+                        .foregroundStyle(world.muted)
+                        .padding(.top, 10)
+
+                    VStack(spacing: 9) {
                         ForEach(game.tutorialSteps.indices, id: \.self) { index in
-                            TutorialStepRow(number: index + 1,
-                                            text: game.tutorialSteps[index],
-                                            tint: game.domain.color)
+                            TutorialStepRow(game: game,
+                                            number: index + 1,
+                                            text: game.tutorialSteps[index])
                         }
                     }
-                    .padding(.top, 2)
-                    .rise(0.2)
-                    TutorialHint(text: game.tutorialHint)
-                        .rise(0.26)
+                    .padding(.top, 20)
+
+                    Text(game.tutorialHint)
+                        .font(.system(size: 12.5, weight: .bold, design: world.bodyDesign))
+                        .foregroundStyle(world.ink)
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(world.raised,
+                                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .padding(.top, 10)
+
+                    Button(action: onStart) {
+                        HStack {
+                            Text("START GAME")
+                            Spacer()
+                            Image(systemName: "arrow.right")
+                        }
+                        .font(.system(size: 17, weight: .black, design: world.titleDesign))
+                        .foregroundStyle(world.background)
+                        .padding(.horizontal, 19)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 58)
+                        .background(world.accent,
+                                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    }
+                    .buttonStyle(PressScale())
+                    .padding(.top, 16)
+                    .padding(.bottom, 24)
                 }
-                .padding(.top, 22)
-                .padding(.bottom, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            Cta(title: "start game", action: onStart)
-                .rise(0.32)
-                .padding(.top, 12)
-            if let onBack {
-                QuietButton(title: "back", action: onBack)
-                    .padding(.top, 6)
+                .padding(.horizontal, 22)
+                .padding(.top, 10)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
             }
         }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.witsBg.ignoresSafeArea())
-    }
-}
-
-private struct GameTutorialHero: View {
-    let game: GameID
-
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: game.symbol)
-                .font(.system(size: 58, weight: .heavy))
-                .foregroundStyle(.white)
-                .frame(width: 94, height: 94)
-                .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(.white.opacity(0.16), lineWidth: 1.5)
-                )
-            HStack(spacing: 8) {
-                tutorialChip(game.domain.label)
-                tutorialChip(game.subskill)
-            }
-        }
-    }
-
-    private func tutorialChip(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 12, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white.opacity(0.78))
-            .lineLimit(1)
-            .minimumScaleFactor(0.78)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background(.white.opacity(0.10), in: Capsule())
     }
 }
 
 private struct TutorialStepRow: View {
+    let game: GameID
     let number: Int
     let text: String
-    var tint: Color = .witsAccent
+
+    private var world: GameWorld { game.world }
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Text("\(number)")
                 .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(tint)
+                .foregroundStyle(world.background)
                 .frame(width: 28, height: 28)
-                .background(tint.opacity(0.14), in: Circle())
+                .background(world.accent, in: Circle())
             Text(text)
-                .font(.witsBody(15, weight: .semibold))
-                .foregroundStyle(Color.witsInk)
+                .font(.system(size: 14.5, weight: .semibold, design: world.bodyDesign))
+                .foregroundStyle(world.ink)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
         .padding(14)
-        .background(Color.witsCard, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(world.surface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.witsLine, lineWidth: 1)
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .strokeBorder(world.ink.opacity(0.12), lineWidth: 1)
         )
     }
 }

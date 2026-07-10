@@ -10,38 +10,213 @@
 
 import SwiftUI
 
-// MARK: - Poster palette
+// MARK: - Game worlds
+
+struct GameWorld {
+    let background: Color
+    let surface: Color
+    let raised: Color
+    let ink: Color
+    let muted: Color
+    let accent: Color
+    let secondary: Color
+    let difficultyColors: [Color]
+    let titleDesign: Font.Design
+    let bodyDesign: Font.Design
+    let uppercaseTitles: Bool
+
+    func difficultyColor(_ difficulty: ChallengeDifficulty) -> Color {
+        difficultyColors[min(difficulty.ordinal, difficultyColors.count - 1)]
+    }
+}
 
 extension GameID {
-    /// Full-bleed card background.
-    var posterBackground: Color {
+    var world: GameWorld {
         switch self {
-        case .arrowStorm: Color(hexAny: 0x5C3A06)
-        case .crowdControl: Color(hexAny: 0x0C3B58)
-        case .echoGrid: Color(hexAny: 0x2E2160)
-        case .colorClash: Color(hexAny: 0x511437)
-        case .tileShift: Color(hexAny: 0x0D4744)
-        case .lastSeen: Color(hexAny: 0x3B1A55)
-        case .slidePuzzle: Color(hexAny: 0x1A2F6E)
-        case .blockEscape: Color(hexAny: 0x4A2C12)
-        case .pegSolitaire: Color(hexAny: 0x123F26)
-        case .split: Color(hexAny: 0x1D1D33)
+        case .arrowStorm:
+            GameWorld(background: Color(hexAny: 0x15130E),
+                      surface: Color(hexAny: 0x252116), raised: Color(hexAny: 0x332C1A),
+                      ink: Color(hexAny: 0xFFF8DD), muted: Color(hexAny: 0xBEB696),
+                      accent: Color(hexAny: 0xFFD43B), secondary: Color(hexAny: 0xF05A28),
+                      difficultyColors: [0xFFE36A, 0xFFB52E, 0xF26A2E, 0xE33D35].map { Color(hexAny: $0) },
+                      titleDesign: .monospaced, bodyDesign: .monospaced, uppercaseTitles: true)
+        case .crowdControl:
+            GameWorld(background: Color(hexAny: 0x031E2A),
+                      surface: Color(hexAny: 0x073344), raised: Color(hexAny: 0x0B4356),
+                      ink: Color(hexAny: 0xE9FCFF), muted: Color(hexAny: 0x8DBAC4),
+                      accent: Color(hexAny: 0x5DE7FF), secondary: Color(hexAny: 0xFF6B6B),
+                      difficultyColors: [0x7DF3D0, 0x5DE7FF, 0xFFB44F, 0xFF6B6B].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: false)
+        case .echoGrid:
+            GameWorld(background: Color(hexAny: 0x160D2C),
+                      surface: Color(hexAny: 0x281849), raised: Color(hexAny: 0x382263),
+                      ink: Color(hexAny: 0xFAF4FF), muted: Color(hexAny: 0xBAA5D0),
+                      accent: Color(hexAny: 0xB693FF), secondary: Color(hexAny: 0x4FFFD7),
+                      difficultyColors: [0x4FFFD7, 0x84C7FF, 0xB693FF, 0xFF5EBE].map { Color(hexAny: $0) },
+                      titleDesign: .monospaced, bodyDesign: .rounded, uppercaseTitles: true)
+        case .colorClash:
+            GameWorld(background: Color(hexAny: 0xFFF4E8),
+                      surface: Color(hexAny: 0xFFFFFF), raised: Color(hexAny: 0xFFE1D2),
+                      ink: Color(hexAny: 0x17120F), muted: Color(hexAny: 0x71635B),
+                      accent: Color(hexAny: 0xFF3D96), secondary: Color(hexAny: 0x00BFC6),
+                      difficultyColors: [0x00BFC6, 0xF2B705, 0xFF6B35, 0xFF3D96].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .default, uppercaseTitles: true)
+        case .tileShift:
+            GameWorld(background: Color(hexAny: 0x002F2A),
+                      surface: Color(hexAny: 0x07463F), raised: Color(hexAny: 0x0D5A50),
+                      ink: Color(hexAny: 0xF7FFE8), muted: Color(hexAny: 0xA4C5B8),
+                      accent: Color(hexAny: 0xC9F227), secondary: Color(hexAny: 0xF45B9B),
+                      difficultyColors: [0xC9F227, 0x70E0B2, 0xF9A826, 0xF45B9B].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: false)
+        case .lastSeen:
+            GameWorld(background: Color(hexAny: 0xF4E4C4),
+                      surface: Color(hexAny: 0xFFF7E6), raised: Color(hexAny: 0xE9D2A5),
+                      ink: Color(hexAny: 0x29233C), muted: Color(hexAny: 0x71677F),
+                      accent: Color(hexAny: 0xFF704D), secondary: Color(hexAny: 0x4777E6),
+                      difficultyColors: [0x45B97C, 0x4777E6, 0xF2A93B, 0xFF704D].map { Color(hexAny: $0) },
+                      titleDesign: .serif, bodyDesign: .rounded, uppercaseTitles: false)
+        case .slidePuzzle:
+            GameWorld(background: Color(hexAny: 0x071C3A),
+                      surface: Color(hexAny: 0x0C2B55), raised: Color(hexAny: 0x123A70),
+                      ink: Color(hexAny: 0xEAF4FF), muted: Color(hexAny: 0x91AFCC),
+                      accent: Color(hexAny: 0x59A9FF), secondary: Color(hexAny: 0xFF9D3D),
+                      difficultyColors: [0x7BDFF2, 0x59A9FF, 0xA68CFF, 0xFF9D3D].map { Color(hexAny: $0) },
+                      titleDesign: .monospaced, bodyDesign: .monospaced, uppercaseTitles: true)
+        case .blockEscape:
+            GameWorld(background: Color(hexAny: 0x211B17),
+                      surface: Color(hexAny: 0x332A24), raised: Color(hexAny: 0x493B31),
+                      ink: Color(hexAny: 0xF6E8D2), muted: Color(hexAny: 0xB6A08F),
+                      accent: Color(hexAny: 0xFF4D3D), secondary: Color(hexAny: 0xF0C27B),
+                      difficultyColors: [0xF0C27B, 0xE99A52, 0xFF7448, 0xFF4D3D].map { Color(hexAny: $0) },
+                      titleDesign: .monospaced, bodyDesign: .default, uppercaseTitles: true)
+        case .pegSolitaire:
+            GameWorld(background: Color(hexAny: 0x063C2E),
+                      surface: Color(hexAny: 0x0A503D), raised: Color(hexAny: 0x11654D),
+                      ink: Color(hexAny: 0xF6E8C9), muted: Color(hexAny: 0xA9C7B7),
+                      accent: Color(hexAny: 0xE9B949), secondary: Color(hexAny: 0xD85B4B),
+                      difficultyColors: [0x91D6A8, 0xE9D45C, 0xE9A449, 0xD85B4B].map { Color(hexAny: $0) },
+                      titleDesign: .serif, bodyDesign: .serif, uppercaseTitles: false)
+        case .split:
+            GameWorld(background: Color(hexAny: 0x090713),
+                      surface: Color(hexAny: 0x191329), raised: Color(hexAny: 0x251B3B),
+                      ink: Color(hexAny: 0xFFF7FF), muted: Color(hexAny: 0xA99CB8),
+                      accent: Color(hexAny: 0xFF466D), secondary: Color(hexAny: 0x39E6E2),
+                      difficultyColors: [0x39E6E2, 0x9E8CFF, 0xFFB13B, 0xFF466D].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .monospaced, uppercaseTitles: true)
         }
     }
 
-    /// Title + underline color on the poster.
-    var posterAccent: Color {
-        switch self {
-        case .arrowStorm: Color(hexAny: 0xFFC53D)
-        case .crowdControl: Color(hexAny: 0x53C9F5)
-        case .echoGrid: Color(hexAny: 0xB4A0FF)
-        case .colorClash: Color(hexAny: 0xFF6FB5)
-        case .tileShift: Color(hexAny: 0x43DDC7)
-        case .lastSeen: Color(hexAny: 0xFFD166)
-        case .slidePuzzle: Color(hexAny: 0x92B4FF)
-        case .blockEscape: Color(hexAny: 0xFF8A5C)
-        case .pegSolitaire: Color(hexAny: 0x74E39F)
-        case .split: Color(hexAny: 0xFF6B6B)
+    var posterBackground: Color { world.background }
+    var posterAccent: Color { world.accent }
+
+    func worldTitle(_ text: String? = nil) -> String {
+        let value = text ?? displayName
+        return world.uppercaseTitles ? value.uppercased() : value
+    }
+}
+
+/// Full-screen material for a game. Patterns are geometric and specific to the
+/// game instead of a shared decorative layer.
+struct GameWorldBackdrop: View {
+    let game: GameID
+    var patternOpacity: Double = 1
+
+    var body: some View {
+        ZStack {
+            game.world.background
+            GameWorldPattern(game: game)
+                .opacity(patternOpacity)
+        }
+        .ignoresSafeArea()
+    }
+}
+
+private struct GameWorldPattern: View {
+    let game: GameID
+
+    var body: some View {
+        Canvas { context, size in
+            let world = game.world
+            switch game {
+            case .arrowStorm:
+                for offset in stride(from: -size.height, through: size.width, by: 54) {
+                    var path = Path()
+                    path.move(to: CGPoint(x: offset, y: 0))
+                    path.addLine(to: CGPoint(x: offset + size.height, y: size.height))
+                    context.stroke(path, with: .color(world.accent.opacity(0.08)), lineWidth: 18)
+                }
+            case .crowdControl:
+                for row in 0..<9 {
+                    for col in 0..<6 {
+                        let x = (CGFloat(col) + (row.isMultiple(of: 2) ? 0.25 : 0.75)) * size.width / 6
+                        let y = CGFloat(row) * size.height / 8
+                        let radius: CGFloat = (row + col).isMultiple(of: 5) ? 7 : 3
+                        context.fill(Path(ellipseIn: CGRect(x: x - radius, y: y - radius,
+                                                           width: radius * 2, height: radius * 2)),
+                                     with: .color(((row + col).isMultiple(of: 5) ? world.secondary : world.accent).opacity(0.13)))
+                    }
+                }
+            case .echoGrid, .slidePuzzle:
+                let step: CGFloat = game == .echoGrid ? 46 : 32
+                for x in stride(from: 0 as CGFloat, through: size.width, by: step) {
+                    var path = Path(); path.move(to: CGPoint(x: x, y: 0)); path.addLine(to: CGPoint(x: x, y: size.height))
+                    context.stroke(path, with: .color(world.accent.opacity(0.08)), lineWidth: 1)
+                }
+                for y in stride(from: 0 as CGFloat, through: size.height, by: step) {
+                    var path = Path(); path.move(to: CGPoint(x: 0, y: y)); path.addLine(to: CGPoint(x: size.width, y: y))
+                    context.stroke(path, with: .color(world.secondary.opacity(0.07)), lineWidth: 1)
+                }
+            case .colorClash:
+                let blocks = [
+                    CGRect(x: -30, y: size.height * 0.12, width: size.width * 0.45, height: 54),
+                    CGRect(x: size.width * 0.68, y: size.height * 0.33, width: size.width * 0.42, height: 72),
+                    CGRect(x: size.width * 0.10, y: size.height * 0.80, width: size.width * 0.34, height: 42)
+                ]
+                for (index, rect) in blocks.enumerated() {
+                    context.fill(Path(rect), with: .color((index.isMultiple(of: 2) ? world.accent : world.secondary).opacity(0.12)))
+                }
+            case .tileShift:
+                for index in 0..<8 {
+                    let side: CGFloat = index.isMultiple(of: 2) ? 36 : 22
+                    let x = CGFloat((index * 71) % 330) / 330 * size.width
+                    let y = CGFloat((index * 137) % 700) / 700 * size.height
+                    context.stroke(Path(roundedRect: CGRect(x: x, y: y, width: side, height: side), cornerRadius: 4),
+                                   with: .color((index.isMultiple(of: 3) ? world.secondary : world.accent).opacity(0.13)),
+                                   lineWidth: 3)
+                }
+            case .lastSeen:
+                for index in 0..<11 {
+                    let radius: CGFloat = index.isMultiple(of: 3) ? 12 : 6
+                    let x = CGFloat((index * 89) % 360) / 360 * size.width
+                    let y = CGFloat((index * 151) % 760) / 760 * size.height
+                    let rect = CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2)
+                    context.stroke(Path(ellipseIn: rect),
+                                   with: .color((index.isMultiple(of: 2) ? world.accent : world.secondary).opacity(0.16)),
+                                   lineWidth: 3)
+                }
+            case .blockEscape:
+                for y in stride(from: 24 as CGFloat, through: size.height, by: 92) {
+                    let rect = CGRect(x: 18, y: y, width: size.width - 36, height: 54)
+                    context.stroke(Path(roundedRect: rect, cornerRadius: 5),
+                                   with: .color(world.secondary.opacity(0.08)), lineWidth: 3)
+                }
+            case .pegSolitaire:
+                for row in 0..<12 {
+                    for col in 0..<7 where (row + col).isMultiple(of: 2) {
+                        let center = CGPoint(x: CGFloat(col) * size.width / 6,
+                                             y: CGFloat(row) * size.height / 11)
+                        context.stroke(Path(ellipseIn: CGRect(x: center.x - 5, y: center.y - 5, width: 10, height: 10)),
+                                       with: .color(world.ink.opacity(0.09)), lineWidth: 2)
+                    }
+                }
+            case .split:
+                context.fill(Path(CGRect(x: 0, y: 0, width: size.width / 2, height: size.height)),
+                             with: .color(world.accent.opacity(0.06)))
+                context.fill(Path(CGRect(x: size.width / 2, y: 0, width: size.width / 2, height: size.height)),
+                             with: .color(world.secondary.opacity(0.06)))
+                var divider = Path(); divider.move(to: CGPoint(x: size.width / 2, y: 0)); divider.addLine(to: CGPoint(x: size.width / 2, y: size.height))
+                context.stroke(divider, with: .color(world.ink.opacity(0.12)), lineWidth: 2)
+            }
         }
     }
 }

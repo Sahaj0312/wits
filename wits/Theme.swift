@@ -302,11 +302,12 @@ struct ProgressTrack: View {
     var fraction: Double
     var animated = true
     var tint: Color = .witsAccent
+    var track: Color = .witsLine
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.witsLine)
+                Capsule().fill(track)
                 Capsule()
                     .fill(tint)
                     .frame(width: max(0, geo.size.width * fraction))

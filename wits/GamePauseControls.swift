@@ -8,14 +8,16 @@
 import SwiftUI
 
 struct GamePauseButton: View {
+    var game: GameID
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: "pause.fill")
                 .font(.system(size: 17, weight: .heavy))
-                .foregroundStyle(Color.witsInk)
+                .foregroundStyle(game.world.ink)
                 .frame(width: 44, height: 44)
+                .background(game.world.surface.opacity(0.88), in: Circle())
         }
         .buttonStyle(.plain)
         .contentShape(Circle())
@@ -24,13 +26,14 @@ struct GamePauseButton: View {
 }
 
 struct GamePauseButtonLayer: View {
+    var game: GameID
     var action: () -> Void
 
     var body: some View {
         // Sits in the safe-area coordinate space: directly below the status
         // bar, aligned with the leading slot games reserve in their top bars.
         GeometryReader { _ in
-            GamePauseButton(action: action)
+            GamePauseButton(game: game, action: action)
                 .position(x: 36,
                           y: 26)
         }
@@ -38,10 +41,11 @@ struct GamePauseButtonLayer: View {
 }
 
 struct GamePausedOverlay: View {
-    var game: GameID?
+    var game: GameID
     var controller: GamePauseController
     var quitTitle = "quit game"
     var onQuit: () -> Void
+    private var world: GameWorld { game.world }
 
     var body: some View {
         ZStack {
@@ -61,30 +65,42 @@ struct GamePausedOverlay: View {
                 VStack(spacing: 18) {
                     Image(systemName: "pause.fill")
                         .font(.system(size: 30, weight: .heavy))
-                        .foregroundStyle(Color.witsAccent)
+                        .foregroundStyle(world.accent)
                         .frame(width: 62, height: 62)
-                        .background(Color.witsAccent.opacity(0.14), in: Circle())
+                        .background(world.accent.opacity(0.14), in: Circle())
 
                     VStack(spacing: 4) {
                         Text("paused")
-                            .font(.witsDisplay(30))
-                            .foregroundStyle(Color.witsInk)
-                        if let game {
-                            Text(game.displayName)
-                                .font(.witsBody(15, weight: .semibold))
-                                .foregroundStyle(Color.witsMuted)
-                        }
+                            .font(.system(size: 30, weight: .black, design: world.titleDesign))
+                            .foregroundStyle(world.ink)
+                        Text(game.worldTitle())
+                            .font(.system(size: 14, weight: .bold, design: world.bodyDesign))
+                            .foregroundStyle(world.muted)
                     }
 
                     VStack(spacing: 12) {
-                        Cta(title: "resume", action: { controller.beginResumeCountdown() })
-                        QuietButton(title: quitTitle, action: onQuit)
+                        Button { controller.beginResumeCountdown() } label: {
+                            Text("RESUME")
+                                .font(.system(size: 16, weight: .black, design: world.titleDesign))
+                                .foregroundStyle(world.background)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 52)
+                                .background(world.accent, in: RoundedRectangle(cornerRadius: 7))
+                        }
+                        .buttonStyle(PressScale())
+                        Button(action: onQuit) {
+                            Text(quitTitle.uppercased())
+                                .font(.system(size: 11.5, weight: .black, design: world.bodyDesign))
+                                .foregroundStyle(world.muted)
+                        }
+                        .buttonStyle(.plain)
                     }
                     .padding(.top, 4)
                 }
                 .padding(28)
                 .frame(maxWidth: 340)
-                .cardSurface()
+                .background(world.surface, in: RoundedRectangle(cornerRadius: 7))
+                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(world.accent.opacity(0.35), lineWidth: 1))
                 .padding(.horizontal, WitsMetrics.screenPadding)
             }
         }

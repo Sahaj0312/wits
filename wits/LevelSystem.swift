@@ -47,15 +47,6 @@ enum ChallengeDifficulty: String, CaseIterable, Codable, Identifiable, Sendable 
         }
     }
 
-    var color: Color {
-        switch self {
-        case .easy: Color(hexAny: 0x2DBE4E)
-        case .medium: Color(hexAny: 0xE5A62B)
-        case .hard: Color(hexAny: 0xE75545)
-        case .extraHard: Color(hexAny: 0x5965C9)
-        }
-    }
-
     var ordinal: Int {
         Self.allCases.firstIndex(of: self) ?? 0
     }

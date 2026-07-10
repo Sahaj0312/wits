@@ -370,6 +370,7 @@ struct BlockEscapeScreen: View {
     private let startedAt = Date()
     private let level: Double
     private let mapLevel: Int
+    private var world: GameWorld { GameID.blockEscape.world }
 
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
@@ -427,7 +428,7 @@ struct BlockEscapeScreen: View {
                         ProgressView()
                             .tint(.white)
                         Text("laying out the tray…")
-                            .font(.witsBody(14, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold, design: world.bodyDesign))
                             .foregroundStyle(.white.opacity(0.7))
                     }
                 }
@@ -483,7 +484,7 @@ struct BlockEscapeScreen: View {
             .foregroundStyle(.white.opacity(0.78))
 
             ProgressView(value: min(1, Double(moves) / Double(max(1, graceMoves))))
-                .tint(moves <= graceMoves ? Color(red: 0.24, green: 0.82, blue: 0.20) : Color.witsWarm)
+                .tint(moves <= graceMoves ? world.secondary : world.accent)
                 .background(.white.opacity(0.16), in: Capsule())
         }
     }
@@ -500,17 +501,17 @@ struct BlockEscapeScreen: View {
         let trayH = cell * CGFloat(board.height) + inset * 2
 
         return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.black.opacity(0.28))
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(world.surface.opacity(0.88))
 
             // exit notch under the hero's target columns
             RoundedRectangle(cornerRadius: 3, style: .continuous)
-                .fill(Color.witsAccent)
+                .fill(world.accent)
                 .frame(width: cell * 2 - 8, height: 5)
                 .offset(x: inset + CGFloat(board.exitX) * cell + 4, y: trayH - 4)
             Image(systemName: "chevron.down")
                 .font(.system(size: 13, weight: .heavy))
-                .foregroundStyle(Color.witsAccent)
+                .foregroundStyle(world.accent)
                 .offset(x: inset + CGFloat(board.exitX) * cell + cell - 7, y: trayH + 6)
 
             ForEach(board.blocks.indices, id: \.self) { i in
@@ -531,17 +532,17 @@ struct BlockEscapeScreen: View {
 
     private func blockView(_ block: KlotskiBlock, hero: Bool, cell: CGFloat) -> some View {
         let gap: CGFloat = 3
-        return RoundedRectangle(cornerRadius: max(8, cell * 0.14), style: .continuous)
-            .fill(hero ? Color(red: 0.91, green: 0.36, blue: 0.31) : Color(red: 0.96, green: 0.92, blue: 0.82))
+        return RoundedRectangle(cornerRadius: max(5, cell * 0.10), style: .continuous)
+            .fill(hero ? world.accent : world.secondary)
             .overlay(
-                RoundedRectangle(cornerRadius: max(8, cell * 0.14), style: .continuous)
+                RoundedRectangle(cornerRadius: max(5, cell * 0.10), style: .continuous)
                     .strokeBorder(Color.black.opacity(0.12), lineWidth: 1.5)
             )
             .overlay {
                 if hero {
                     Image(systemName: "arrow.down")
                         .font(.system(size: cell * 0.34, weight: .heavy))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundStyle(world.background.opacity(0.88))
                 }
             }
             .frame(width: cell * CGFloat(block.w) - gap * 2, height: cell * CGFloat(block.h) - gap * 2)

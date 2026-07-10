@@ -74,6 +74,7 @@ final class ArcadeSKScene: SKScene {
     private var hits = 0, misses = 0, near = 0, score = 0, combo = 0, bestCombo = 0
     private var timeLeft = 45.0
     private var multiplier: Int { min(6, 1 + combo / 3) }
+    private var world: GameWorld { game.id.world }
 
     // input state
     private var startUnit: CGPoint?
@@ -97,25 +98,7 @@ final class ArcadeSKScene: SKScene {
         style = ArcadeStyle(size: size, dab: ArcadeTextures.dab, ring: ArcadeTextures.ring, spark: ArcadeTextures.spark)
         model.bounds = size
 
-        // Background: these games use the themed app background (matching arrow
-        // storm's clean look); other arcade games use the provided light field art.
-        let themedBackgroundGames: Set<GameID> = [.crowdControl, .echoGrid]
-        if themedBackgroundGames.contains(game.id) {
-            backgroundColor = UIColor(Color.witsBg)
-        } else {
-            // premium light background (provided asset, aspect-filled)
-            let bg = SKSpriteNode(texture: ArcadeTextures.bg)
-            bg.position = CGPoint(x: size.width/2, y: size.height/2)
-            bg.zPosition = -10
-            let tex = ArcadeTextures.bg.size()
-            if tex.width > 0, tex.height > 0 {
-                let scale = max(size.width / tex.width, size.height / tex.height)
-                bg.size = CGSize(width: tex.width * scale, height: tex.height * scale)
-            } else {
-                bg.size = size
-            }
-            addChild(bg)
-        }
+        backgroundColor = UIColor(world.background)
 
         addChild(fieldLayer)
         game.setupScene(self, style: style)
@@ -177,7 +160,7 @@ final class ArcadeSKScene: SKScene {
 
     private func scoreText() -> NSAttributedString {
         NSAttributedString(string: "\(score)", attributes: [
-            .font: roundedUIFont(28), .foregroundColor: UIColor(Color.witsInk)])
+            .font: roundedUIFont(28), .foregroundColor: UIColor(world.ink)])
     }
 
     private func updateHUD() {
@@ -190,13 +173,13 @@ final class ArcadeSKScene: SKScene {
             right = "\(Int(ceil(timeLeft)))s"
         }
         timerLabel.attributedText = NSAttributedString(string: right, attributes: [
-            .font: roundedUIFont(22), .foregroundColor: UIColor(Color.witsMuted)])
+            .font: roundedUIFont(22), .foregroundColor: UIColor(world.muted)])
     }
 
     private func showHowTo() {
         let label = SKLabelNode()
         label.attributedText = NSAttributedString(string: game.howTo, attributes: [
-            .font: roundedUIFont(17, weight: .semibold), .foregroundColor: UIColor(Color.witsInk)])
+            .font: roundedUIFont(17, weight: .semibold), .foregroundColor: UIColor(world.ink)])
         label.numberOfLines = 2
         label.preferredMaxLayoutWidth = size.width * 0.7
         label.horizontalAlignmentMode = .center
@@ -204,9 +187,9 @@ final class ArcadeSKScene: SKScene {
         label.position = CGPoint(x: size.width/2, y: size.height/2)
         label.zPosition = 100
 
-        let plate = SKShapeNode(rectOf: CGSize(width: size.width * 0.82, height: 90), cornerRadius: 18)
-        plate.fillColor = UIColor(Color.witsCard)
-        plate.strokeColor = UIColor(Color.witsLine)
+        let plate = SKShapeNode(rectOf: CGSize(width: size.width * 0.82, height: 90), cornerRadius: 7)
+        plate.fillColor = UIColor(world.surface)
+        plate.strokeColor = UIColor(world.accent).withAlphaComponent(0.35)
         plate.lineWidth = 1
         plate.position = CGPoint(x: size.width/2, y: size.height/2)
         plate.zPosition = 99
@@ -287,7 +270,7 @@ final class ArcadeSKScene: SKScene {
         case .hit:
             hits += 1; combo += 1; bestCombo = max(bestCombo, combo)
             score += r.points * multiplier
-            if let id = r.entityID, let n = nodes[id] { fx(at: n.position, color: UIColor(Color.witsAccent)) }
+            if let id = r.entityID, let n = nodes[id] { fx(at: n.position, color: UIColor(world.accent)) }
         case .nearMiss:
             near += 1; combo = 0
         case .miss:

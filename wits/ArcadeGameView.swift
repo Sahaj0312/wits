@@ -36,36 +36,37 @@ struct ArcadeGameView: View {
     private let startedAt = Date()
 
     private var multiplier: Int { min(6, 1 + combo / 3) }
+    private var world: GameWorld { game.id.world }
 
     var body: some View {
         VStack(spacing: 10) {
             if !cfg.isSurvival {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                    Text("\(Text("\(score)").foregroundStyle(world.accent)) pts")
                         .font(.system(size: 17, weight: .heavy, design: .rounded)).monospacedDigit()
-                        .foregroundStyle(Color.witsInk)
+                        .foregroundStyle(world.ink)
                     if multiplier > 1 {
                         Text("×\(multiplier)")
                             .font(.system(size: 12, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.witsAccent)
+                            .foregroundStyle(world.accent)
                             .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                            .background(world.accent.opacity(0.14), in: Capsule())
                     }
                     Spacer()
                     Text("\(Int(ceil(timeLeft)))s")
                         .font(.system(size: 17, weight: .heavy, design: .rounded)).monospacedDigit()
-                        .foregroundStyle(Color.witsMuted)
+                        .foregroundStyle(world.muted)
                 }
                 .padding(.horizontal, WitsMetrics.screenPadding)
-                ProgressTrack(fraction: max(0, timeLeft / cfg.targetDurationSec), animated: false)
+                ProgressTrack(fraction: max(0, timeLeft / cfg.targetDurationSec), animated: false,
+                              tint: world.accent, track: world.surface)
                     .padding(.horizontal, WitsMetrics.screenPadding)
             }
 
             GeometryReader { geo in
                 ZStack {
-                    ArcadeArena()
-                        .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
-                        .shadow(color: .witsShadow, radius: 10, y: 6)
+                    ArcadeArena(game: game.id)
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
                     field(size: geo.size)
 
@@ -75,15 +76,15 @@ struct ArcadeGameView: View {
 
                     if showHowTo {
                         Text(game.howTo)
-                            .font(.witsBody(15, weight: .semibold))
-                            .foregroundStyle(Color.witsInk)
+                            .font(.system(size: 15, weight: .semibold, design: world.bodyDesign))
+                            .foregroundStyle(world.ink)
                             .multilineTextAlignment(.center)
                             .padding(18)
-                            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(world.raised, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                             .padding(.horizontal, 30)
                     }
                 }
-                .clipShape(RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 .onAppear {
                     scene.bounds = geo.size
                     if !started { started = true; bootstrap() }
@@ -94,7 +95,7 @@ struct ArcadeGameView: View {
         .padding(.bottom, 12)
         .padding(.top, cfg.isSurvival ? 0 : 18)
         .witsShake(trigger: shakeTick)
-        .witsFlash(.witsWarm, trigger: flashTick)
+        .witsFlash(world.secondary, trigger: flashTick)
     }
 
     @ViewBuilder

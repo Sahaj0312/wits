@@ -417,18 +417,19 @@ private struct SlideTile: View {
     var inPlace: Bool
     var flashing: Bool
     var cell: CGFloat
+    private var world: GameWorld { GameID.slidePuzzle.world }
 
     var body: some View {
-        RoundedRectangle(cornerRadius: max(8, cell * 0.16), style: .continuous)
-            .fill(inPlace ? Color(red: 0.80, green: 0.89, blue: 0.66) : Color(red: 0.96, green: 0.92, blue: 0.82))
+        RoundedRectangle(cornerRadius: max(5, cell * 0.10), style: .continuous)
+            .fill(inPlace ? world.secondary : world.raised)
             .overlay(
-                RoundedRectangle(cornerRadius: max(8, cell * 0.16), style: .continuous)
-                    .strokeBorder(flashing ? Color.witsWarm : Color.black.opacity(0.12), lineWidth: flashing ? 3 : 1.5)
+                RoundedRectangle(cornerRadius: max(5, cell * 0.10), style: .continuous)
+                    .strokeBorder(flashing ? world.accent : world.ink.opacity(0.18), lineWidth: flashing ? 3 : 1.5)
             )
             .overlay {
                 Text("\(value)")
                     .font(.system(size: cell * 0.42, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color(red: 0.28, green: 0.21, blue: 0.10))
+                    .foregroundStyle(world.ink)
                     .monospacedDigit()
                     .minimumScaleFactor(0.6)
             }

@@ -19,6 +19,7 @@ final class TracePathArcade: ArcadeGame {
     let reverse: Bool
     let inputMode: ArcadeInputMode = .tap
     var howTo: String { reverse ? "watch the path, then tap it BACKWARDS" : "watch the path, then tap it in order" }
+    private var world: GameWorld { id.world }
 
     private enum Phase { case show, awaitTrace, reveal }
     private var phase: Phase = .show
@@ -143,7 +144,7 @@ final class TracePathArcade: ArcadeGame {
         let r = e.radius * style.unit
         let n = SKShapeNode(rectOf: CGSize(width: r * 2, height: r * 2), cornerRadius: r * 0.55)
         n.strokeColor = .clear; n.zPosition = 1
-        n.fillColor = UIColor(Color.witsCard)
+        n.fillColor = UIColor(world.surface)
         n.addSoftShadow(radius: r, style: style, alpha: 0.10)
         return n
     }
@@ -151,9 +152,9 @@ final class TracePathArcade: ArcadeGame {
     func refreshNode(_ node: SKNode, _ e: ArcadeEntity, style: ArcadeStyle) {
         let lit = e.id == litID
         let selected = e.a == 1
-        let color: UIColor = lit ? UIColor(Color.witsAccent)
-            : selected ? UIColor(Color.witsAccent).withAlphaComponent(0.6)
-            : UIColor(Color.witsCard)
+        let color: UIColor = lit ? UIColor(world.accent)
+            : selected ? UIColor(world.secondary).withAlphaComponent(0.72)
+            : UIColor(world.surface)
         (node as? SKShapeNode)?.fillColor = color
         node.setScale(lit || selected ? 1.14 : 1.0)
     }
@@ -163,8 +164,8 @@ final class TracePathArcade: ArcadeGame {
         let path = Path(roundedRect: rect, cornerRadius: rect.width * 0.3)
         if lit {
             var g = ctx
-            g.addFilter(.shadow(color: Color.witsAccent.opacity(0.9), radius: rect.width * 0.5))
-            g.fill(path, with: .color(.witsAccent))
+            g.addFilter(.shadow(color: world.accent.opacity(0.9), radius: rect.width * 0.5))
+            g.fill(path, with: .color(world.accent))
             ctx.fill(Path(ellipseIn: rect.insetBy(dx: rect.width * 0.3, dy: rect.height * 0.3)),
                      with: .color(.white.opacity(0.7)))
         } else {
@@ -178,8 +179,8 @@ final class TracePathArcade: ArcadeGame {
             Spacer()
             Text(phase == .awaitTrace ? (reverse ? "tap it backwards" : "tap it in order")
                  : phase == .reveal ? "" : "watch")
-                .font(.witsBody(13, weight: .semibold))
-                .foregroundStyle(Color.witsFaint)
+                .font(.system(size: 13, weight: .semibold, design: world.bodyDesign))
+                .foregroundStyle(world.muted)
                 .padding(.bottom, 8)
         }.allowsHitTesting(false))
     }

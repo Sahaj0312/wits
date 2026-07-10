@@ -31,6 +31,7 @@ struct LastSeenScreen: View {
     @State private var finished = false
     private let startedAt = Date()
     private let level: Double
+    private var world: GameWorld { GameID.lastSeen.world }
 
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
@@ -42,35 +43,37 @@ struct LastSeenScreen: View {
         VStack(spacing: 12) {
             if !cfg.isSurvival {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                    Text("\(Text("\(score)").foregroundStyle(world.accent)) pts")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsInk).monospacedDigit()
+                        .foregroundStyle(world.ink).monospacedDigit()
                     Spacer()
                     Text("\(Int(ceil(timeLeft)))s")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsMuted).monospacedDigit()
+                        .foregroundStyle(world.muted).monospacedDigit()
                 }
-                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false,
+                              tint: world.accent, track: world.raised)
             }
             Spacer()
             let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(Array(order.enumerated()), id: \.offset) { _, iconID in
                     let isFlash = flash?.idx == iconID
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(isFlash ? (flash!.ok ? Color.witsAccent.opacity(0.85) : Color.witsWarm.opacity(0.8)) : Color.witsCard)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(isFlash ? (flash!.ok ? world.secondary.opacity(0.88) : world.accent.opacity(0.88)) : world.surface)
                         .aspectRatio(1, contentMode: .fit)
                         .overlay(
                             Image(systemName: lastSeenPool[iconID])
                                 .font(.system(size: 26, weight: .heavy))
-                                .foregroundStyle(isFlash ? .white : Color.witsInk)
+                                .foregroundStyle(isFlash ? world.background : world.ink)
                         )
-                        .shadow(color: .witsShadow, radius: 6, y: 3)
+                        .shadow(color: world.ink.opacity(0.12), radius: 4, y: 2)
                         .onTapGesture { tap(iconID) }
                 }
             }
             Text("tap one you haven't tapped yet")
-                .font(.witsBody(12.5)).foregroundStyle(Color.witsFaint)
+                .font(.system(size: 12.5, weight: .semibold, design: world.bodyDesign))
+                .foregroundStyle(world.muted)
                 .frame(maxWidth: .infinity)
             Spacer()
         }

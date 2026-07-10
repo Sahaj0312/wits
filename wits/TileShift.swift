@@ -55,6 +55,7 @@ struct TileShiftScreen: View {
     }
 
     private var multiplier: Int { min(5, 1 + streak / 3) }
+    private var world: GameWorld { GameID.tileShift.world }
 
     private static func make(byColor: Bool) -> Round {
         let target = Tile(shape: .random(in: 0..<3), color: .random(in: 0..<3))
@@ -80,46 +81,48 @@ struct TileShiftScreen: View {
         VStack(spacing: 12) {
             if !cfg.isSurvival {
                 HStack(alignment: .firstTextBaseline) {
-                    Text("\(Text("\(score)").foregroundStyle(Color.witsAccent)) pts")
+                    Text("\(Text("\(score)").foregroundStyle(world.accent)) pts")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsInk).monospacedDigit()
+                        .foregroundStyle(world.ink).monospacedDigit()
                     if multiplier > 1 {
                         Text("×\(multiplier)")
                             .font(.system(size: 12, weight: .heavy, design: .rounded))
-                            .foregroundStyle(Color.witsAccent)
+                            .foregroundStyle(world.accent)
                             .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.witsAccent.opacity(0.14), in: Capsule())
+                            .background(world.accent.opacity(0.14), in: Capsule())
                     }
                     Spacer()
                     Text("\(Int(ceil(timeLeft)))s")
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(Color.witsMuted).monospacedDigit()
+                        .foregroundStyle(world.muted).monospacedDigit()
                 }
-                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false)
+                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false,
+                              tint: world.accent, track: world.surface)
             }
 
             Text(round.byColor ? "MATCH THE COLOUR" : "MATCH THE SHAPE")
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
                 .kerning(1)
-                .foregroundStyle(round.byColor ? Color.witsAccent : Color.witsWarm)
+                .foregroundStyle(round.byColor ? world.accent : world.secondary)
                 .padding(.horizontal, 16).padding(.vertical, 9)
-                .background((round.byColor ? Color.witsAccent : Color.witsWarm).opacity(0.14), in: Capsule())
+                .background((round.byColor ? world.accent : world.secondary).opacity(0.14), in: Capsule())
                 .padding(.top, 6)
 
             Spacer()
             tileView(round.target)
                 .frame(width: 120, height: 120)
-                .cardSurface()
+                .background(world.surface, in: RoundedRectangle(cornerRadius: 7))
+                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(world.ink.opacity(0.12), lineWidth: 1))
                 .id(round.id)
                 .overlay(
-                    RoundedRectangle(cornerRadius: WitsMetrics.radius, style: .continuous)
-                        .strokeBorder(feedback == true ? Color.witsAccent : feedback == false ? Color.witsWarm : .clear, lineWidth: 2.5)
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(feedback == true ? world.accent : feedback == false ? world.secondary : .clear, lineWidth: 2.5)
                         .padding(-10)
                 )
             ZStack(alignment: .leading) {
-                Capsule().fill(Color.witsLine)
+                Capsule().fill(world.surface)
                 GeometryReader { geo in
-                    Capsule().fill(windowFrac < 0.35 ? Color.witsWarm : Color.witsMuted)
+                    Capsule().fill(windowFrac < 0.35 ? world.secondary : world.muted)
                         .frame(width: max(0, geo.size.width * windowFrac))
                 }
             }
@@ -130,7 +133,7 @@ struct TileShiftScreen: View {
                     Button { answer(i) } label: {
                         tileView(round.options[i])
                             .frame(maxWidth: .infinity).frame(height: 110)
-                            .background(Color.witsTint, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .background(world.surface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                     }
                     .buttonStyle(.plain)
                 }

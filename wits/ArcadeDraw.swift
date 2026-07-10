@@ -52,16 +52,12 @@ extension GraphicsContext {
 
 /// The dark game stage behind every arcade field — gradient + soft accent glows.
 struct ArcadeArena: View {
+    var game: GameID = .split
+
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [Color(light: 0x202B4D, dark: 0x1C2546), Color(light: 0x121A36, dark: 0x0D1326)],
-                startPoint: .top, endPoint: .bottom
-            )
-            RadialGradient(colors: [Color.witsAccent.opacity(0.20), .clear],
-                           center: .topLeading, startRadius: 0, endRadius: 360)
-            RadialGradient(colors: [Color.witsWarm.opacity(0.12), .clear],
-                           center: .bottomTrailing, startRadius: 0, endRadius: 380)
+            game.world.surface
+            GameWorldBackdrop(game: game, patternOpacity: 0.5)
         }
     }
 }

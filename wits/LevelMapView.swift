@@ -2,8 +2,8 @@
 //  LevelMapView.swift
 //  wits
 //
-//  Pre-game difficulty selector. Each difficulty owns an independent,
-//  unbounded level track.
+//  A game-owned difficulty selector. The launcher supplies progression; every
+//  visual decision comes from the selected game's world.
 //
 
 import SwiftUI
@@ -17,215 +17,264 @@ struct DifficultySelectView: View {
     @State private var difficulty: ChallengeDifficulty = .easy
     @State private var showHelp = false
 
-    private var level: Int {
-        app.levels.currentLevel(for: game, difficulty: difficulty)
-    }
+    private var world: GameWorld { game.world }
+    private var level: Int { app.levels.currentLevel(for: game, difficulty: difficulty) }
+    private var difficultyColor: Color { world.difficultyColor(difficulty) }
 
     var body: some View {
-        GeometryReader { proxy in
-            let heroHeight = min(350, max(285, proxy.size.height * 0.37))
+        ZStack {
+            GameWorldBackdrop(game: game)
+
             ScrollView(showsIndicators: false) {
                 VStack(spacing: 0) {
-                    hero
-                        .frame(height: heroHeight)
-
-                    selector
-                        .frame(minHeight: max(430, proxy.size.height - heroHeight))
+                    navigation
+                    identity
+                    difficultyControl
+                    playButton
+                        .padding(.top, 28)
+                        .padding(.bottom, 30)
                 }
-                .frame(minHeight: proxy.size.height)
-            }
-            .background(Color.witsBg)
-        }
-        .ignoresSafeArea(edges: .bottom)
-        .onAppear {
-            difficulty = app.levels.selectedDifficulty(for: game)
-        }
-        .onChange(of: difficulty) { _, value in
-            app.levels.select(value, for: game)
-        }
-        .sheet(isPresented: $showHelp) {
-            GameHelpSheet(game: game)
-        }
-    }
-
-    private var hero: some View {
-        ZStack {
-            game.posterBackground
-            GamePosterArt(game: game)
-                .scaleEffect(1.22)
-                .opacity(0.62)
-            Color.black.opacity(0.24)
-
-            VStack(spacing: 0) {
-                HStack {
-                    circleButton(symbol: "chevron.left", label: "Close", action: onClose)
-                    Spacer()
-                    circleButton(symbol: "questionmark", label: "How to play") {
-                        showHelp = true
-                    }
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-
-                Spacer(minLength: 12)
-
-                Text(game.displayName.uppercased())
-                    .font(.system(size: 36, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.72)
-
-                Text(game.cardHow)
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.94))
-                    .multilineTextAlignment(.center)
-                    .lineLimit(4)
-                    .minimumScaleFactor(0.82)
-                    .padding(.horizontal, 34)
-                    .padding(.top, 12)
-
-                Spacer(minLength: 28)
+                .padding(.horizontal, 22)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
             }
         }
-        .clipped()
+        .onAppear { difficulty = app.levels.selectedDifficulty(for: game) }
+        .onChange(of: difficulty) { _, value in app.levels.select(value, for: game) }
+        .sheet(isPresented: $showHelp) { GameHelpSheet(game: game) }
     }
 
-    private var selector: some View {
-        VStack(spacing: 0) {
-            DifficultyFace(difficulty: difficulty)
-                .padding(.top, 22)
-
-            Text(difficulty.title.uppercased())
-                .font(.system(size: 34, weight: .black, design: .rounded))
-                .foregroundStyle(difficulty.color)
+    private var navigation: some View {
+        HStack {
+            worldIconButton(symbol: "chevron.left", label: "Close", action: onClose)
+            Spacer()
+            Text(game.subskill.uppercased())
+                .font(.system(size: 10.5, weight: .black, design: world.bodyDesign))
+                .foregroundStyle(world.muted)
                 .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .padding(.top, 16)
+                .minimumScaleFactor(0.7)
+            Spacer()
+            worldIconButton(symbol: "questionmark", label: "How to play") { showHelp = true }
+        }
+        .padding(.top, 10)
+    }
 
-            DifficultySlider(selection: $difficulty)
-                .padding(.horizontal, 28)
-                .padding(.top, 18)
+    private var identity: some View {
+        VStack(spacing: 4) {
+            GamePosterArt(game: game)
+                .frame(height: 225)
+                .frame(maxWidth: 430)
+
+            Text(game.worldTitle())
+                .font(.system(size: titleSize, weight: .black, design: world.titleDesign))
+                .foregroundStyle(world.ink)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.62)
+
+            Text(game.tagline)
+                .font(.system(size: 14.5, weight: .semibold, design: world.bodyDesign))
+                .foregroundStyle(world.muted)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .padding(.top, 7)
+        }
+    }
+
+    private var difficultyControl: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 15) {
+                GameDifficultyToken(game: game, difficulty: difficulty)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(difficulty.title.uppercased())
+                        .font(.system(size: 24, weight: .black, design: world.titleDesign))
+                        .foregroundStyle(difficultyColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                    Text("LEVEL \(level)")
+                        .font(.system(size: 12, weight: .black, design: .monospaced))
+                        .foregroundStyle(world.ink)
+                        .monospacedDigit()
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 27)
+
+            DifficultySlider(game: game, selection: $difficulty)
+                .padding(.top, 17)
 
             HStack(spacing: 0) {
                 ForEach(ChallengeDifficulty.allCases) { option in
-                    Text(option.shortTitle)
-                        .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(option == difficulty ? option.color : Color.witsFaint)
+                    Text(option.shortTitle.uppercased())
+                        .font(.system(size: 9.5, weight: .black, design: world.bodyDesign))
+                        .foregroundStyle(option == difficulty
+                                         ? world.difficultyColor(option)
+                                         : world.muted.opacity(0.62))
                         .frame(maxWidth: .infinity)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.72)
                 }
             }
-            .padding(.horizontal, 26)
-            .padding(.top, 2)
-
-            Spacer(minLength: 28)
-
-            Button {
-                onPlay(difficulty, level)
-            } label: {
-                VStack(spacing: 1) {
-                    Text("PLAY")
-                        .font(.system(size: 30, weight: .black, design: .rounded))
-                    Text("Level \(level)")
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                }
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(height: 78)
-                .background(difficulty.color,
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .shadow(color: difficulty.color.opacity(0.28), radius: 10, y: 6)
-            }
-            .buttonStyle(PressScale())
-            .padding(.horizontal, 42)
-
-            Spacer(minLength: 26)
+            .padding(.horizontal, 1)
+            .padding(.top, 4)
         }
-        .background(Color.witsBg)
     }
 
-    private func circleButton(symbol: String,
-                              label: String,
-                              action: @escaping () -> Void) -> some View {
+    private var playButton: some View {
+        Button { onPlay(difficulty, level) } label: {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("PLAY")
+                        .font(.system(size: 25, weight: .black, design: world.titleDesign))
+                    Text("\(difficulty.title) · level \(level)")
+                        .font(.system(size: 12.5, weight: .bold, design: world.bodyDesign))
+                        .monospacedDigit()
+                }
+                Spacer()
+                Image(systemName: "arrow.right")
+                    .font(.system(size: 23, weight: .black))
+            }
+            .foregroundStyle(world.background)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity)
+            .frame(height: 72)
+            .background(difficultyColor,
+                        in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+            .overlay(alignment: .bottom) {
+                Rectangle().fill(world.secondary).frame(height: 4)
+            }
+        }
+        .buttonStyle(PressScale())
+        .shadow(color: difficultyColor.opacity(0.25), radius: 12, y: 6)
+    }
+
+    private var titleSize: CGFloat {
+        switch game {
+        case .crowdControl, .pegSolitaire: 34
+        case .blockEscape, .slidePuzzle: 38
+        default: 42
+        }
+    }
+
+    private func worldIconButton(symbol: String,
+                                 label: String,
+                                 action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Image(systemName: symbol)
-                .font(.system(size: 20, weight: .black))
-                .foregroundStyle(.white)
-                .frame(width: 52, height: 52)
-                .background(Color.black.opacity(0.64), in: Circle())
+                .font(.system(size: 17, weight: .black))
+                .foregroundStyle(world.ink)
+                .frame(width: 44, height: 44)
+                .background(world.surface, in: Circle())
+                .overlay(Circle().strokeBorder(world.accent.opacity(0.42), lineWidth: 1))
         }
         .buttonStyle(PressScale())
         .accessibilityLabel(label)
     }
 }
 
-private struct DifficultyFace: View {
+private struct GameDifficultyToken: View {
+    let game: GameID
     let difficulty: ChallengeDifficulty
 
+    private var world: GameWorld { game.world }
+
     var body: some View {
-        ZStack {
-            Circle()
-                .fill(Color(hexAny: 0x3A3A3D))
-            Circle()
-                .fill(.black)
-                .padding(10)
-            Circle()
-                .fill(difficulty.color)
-                .padding(22)
+        ZStack(alignment: .bottomTrailing) {
+            Group {
+                switch game {
+                case .crowdControl, .pegSolitaire:
+                    Circle().fill(world.surface)
+                case .arrowStorm, .blockEscape, .slidePuzzle:
+                    Rectangle().fill(world.surface)
+                default:
+                    RoundedRectangle(cornerRadius: 7, style: .continuous).fill(world.surface)
+                }
+            }
+            .overlay {
+                Image(systemName: game.symbol)
+                    .font(.system(size: 27, weight: .black))
+                    .foregroundStyle(world.difficultyColor(difficulty))
+            }
+            .overlay {
+                switch game {
+                case .crowdControl, .pegSolitaire:
+                    Circle().strokeBorder(world.ink.opacity(0.18), lineWidth: 1)
+                default:
+                    RoundedRectangle(cornerRadius: game == .arrowStorm || game == .blockEscape || game == .slidePuzzle ? 0 : 7)
+                        .strokeBorder(world.ink.opacity(0.18), lineWidth: 1)
+                }
+            }
+
             Image(systemName: difficulty.symbol)
-                .font(.system(size: 39, weight: .black))
-                .foregroundStyle(.black.opacity(0.88))
+                .font(.system(size: 9, weight: .black))
+                .foregroundStyle(world.background)
+                .frame(width: 23, height: 23)
+                .background(world.difficultyColor(difficulty), in: Circle())
+                .offset(x: 6, y: 6)
         }
-        .frame(width: 116, height: 116)
-        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: difficulty)
+        .frame(width: 66, height: 66)
+        .animation(.spring(response: 0.24, dampingFraction: 0.72), value: difficulty)
         .accessibilityHidden(true)
     }
 }
 
 private struct DifficultySlider: View {
+    let game: GameID
     @Binding var selection: ChallengeDifficulty
+
+    private var world: GameWorld { game.world }
 
     var body: some View {
         GeometryReader { proxy in
-            let thumb: CGFloat = 58
+            let thumb: CGFloat = 52
             let inset = thumb / 2
             let usable = max(1, proxy.size.width - thumb)
             let step = usable / CGFloat(max(1, ChallengeDifficulty.allCases.count - 1))
             let x = inset + CGFloat(selection.ordinal) * step
 
             ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(Color(hexAny: 0x3A3A3D))
-                    .frame(height: 30)
+                RoundedRectangle(cornerRadius: game == .arrowStorm || game == .slidePuzzle ? 0 : 7)
+                    .fill(world.surface)
+                    .frame(height: 24)
 
-                Capsule()
-                    .fill(
-                        LinearGradient(colors: ChallengeDifficulty.allCases.map(\.color),
-                                       startPoint: .leading,
-                                       endPoint: .trailing)
-                    )
-                    .frame(height: 18)
-                    .padding(.horizontal, 6)
+                HStack(spacing: 0) {
+                    ForEach(ChallengeDifficulty.allCases) { option in
+                        Rectangle()
+                            .fill(world.difficultyColor(option))
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .frame(height: 10)
+                .padding(.horizontal, 7)
+                .clipShape(RoundedRectangle(cornerRadius: 3))
 
                 ForEach(ChallengeDifficulty.allCases) { option in
                     Circle()
-                        .fill(.white.opacity(option == selection ? 0 : 0.72))
+                        .fill(world.background)
                         .frame(width: 5, height: 5)
                         .position(x: inset + CGFloat(option.ordinal) * step,
                                   y: proxy.size.height / 2)
                 }
 
-                Circle()
-                    .fill(.white)
-                    .frame(width: thumb, height: thumb)
-                    .overlay(Circle().fill(selection.color).padding(15))
-                    .shadow(color: .black.opacity(0.2), radius: 5, y: 3)
-                    .position(x: x, y: proxy.size.height / 2)
+                Group {
+                    if game == .arrowStorm || game == .blockEscape || game == .slidePuzzle {
+                        Rectangle().fill(world.ink)
+                    } else if game == .crowdControl || game == .pegSolitaire {
+                        Circle().fill(world.ink)
+                    } else {
+                        RoundedRectangle(cornerRadius: 6).fill(world.ink)
+                    }
+                }
+                .frame(width: thumb, height: thumb)
+                .overlay {
+                    Image(systemName: game.symbol)
+                        .font(.system(size: 18, weight: .black))
+                        .foregroundStyle(world.difficultyColor(selection))
+                }
+                .shadow(color: .black.opacity(0.3), radius: 5, y: 3)
+                .position(x: x, y: proxy.size.height / 2)
             }
-            .frame(maxHeight: .infinity)
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
@@ -233,22 +282,18 @@ private struct DifficultySlider: View {
                         let raw = (gesture.location.x - inset) / usable
                         let ordinal = Int((raw * CGFloat(ChallengeDifficulty.allCases.count - 1)).rounded())
                         let clamped = min(ChallengeDifficulty.allCases.count - 1, max(0, ordinal))
-                        if let next = ChallengeDifficulty(ordinal: clamped), next != selection {
-                            withAnimation(.spring(response: 0.22, dampingFraction: 0.78)) {
-                                selection = next
-                            }
-                        }
+                        guard let next = ChallengeDifficulty(ordinal: clamped), next != selection else { return }
+                        withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) { selection = next }
                     }
             )
         }
-        .frame(height: 68)
+        .frame(height: 60)
         .accessibilityElement()
         .accessibilityLabel("Difficulty")
         .accessibilityValue(selection.title)
         .accessibilityAdjustableAction { direction in
             let delta = direction == .increment ? 1 : -1
-            let ordinal = min(ChallengeDifficulty.allCases.count - 1,
-                              max(0, selection.ordinal + delta))
+            let ordinal = min(ChallengeDifficulty.allCases.count - 1, max(0, selection.ordinal + delta))
             if let next = ChallengeDifficulty(ordinal: ordinal) { selection = next }
         }
     }
@@ -258,45 +303,50 @@ private struct GameHelpSheet: View {
     let game: GameID
     @Environment(\.dismiss) private var dismiss
 
+    private var world: GameWorld { game.world }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                Image(systemName: game.symbol)
-                    .font(.system(size: 19, weight: .heavy))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(game.domain.color,
-                                in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                Text(game.displayName)
-                    .font(.witsDisplay(26))
-                    .foregroundStyle(Color.witsInk)
-                Spacer()
-                Button {
-                    dismiss()
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 15, weight: .heavy))
-                        .foregroundStyle(Color.witsMuted)
-                        .frame(width: 40, height: 40)
-                        .background(Color.witsCard, in: Circle())
+        ZStack {
+            GameWorldBackdrop(game: game, patternOpacity: 0.55)
+            VStack(alignment: .leading, spacing: 18) {
+                HStack {
+                    Image(systemName: game.symbol)
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundStyle(world.accent)
+                        .frame(width: 48, height: 48)
+                        .background(world.surface,
+                                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                    Text(game.worldTitle("how to play"))
+                        .font(.system(size: 25, weight: .black, design: world.titleDesign))
+                        .foregroundStyle(world.ink)
+                    Spacer()
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 15, weight: .black))
+                            .foregroundStyle(world.ink)
+                            .frame(width: 40, height: 40)
+                            .background(world.surface, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close")
+
+                Rectangle().fill(world.accent).frame(height: 4)
+
+                Text(game.cardHow)
+                    .font(.system(size: 15.5, weight: .semibold, design: world.bodyDesign))
+                    .foregroundStyle(world.ink)
+
+                Text(game.cardAbout)
+                    .font(.system(size: 14.5, weight: .regular, design: world.bodyDesign))
+                    .foregroundStyle(world.muted)
+
+                Spacer(minLength: 0)
             }
-
-            Text(game.cardHow)
-                .font(.witsBody(15.5, weight: .semibold))
-                .foregroundStyle(Color.witsInk)
-
-            Text(game.cardAbout)
-                .font(.witsBody(14.5))
-                .foregroundStyle(Color.witsMuted)
-
-            Spacer(minLength: 0)
+            .padding(22)
         }
-        .padding(22)
-        .background(Color.witsBg.ignoresSafeArea())
         .presentationDetents([.medium])
         .presentationDragIndicator(.visible)
+        .presentationBackground(world.background)
     }
 }

@@ -320,6 +320,7 @@ struct PegSolitaireScreen: View {
     private let startedAt = Date()
     private let level: Double
     private let mapLevel: Int
+    private var world: GameWorld { GameID.pegSolitaire.world }
 
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
@@ -345,7 +346,7 @@ struct PegSolitaireScreen: View {
                         ProgressView()
                             .tint(.white)
                         Text("setting up the board…")
-                            .font(.witsBody(14, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold, design: world.bodyDesign))
                             .foregroundStyle(.white.opacity(0.7))
                     }
                 } else {
@@ -446,7 +447,7 @@ struct PegSolitaireScreen: View {
             .foregroundStyle(.white.opacity(0.78))
 
             ProgressView(value: min(1, Double(cleared) / Double(max(1, startPegs - 1))))
-                .tint(Color(red: 0.24, green: 0.82, blue: 0.20))
+                .tint(world.accent)
                 .background(.white.opacity(0.16), in: Capsule())
         }
     }
@@ -473,8 +474,8 @@ struct PegSolitaireScreen: View {
         let destinations = legalDestinations
 
         return ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.black.opacity(0.28))
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(world.surface.opacity(0.90))
 
             ForEach(puzzle.holes.sorted(), id: \.self) { hole in
                 let gx = CGFloat(hole % puzzle.cols) + stagger * CGFloat(hole / puzzle.cols)
@@ -502,7 +503,7 @@ struct PegSolitaireScreen: View {
                 .frame(width: cell * 0.72, height: cell * 0.72)
             if isTarget && !hasPeg {
                 Circle()
-                    .strokeBorder(Color.witsAccent.opacity(0.9), lineWidth: 2.5)
+                    .strokeBorder(world.accent.opacity(0.9), lineWidth: 2.5)
                     .frame(width: cell * 0.72, height: cell * 0.72)
             }
             if isDestination {
@@ -512,7 +513,7 @@ struct PegSolitaireScreen: View {
             }
             if hasPeg {
                 Circle()
-                    .fill(isSelected ? Color.witsAccent : Color(red: 0.96, green: 0.92, blue: 0.82))
+                    .fill(isSelected ? world.secondary : world.ink)
                     .frame(width: cell * 0.58, height: cell * 0.58)
                     .scaleEffect(vanishing == hole ? 0.1 : (isSelected ? 1.12 : 1))
                     .shadow(color: .black.opacity(0.25), radius: 3, y: 2)

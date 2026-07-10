@@ -360,7 +360,7 @@ struct SplitSurvivalScreen: View {
         }
         .overlay {
             if phase == .playing, !pauseController.isPaused {
-                GamePauseButtonLayer {
+                GamePauseButtonLayer(game: .split) {
                     pauseController.pause()
                 }
             }
