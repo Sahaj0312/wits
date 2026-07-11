@@ -566,39 +566,40 @@ private struct PegSolitairePoster: View {
     }
 }
 
-// MARK: - Split — steer below, pick above, all at once.
+// MARK: - Split — steer on the left, pick on the right, all at once.
 
 private struct SplitPoster: View {
     let w: CGFloat, h: CGFloat
 
     var body: some View {
-        let pillar = Color(hexAny: 0x74E39F)
+        let pillar = Color(hexAny: 0x39E6E2)
         ZStack {
-            // Go/no-go up top: two red targets and the green look-alike trap.
-            apple(Color(hexAny: 0xFF5964)).position(x: w * 0.28, y: h * 0.49)
-            apple(Color(hexAny: 0xFF5964)).position(x: w * 0.50, y: h * 0.46)
-            apple(Color(hexAny: 0x8FD65A)).position(x: w * 0.73, y: h * 0.50)
-
+            // The screen divide runs down the middle, like the game.
             Capsule()
                 .fill(.white.opacity(0.16))
-                .frame(width: w * 0.74, height: 3)
-                .position(x: w * 0.5, y: h * 0.615)
+                .frame(width: 3, height: h * 0.50)
+                .position(x: w * 0.5, y: h * 0.665)
 
-            // Flappy lane below: flyer + a pillar gap to thread.
+            // Left hand: flyer threading a pillar gap.
             Image(systemName: "paperplane.fill")
                 .font(.system(size: w * 0.115, weight: .heavy))
                 .foregroundStyle(.white)
                 .shadow(color: Color(hexAny: 0xFF6B6B).opacity(0.7), radius: 6)
-                .position(x: w * 0.30, y: h * 0.76)
+                .position(x: w * 0.20, y: h * 0.70)
 
             RoundedRectangle(cornerRadius: w * 0.025, style: .continuous)
                 .fill(pillar)
-                .frame(width: w * 0.11, height: h * 0.085)
-                .position(x: w * 0.72, y: h * 0.685)
+                .frame(width: w * 0.11, height: h * 0.11)
+                .position(x: w * 0.37, y: h * 0.505)
             RoundedRectangle(cornerRadius: w * 0.025, style: .continuous)
                 .fill(pillar)
-                .frame(width: w * 0.11, height: h * 0.085)
-                .position(x: w * 0.72, y: h * 0.845)
+                .frame(width: w * 0.11, height: h * 0.11)
+                .position(x: w * 0.37, y: h * 0.825)
+
+            // Right hand: two targets and the green look-alike trap.
+            apple(Color(hexAny: 0xFF5964)).position(x: w * 0.66, y: h * 0.50)
+            apple(Color(hexAny: 0xFF5964)).position(x: w * 0.85, y: h * 0.61)
+            apple(Color(hexAny: 0x8FD65A)).position(x: w * 0.70, y: h * 0.76)
         }
     }
 
