@@ -10,8 +10,7 @@
 //    wits.split.survival.depth.v2   Split level plus fractional depth
 //    wits.weekly.<game-id>    recurring every Monday at 00:00 UTC for 7 days
 //  Achievement IDs:
-//    wits.ach.first3star                  first 3★ on any level
-//    wits.ach.stars.50 / .150 / .300      star-total milestones
+//    wits.ach.levels.50 / .150 / .300     lifetime level-clear milestones
 //    wits.ach.streak.7 / .30              longest-streak milestones
 //
 
@@ -92,21 +91,17 @@ final class GameCenterManager {
     // MARK: Progress → leaderboard + achievements
 
     /// Called after every recorded run: refresh newly earned achievements.
-    /// Lifetime stars remain an achievement signal, never a grind leaderboard.
+    /// Lifetime clears remain an achievement signal, never a grind leaderboard.
     /// All predicates are computed from local
     /// state, so re-evaluating is idempotent.
     func recordProgress(levels: LevelProgressStore, streak: StreakState) {
         guard isAuthenticated else { return }
-        let totalStars = GameID.live.reduce(0) { $0 + levels.totalStars(for: $1) }
+        let totalClears = GameID.live.reduce(0) { $0 + levels.totalClears(for: $1) }
 
         var earned: [String] = []
 
-        if GameID.live.contains(where: { levels.hasThreeStarLevel(for: $0) }) {
-            earned.append("wits.ach.first3star")
-        }
-
-        for milestone in [50, 150, 300] where totalStars >= milestone {
-            earned.append("wits.ach.stars.\(milestone)")
+        for milestone in [50, 150, 300] where totalClears >= milestone {
+            earned.append("wits.ach.levels.\(milestone)")
         }
         for milestone in [7, 30] where streak.longest >= milestone {
             earned.append("wits.ach.streak.\(milestone)")

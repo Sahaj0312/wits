@@ -95,7 +95,7 @@ final class AppModel {
             levels.recordAttempt(game: id,
                                  difficulty: trackDifficulty,
                                  level: trackLevel,
-                                 stars: StarGrader.stars(quality: quality), quality: quality)
+                                 quality: quality)
         }
 
         streak = StreakEngine.recordActivity(streak, today: Date())
@@ -106,7 +106,7 @@ final class AppModel {
 
     /// Weekly competition is deliberately outside campaign progression. It
     /// records the run and streak, keeps only this week's best, and submits the
-    /// comparable fixed-seed score without changing levels, stars, or mastery.
+    /// comparable fixed-seed score without changing levels or mastery.
     @discardableResult
     func recordWeeklyChallengeResult(_ result: GameResult,
                                      challenge: WeeklyChallenge) -> WeeklyRunOutcome {

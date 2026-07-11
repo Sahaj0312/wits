@@ -11,7 +11,7 @@ struct DifficultyLevelResultView: View {
     let game: GameID
     let difficulty: ChallengeDifficulty
     let level: Int
-    let stars: Int
+    let passed: Bool
     let quality: Double
     let improved: Bool
     let onRetry: () -> Void
@@ -20,7 +20,6 @@ struct DifficultyLevelResultView: View {
 
     private var world: GameWorld { game.world }
     private var difficultyColor: Color { world.difficultyColor(difficulty) }
-    private var passed: Bool { stars >= 1 }
     private var nextLevel: Int { level == Int.max ? Int.max : level + 1 }
 
     var body: some View {
@@ -50,14 +49,21 @@ struct DifficultyLevelResultView: View {
                     .multilineTextAlignment(.center)
                     .padding(.top, 9)
 
-                HStack(spacing: 12) {
-                    ForEach(0..<3, id: \.self) { index in
-                        Image(systemName: index < stars ? "star.fill" : "star")
-                            .font(.system(size: 38, weight: .black))
-                            .foregroundStyle(index < stars ? world.accent : world.muted.opacity(0.34))
+                Text(passed ? "PASSED" : "NOT YET")
+                    .font(.system(size: 15, weight: .black, design: world.bodyDesign))
+                    .foregroundStyle(passed ? world.background : world.muted)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 9)
+                    .background(
+                        passed ? AnyShapeStyle(world.accent) : AnyShapeStyle(world.surface),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        if !passed {
+                            Capsule().strokeBorder(world.muted.opacity(0.34), lineWidth: 1)
+                        }
                     }
-                }
-                .padding(.top, 27)
+                    .padding(.top, 27)
 
                 Text("\(Int((quality * 100).rounded()))%")
                     .font(.system(size: 14, weight: .black, design: .monospaced))
@@ -152,12 +158,10 @@ struct DifficultyLevelResultView: View {
     }
 
     private var headline: String {
-        switch (passed, stars, improved) {
-        case (false, _, _): "same challenge. another attempt."
-        case (true, 3, true): "clean run. move up."
-        case (true, _, true): "new best. next level unlocked."
-        case (true, 3, false): "still perfect."
-        default: "cleared. keep the track moving."
+        switch (passed, improved) {
+        case (false, _): "same challenge. another attempt."
+        case (true, true): "new best. next level unlocked."
+        case (true, false): "cleared. keep the track moving."
         }
     }
 }

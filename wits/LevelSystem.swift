@@ -132,32 +132,47 @@ enum DifficultyScale {
     }
 }
 
-// MARK: - Stars
+// MARK: - Grading
 
-enum StarGrader {
+enum LevelGrader {
     static let passQuality = 0.60
-    static let twoStarQuality = 0.75
-    static let threeStarQuality = 0.90
 
-    static func stars(quality: Double) -> Int {
-        switch quality {
-        case threeStarQuality...: 3
-        case twoStarQuality..<threeStarQuality: 2
-        case passQuality..<twoStarQuality: 1
-        default: 0
-        }
-    }
-
-    static func stars(for result: GameResult) -> Int {
-        stars(quality: result.performanceQuality ?? result.accuracy)
+    static func passed(quality: Double) -> Bool {
+        quality >= passQuality
     }
 }
 
 // MARK: - Progress store
 
 struct LevelRecord: Codable, Equatable {
-    var stars: Int
+    var passed: Bool
     var bestQuality: Double
+
+    init(passed: Bool, bestQuality: Double) {
+        self.passed = passed
+        self.bestQuality = bestQuality
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case passed, bestQuality, stars
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        bestQuality = try container.decodeIfPresent(Double.self, forKey: .bestQuality) ?? 0
+        if let passed = try container.decodeIfPresent(Bool.self, forKey: .passed) {
+            self.passed = passed
+        } else {
+            // Records written before pass/fail stored 1-3 stars; any star was a pass.
+            passed = (try container.decodeIfPresent(Int.self, forKey: .stars) ?? 0) >= 1
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(passed, forKey: .passed)
+        try container.encode(bestQuality, forKey: .bestQuality)
+    }
 }
 
 struct DifficultyTrackProgress: Codable, Equatable {
@@ -215,28 +230,16 @@ final class LevelProgressStore {
         tracks[game]?[difficulty]?.records[level]
     }
 
-    func stars(for game: GameID,
-               difficulty: ChallengeDifficulty,
-               level: Int) -> Int {
-        record(for: game, difficulty: difficulty, level: level)?.stars ?? 0
-    }
-
-    func totalStars(for game: GameID) -> Int {
-        tracks[game]?.values.reduce(0) { total, track in
-            total + track.records.values.reduce(0) { $0 + $1.stars }
-        } ?? 0
+    func hasPassed(game: GameID,
+                   difficulty: ChallengeDifficulty,
+                   level: Int) -> Bool {
+        record(for: game, difficulty: difficulty, level: level)?.passed ?? false
     }
 
     func totalClears(for game: GameID) -> Int {
         tracks[game]?.values.reduce(0) { total, track in
-            total + track.records.values.filter { $0.stars >= 1 }.count
+            total + track.records.values.filter(\.passed).count
         } ?? 0
-    }
-
-    func hasThreeStarLevel(for game: GameID) -> Bool {
-        tracks[game]?.values.contains { track in
-            track.records.values.contains { $0.stars >= 3 }
-        } ?? false
     }
 
     func marathonBest(for game: GameID) -> MarathonBest? {
@@ -262,18 +265,19 @@ final class LevelProgressStore {
     func recordAttempt(game: GameID,
                        difficulty: ChallengeDifficulty,
                        level: Int,
-                       stars: Int,
                        quality: Double) -> Bool {
         let safeLevel = max(1, level)
         var perGame = tracks[game] ?? [:]
         var track = perGame[difficulty] ?? DifficultyTrackProgress()
         let existing = track.records[safeLevel]
-        let improved = stars > (existing?.stars ?? 0) || quality > (existing?.bestQuality ?? 0)
+        let passed = LevelGrader.passed(quality: quality)
+        let improved = (passed && !(existing?.passed ?? false)) ||
+            quality > (existing?.bestQuality ?? 0)
         track.records[safeLevel] = LevelRecord(
-            stars: max(stars, existing?.stars ?? 0),
+            passed: passed || (existing?.passed ?? false),
             bestQuality: max(quality, existing?.bestQuality ?? 0)
         )
-        if stars >= 1, safeLevel >= track.unlockedLevel, safeLevel < Int.max {
+        if passed, safeLevel >= track.unlockedLevel, safeLevel < Int.max {
             track.unlockedLevel = safeLevel + 1
         }
         perGame[difficulty] = track
@@ -355,10 +359,10 @@ final class LevelProgressStore {
                 var track = perGame[position.difficulty] ?? DifficultyTrackProgress()
                 let existing = track.records[position.level]
                 track.records[position.level] = LevelRecord(
-                    stars: max(record.stars, existing?.stars ?? 0),
+                    passed: record.passed || (existing?.passed ?? false),
                     bestQuality: max(record.bestQuality, existing?.bestQuality ?? 0)
                 )
-                if record.stars >= 1 {
+                if record.passed {
                     track.unlockedLevel = max(track.unlockedLevel, position.level + 1)
                 }
                 perGame[position.difficulty] = track

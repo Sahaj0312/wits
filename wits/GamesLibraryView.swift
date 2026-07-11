@@ -188,7 +188,7 @@ private struct GameLauncher: View {
     @State private var phase: Phase = .selector
     @State private var playDifficulty: ChallengeDifficulty = .easy
     @State private var playLevel = 1
-    @State private var lastStars = 0
+    @State private var lastPassed = false
     @State private var lastQuality = 0.0
     @State private var lastImproved = false
     @State private var weeklyChallenge: WeeklyChallenge?
@@ -324,7 +324,7 @@ private struct GameLauncher: View {
                 game: game,
                 difficulty: playDifficulty,
                 level: playLevel,
-                stars: lastStars,
+                passed: lastPassed,
                 quality: lastQuality,
                 improved: lastImproved,
                 onRetry: { startRun() },
@@ -392,9 +392,9 @@ private struct GameLauncher: View {
         }
 
         // Snapshot before recording — recordGameResult merges this run in.
-        let starsBefore = app.levels.stars(for: game,
-                                           difficulty: playDifficulty,
-                                           level: playLevel)
+        let passedBefore = app.levels.hasPassed(game: game,
+                                                difficulty: playDifficulty,
+                                                level: playLevel)
         let qualityBefore = app.levels.record(for: game,
                                               difficulty: playDifficulty,
                                               level: playLevel)?.bestQuality ?? 0
@@ -403,11 +403,11 @@ private struct GameLauncher: View {
         tagged.raw["difficultyTrack"] = Double(playDifficulty.ordinal)
         let scored = app.recordGameResult(tagged)
         let quality = scored.performanceQuality ?? scored.accuracy
-        let stars = StarGrader.stars(quality: quality)
+        let passed = LevelGrader.passed(quality: quality)
 
-        lastStars = stars
+        lastPassed = passed
         lastQuality = quality
-        lastImproved = stars > starsBefore || (stars >= 1 && quality > qualityBefore)
+        lastImproved = passed && (!passedBefore || quality > qualityBefore)
         withAnimation(.easeOut(duration: 0.2)) { phase = .levelResult }
         AdManager.shared.gameCompleted()
         AdManager.shared.maybeShowInterstitial()

@@ -61,15 +61,12 @@ final class LevelSystemTests: XCTestCase {
         }
     }
 
-    // MARK: Stars
+    // MARK: Grading
 
-    func testStarThresholds() {
-        XCTAssertEqual(StarGrader.stars(quality: 0.59), 0)
-        XCTAssertEqual(StarGrader.stars(quality: 0.60), 1)
-        XCTAssertEqual(StarGrader.stars(quality: 0.74), 1)
-        XCTAssertEqual(StarGrader.stars(quality: 0.75), 2)
-        XCTAssertEqual(StarGrader.stars(quality: 0.89), 2)
-        XCTAssertEqual(StarGrader.stars(quality: 0.90), 3)
+    func testPassThreshold() {
+        XCTAssertFalse(LevelGrader.passed(quality: 0.59))
+        XCTAssertTrue(LevelGrader.passed(quality: 0.60))
+        XCTAssertTrue(LevelGrader.passed(quality: 0.95))
     }
 
     // MARK: Independent tracks
@@ -80,7 +77,6 @@ final class LevelSystemTests: XCTestCase {
             store.recordAttempt(game: .blockEscape,
                                 difficulty: .easy,
                                 level: level,
-                                stars: 1,
                                 quality: 0.65)
         }
 
@@ -93,9 +89,9 @@ final class LevelSystemTests: XCTestCase {
         store.recordAttempt(game: .echoGrid,
                             difficulty: .medium,
                             level: 1,
-                            stars: 0,
                             quality: 0.42)
         XCTAssertEqual(store.currentLevel(for: .echoGrid, difficulty: .medium), 1)
+        XCTAssertFalse(store.hasPassed(game: .echoGrid, difficulty: .medium, level: 1))
     }
 
     func testTrackHasNoFiniteLevelCeiling() {
@@ -104,26 +100,23 @@ final class LevelSystemTests: XCTestCase {
             store.recordAttempt(game: .colorClash,
                                 difficulty: .extraHard,
                                 level: level,
-                                stars: 1,
                                 quality: 0.65)
         }
         XCTAssertEqual(store.currentLevel(for: .colorClash, difficulty: .extraHard), 251)
     }
 
-    func testStarsAndQualityNeverGoDown() {
+    func testPassAndQualityNeverGoDown() {
         let store = LevelProgressStore()
         store.recordAttempt(game: .pegSolitaire,
                             difficulty: .hard,
                             level: 1,
-                            stars: 3,
                             quality: 0.95)
         let improved = store.recordAttempt(game: .pegSolitaire,
                                            difficulty: .hard,
                                            level: 1,
-                                           stars: 1,
                                            quality: 0.62)
         XCTAssertFalse(improved)
-        XCTAssertEqual(store.stars(for: .pegSolitaire, difficulty: .hard, level: 1), 3)
+        XCTAssertTrue(store.hasPassed(game: .pegSolitaire, difficulty: .hard, level: 1))
         XCTAssertEqual(store.record(for: .pegSolitaire,
                                     difficulty: .hard,
                                     level: 1)?.bestQuality, 0.95)
@@ -135,7 +128,6 @@ final class LevelSystemTests: XCTestCase {
         store?.recordAttempt(game: .slidePuzzle,
                              difficulty: .extraHard,
                              level: 1,
-                             stars: 2,
                              quality: 0.8)
         store = nil
 
@@ -143,6 +135,23 @@ final class LevelSystemTests: XCTestCase {
         XCTAssertEqual(reloaded.selectedDifficulty(for: .slidePuzzle), .extraHard)
         XCTAssertEqual(reloaded.currentLevel(for: .slidePuzzle, difficulty: .extraHard), 2)
         XCTAssertEqual(reloaded.currentLevel(for: .slidePuzzle, difficulty: .easy), 1)
+    }
+
+    func testStoredStarRecordsDecodeAsPassed() {
+        let starEraJSON = """
+        {"tracks":[{"game":"blockEscape","difficulty":"easy","progress":\
+        {"unlockedLevel":2,"records":{"1":{"stars":2,"bestQuality":0.8}}}}],\
+        "selections":[],"marathon":[]}
+        """
+        UserDefaults.standard.set(Data(starEraJSON.utf8),
+                                  forKey: "wits.difficultyProgress.v2")
+
+        let store = LevelProgressStore()
+        XCTAssertTrue(store.hasPassed(game: .blockEscape, difficulty: .easy, level: 1))
+        XCTAssertEqual(store.record(for: .blockEscape,
+                                    difficulty: .easy,
+                                    level: 1)?.bestQuality, 0.8)
+        XCTAssertEqual(store.currentLevel(for: .blockEscape, difficulty: .easy), 2)
     }
 
     // MARK: Migration

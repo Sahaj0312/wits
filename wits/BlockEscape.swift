@@ -646,7 +646,7 @@ struct BlockEscapeScreen: View {
         let moveEfficiency = min(1, Double(graceMoves) / Double(max(1, moves)))
         let timeEfficiency = min(1, parSeconds / seconds)
         // Escaping at all earns the floor, and move quality dominates the rest,
-        // so a slow, deliberate near-optimal solve still grades to 3 stars.
+        // so a slow, deliberate near-optimal solve still grades to a clean pass.
         // Time keeps a small weight to reward decisiveness at the margins.
         let accuracy = max(0, min(1, 0.30 + moveEfficiency * 0.60 + timeEfficiency * 0.10))
         let score = max(0, Int((Double(par) * 24 + moveEfficiency * 1300 + timeEfficiency * 500).rounded()))

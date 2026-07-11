@@ -329,7 +329,7 @@ extension GameID {
             [
                 "watch the tiles light up in order.",
                 "when the board goes dark, tap them backwards.",
-                "you get a fixed set of rounds — perfect ones earn the stars."
+                "you get a fixed set of rounds — clear enough of them to pass."
             ]
         case .colorClash:
             [

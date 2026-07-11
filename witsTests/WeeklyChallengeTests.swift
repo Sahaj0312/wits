@@ -117,7 +117,7 @@ final class WeeklyChallengeProgressTests: XCTestCase {
 
         XCTAssertEqual(app.difficultyState(for: .arrowStorm, difficulty: challenge.difficulty), before)
         XCTAssertEqual(app.levels.currentLevel(for: .arrowStorm, difficulty: challenge.difficulty), levelBefore)
-        XCTAssertEqual(app.levels.totalStars(for: .arrowStorm), 0)
+        XCTAssertEqual(app.levels.totalClears(for: .arrowStorm), 0)
         XCTAssertEqual(app.levels.weeklyBest(for: challenge)?.score, 1_200)
     }
 }
