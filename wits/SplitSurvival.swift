@@ -48,6 +48,10 @@ final class SplitGame {
     // State
     private(set) var birdY: CGFloat = 0.42
     private(set) var birdV: CGFloat = 0
+    /// Smoothed nose angle (radians) the renderer draws. Chases the
+    /// velocity-derived target so a flap swoops the nose up instead of
+    /// snapping it in a single frame.
+    private(set) var displayPitch: Double = 0
     private var pipes: [Pipe] = []
     private var emojis: [Emoji] = []
     private(set) var level = 1
@@ -91,7 +95,7 @@ final class SplitGame {
     var depthIntoLevel: Double { min(1, levelElapsed / timeForLevel(level)) }
 
     func reset() {
-        birdY = 0.42; birdV = 0
+        birdY = 0.42; birdV = 0; displayPitch = 0
         pipes = []; emojis = []
         level = 1; levelElapsed = 0; totalElapsed = 0
         alive = true; started = false; deathReason = ""; trials = 0
@@ -112,7 +116,7 @@ final class SplitGame {
     /// `sincePipe = 0` grants a full spacing of clear air, unlike reset's
     /// forced early first pipe.
     func revive() {
-        birdY = 0.42; birdV = 0
+        birdY = 0.42; birdV = 0; displayPitch = 0
         pipes = []; emojis = []
         levelElapsed = 0
         alive = true; started = false; deathReason = ""
@@ -152,6 +156,14 @@ final class SplitGame {
     private func stepFlyer(_ dt: Double) {
         birdV += gravity * CGFloat(dt)
         birdY += birdV * CGFloat(dt)
+
+        // Nose follows the motion, eased: quick (but not instant) up on a
+        // flap, a lazier settle back down as the fall builds. birdV is in
+        // play-area units per second (flap −0.86 … falling ≈ +1.3).
+        let targetPitch = max(-0.55, min(0.75, Double(birdV) * 0.55))
+        let rate = targetPitch < displayPitch ? 14.0 : 6.0
+        displayPitch += (targetPitch - displayPitch) * min(1, dt * rate)
+
         if birdY - birdRy <= 0 { birdY = birdRy; birdV = max(birdV, 0) }   // ceiling clamps
         if birdY + birdRy >= 1 { die("you hit the floor"); return }        // floor kills
 
@@ -313,18 +325,16 @@ final class SplitGame {
         let bx = birdX * size.width
         let by = birdY * size.height
         let r = max(12, birdRy * size.height)
-        let rect = CGRect(x: bx - r, y: by - r, width: r * 2, height: r * 2)
-        ctx.orb(rect, color: Color.witsAccent, glow: 0.95)
 
-        var wing = Path()
-        wing.move(to: CGPoint(x: bx - r * 0.15, y: by + r * 0.1))
-        wing.addLine(to: CGPoint(x: bx - r * 1.0, y: by + r * 0.55))
-        wing.addLine(to: CGPoint(x: bx - r * 0.45, y: by - r * 0.08))
-        wing.closeSubpath()
-        ctx.fill(wing, with: .color(.white.opacity(0.34)))
-
-        ctx.fill(Path(ellipseIn: CGRect(x: bx + r * 0.25, y: by - r * 0.42, width: r * 0.32, height: r * 0.32)),
-                 with: .color(Color(light: 0x13203C, dark: 0x13203C)))
+        var plane = ctx
+        plane.translateBy(x: bx, y: by)
+        // The SF glyph points up-right; +45° levels it out to fly right.
+        plane.rotate(by: .degrees(45) + .radians(displayPitch))
+        plane.addFilter(.shadow(color: Color.witsAccent.opacity(0.85), radius: 9))
+        var icon = plane.resolve(Image(systemName: "paperplane.fill"))
+        icon.shading = .color(.white)
+        let d = r * 2.5
+        plane.draw(icon, in: CGRect(x: -d / 2, y: -d / 2, width: d, height: d))
     }
 }
 
@@ -714,16 +724,11 @@ private struct SplitIntroHero: View {
                             .shadow(color: Color.witsAccent.opacity(0.28), radius: 10)
                     }
 
-                    Circle()
-                        .fill(Color.witsAccent)
-                        .frame(width: 30, height: 30)
-                        .overlay(alignment: .topTrailing) {
-                            Circle()
-                                .fill(.white.opacity(0.62))
-                                .frame(width: 8, height: 8)
-                                .offset(x: -7, y: 7)
-                        }
-                        .shadow(color: Color.witsAccent.opacity(0.6), radius: 14)
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 27, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .rotationEffect(.degrees(33))   // flying right, a touch nose-up
+                        .shadow(color: Color.witsAccent.opacity(0.7), radius: 12)
                         .position(x: 52, y: 98)
 
                     SplitHeroChip(text: target, accent: .witsAccent)
