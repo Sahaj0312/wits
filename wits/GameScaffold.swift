@@ -373,6 +373,12 @@ extension GameID {
                 "tap the right-side targets before they pass.",
                 "avoid the look-alike; one mistake ends the run."
             ]
+        case .blockFit:
+            [
+                "drag pieces from the tray onto the board.",
+                "fill a full row or column to clear it.",
+                "pieces never rotate — the run ends when nothing fits."
+            ]
         }
     }
 }

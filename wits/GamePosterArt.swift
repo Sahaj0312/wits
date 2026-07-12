@@ -103,6 +103,13 @@ extension GameID {
                       accent: Color(hexAny: 0xFF466D), secondary: Color(hexAny: 0x39E6E2),
                       difficultyColors: [0x39E6E2, 0x9E8CFF, 0xFFB13B, 0xFF466D].map { Color(hexAny: $0) },
                       titleDesign: .rounded, bodyDesign: .monospaced, uppercaseTitles: true)
+        case .blockFit:
+            GameWorld(background: Color(hexAny: 0x141C4F),
+                      surface: Color(hexAny: 0x1F2A6B), raised: Color(hexAny: 0x2A3785),
+                      ink: Color(hexAny: 0xF0F4FF), muted: Color(hexAny: 0x93A0D9),
+                      accent: Color(hexAny: 0xFFB13B), secondary: Color(hexAny: 0x4BE3A9),
+                      difficultyColors: [0x4BE3A9, 0x58B4FF, 0xFFB13B, 0xFF5E7A].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: true)
         }
     }
 
@@ -216,6 +223,22 @@ private struct GameWorldPattern: View {
                              with: .color(world.secondary.opacity(0.06)))
                 var divider = Path(); divider.move(to: CGPoint(x: size.width / 2, y: 0)); divider.addLine(to: CGPoint(x: size.width / 2, y: size.height))
                 context.stroke(divider, with: .color(world.ink.opacity(0.12)), lineWidth: 2)
+            case .blockFit:
+                let step: CGFloat = 44
+                for x in stride(from: 0 as CGFloat, through: size.width, by: step) {
+                    for y in stride(from: 0 as CGFloat, through: size.height, by: step) {
+                        let cell = CGRect(x: x + 3, y: y + 3, width: step - 6, height: step - 6)
+                        context.stroke(Path(roundedRect: cell, cornerRadius: 6),
+                                       with: .color(world.ink.opacity(0.05)), lineWidth: 1.5)
+                    }
+                }
+                for index in 0..<5 {
+                    let x = CGFloat((index * 113) % 340) / 340 * size.width
+                    let y = CGFloat((index * 197) % 720) / 720 * size.height
+                    let cell = CGRect(x: x, y: y, width: step - 6, height: step - 6)
+                    context.fill(Path(roundedRect: cell, cornerRadius: 6),
+                                 with: .color((index.isMultiple(of: 2) ? world.accent : world.secondary).opacity(0.10)))
+                }
             }
         }
     }
@@ -244,6 +267,7 @@ struct GamePosterArt: View {
                 case .blockEscape: BlockEscapePoster(w: w, h: h)
                 case .pegSolitaire: PegSolitairePoster(w: w, h: h)
                 case .split: SplitPoster(w: w, h: h)
+                case .blockFit: BlockFitPoster(w: w, h: h)
                 }
             }
         }
@@ -623,5 +647,73 @@ private struct SplitPoster: View {
                         .offset(x: -d * 0.18, y: -d * 0.18)
                 )
         }
+    }
+}
+
+// MARK: - Block fit — a hand piece hovers over the almost-full bottom row.
+
+private struct BlockFitPoster: View {
+    let w: CGFloat, h: CGFloat
+
+    // (col, row, palette hex) on a 5-wide board; row 3 is one cell from full.
+    private let placed: [(Int, Int, UInt32)] = [
+        (0, 3, 0xFFB13B), (1, 3, 0x4BE3A9), (2, 3, 0x58B4FF), (4, 3, 0xFF5E7A),
+        (0, 2, 0x4BE3A9), (1, 2, 0xA78BFF),
+        (4, 2, 0xFFB13B), (4, 1, 0x58B4FF),
+    ]
+
+    var body: some View {
+        let s = w * 0.145
+        let gap = w * 0.014
+        let step = s + gap
+        let originX = w * 0.5 - step * 2.5 + gap / 2
+        let originY = h * 0.86 - step * 4
+
+        func position(_ col: Int, _ row: Int) -> CGPoint {
+            CGPoint(x: originX + (CGFloat(col) + 0.5) * step,
+                    y: originY + (CGFloat(row) + 0.5) * step)
+        }
+
+        return ZStack {
+            // Faint empty grid.
+            ForEach(0..<20, id: \.self) { i in
+                RoundedRectangle(cornerRadius: s * 0.2, style: .continuous)
+                    .fill(.white.opacity(0.07))
+                    .frame(width: s, height: s)
+                    .position(position(i % 5, i / 5))
+            }
+            ForEach(0..<placed.count, id: \.self) { i in
+                let cell = placed[i]
+                block(Color(hexAny: cell.2), size: s)
+                    .position(position(cell.0, cell.1))
+            }
+            // The missing cell, marked like a landing slot.
+            RoundedRectangle(cornerRadius: s * 0.2, style: .continuous)
+                .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [4, 3.5]))
+                .foregroundStyle(.white.opacity(0.7))
+                .frame(width: s, height: s)
+                .position(position(3, 3))
+
+            // The floating hand piece, mid-drag with a glow.
+            ZStack {
+                block(Color(hexAny: 0xFFE066), size: s).offset(x: -step / 2, y: -step / 2)
+                block(Color(hexAny: 0xFFE066), size: s).offset(x: step / 2, y: -step / 2)
+                block(Color(hexAny: 0xFFE066), size: s).offset(x: -step / 2, y: step / 2)
+            }
+            .shadow(color: Color(hexAny: 0xFFE066).opacity(0.55), radius: 8)
+            .position(x: w * 0.62, y: h * 0.42)
+        }
+    }
+
+    private func block(_ color: Color, size: CGFloat) -> some View {
+        RoundedRectangle(cornerRadius: size * 0.2, style: .continuous)
+            .fill(color)
+            .frame(width: size, height: size)
+            .overlay(
+                RoundedRectangle(cornerRadius: size * 0.14, style: .continuous)
+                    .fill(.white.opacity(0.28))
+                    .frame(width: size * 0.42, height: size * 0.42)
+                    .offset(x: -size * 0.16, y: -size * 0.16)
+            )
     }
 }

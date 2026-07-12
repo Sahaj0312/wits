@@ -129,7 +129,8 @@ struct GamesLibraryView: View {
             .shadow(color: g.world.accent.opacity(0.16), radius: 12, y: 6)
             .overlay(alignment: .topTrailing) {
                 if g.isStandalone {
-                    survivalSticker.offset(x: 5, y: -5)
+                    survivalSticker(g == .split ? "survival!" : "endless!")
+                        .offset(x: 5, y: -5)
                 }
             }
         }
@@ -158,17 +159,19 @@ struct GamesLibraryView: View {
     private func progressLabel(_ g: GameID) -> String {
         if g.isStandalone {
             guard let best = app.levels.marathonBest(for: g) else { return "no runs yet" }
-            return "best \(WeeklyChallengeScorer.splitLabel(rankValue: best.leaderboardScore))"
+            return g == .split
+                ? "best \(WeeklyChallengeScorer.splitLabel(rankValue: best.leaderboardScore))"
+                : "best \(best.score)"
         }
         let difficulty = app.levels.selectedDifficulty(for: g)
         let level = app.levels.currentLevel(for: g, difficulty: difficulty)
         return "\(difficulty.title) · level \(level)"
     }
 
-    /// Tilted sticker in the reference-app spirit — marks split as the one
-    /// one-life survival mode on the shelf.
-    private var survivalSticker: some View {
-        Text("survival!")
+    /// Tilted sticker in the reference-app spirit — marks the standalone
+    /// endless modes on the shelf.
+    private func survivalSticker(_ text: String) -> some View {
+        Text(text)
             .font(.system(size: 11, weight: .heavy, design: .rounded))
             .foregroundStyle(.white)
             .padding(.horizontal, 10)
@@ -206,8 +209,9 @@ private struct GameLauncher: View {
     var body: some View {
         switch phase {
         case .selector:
-            if game == .split {
-                SplitModeSelectView(
+            if game.isStandalone {
+                StandaloneModeSelectView(
+                    game: game,
                     onSurvival: {
                         runKind = .survival
                         weeklyChallenge = nil
@@ -244,7 +248,26 @@ private struct GameLauncher: View {
                 }
             )
         case .playing:
-            if game == .split {
+            if game == .blockFit {
+                let challenge = weeklyChallenge ?? .current(for: .blockFit)
+                let isWeekly = runKind == .weekly
+                BlockFitScreen(
+                    best: app.levels.marathonBest(for: .blockFit)?.score ?? 0,
+                    seed: isWeekly ? challenge.seed : nil,
+                    isWeekly: isWeekly,
+                    weeklyBestScore: app.levels.weeklyBest(for: challenge)?.score ?? 0,
+                    onRunComplete: { score, lines, pieces in
+                        let result = blockFitResult(score: score, lines: lines, pieces: pieces)
+                        if isWeekly {
+                            _ = app.recordWeeklyChallengeResult(result, challenge: challenge)
+                        } else {
+                            app.recordStandaloneGameResult(result)
+                            app.recordMarathon(game: .blockFit, depth: score, score: score)
+                        }
+                    },
+                    onQuit: { withAnimation { phase = .selector } }
+                )
+            } else if game == .split {
                 let challenge = weeklyChallenge ?? .current(for: .split)
                 let isWeekly = runKind == .weekly
                 let survivalBest = app.levels.marathonBest(for: .split)
@@ -411,6 +434,20 @@ private struct GameLauncher: View {
         withAnimation(.easeOut(duration: 0.2)) { phase = .levelResult }
         AdManager.shared.gameCompleted()
         AdManager.shared.maybeShowInterstitial()
+    }
+
+    private func blockFitResult(score: Int, lines: Int, pieces: Int) -> GameResult {
+        var result = GameResult(game: .blockFit,
+                                score: score,
+                                baseScore: score,
+                                accuracy: 0,
+                                trials: max(1, pieces))
+        result.raw = [
+            "score": Double(score),
+            "lines": Double(lines),
+            "pieces": Double(pieces)
+        ]
+        return result
     }
 
     private func splitResult(level: Int, depth: Double, trials: Int) -> GameResult {

@@ -8,6 +8,7 @@
 //
 //  Leaderboard IDs (create these in App Store Connect; immutable once live):
 //    wits.split.survival.depth.v2   Split level plus fractional depth
+//    wits.marathon.blockFit         Block Fit endless best score
 //    wits.weekly.<game-id>    recurring every Monday at 00:00 UTC for 7 days
 //  Achievement IDs:
 //    wits.ach.levels.50 / .150 / .300     lifetime level-clear milestones
@@ -114,8 +115,8 @@ final class GameCenterManager {
     /// recorded while signed out).
     func syncLocalBests(levels: LevelProgressStore, streak: StreakState) {
         guard isAuthenticated else { return }
-        if levels.marathonBest(for: .split) != nil {
-            submitMarathonBest(game: .split, levels: levels)
+        for game in GameID.standalone where levels.marathonBest(for: game) != nil {
+            submitMarathonBest(game: game, levels: levels)
         }
         for game in GameID.allCases {
             submitWeeklyBest(challenge: .current(for: game), levels: levels)

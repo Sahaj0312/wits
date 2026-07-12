@@ -61,7 +61,7 @@ enum HeroPattern {
             sparks(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .slidePuzzle:
             slide(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .blockEscape:
+        case .blockEscape, .blockFit:
             escape(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .pegSolitaire:
             pegs(&ctx, size, ink: ink, soft: inkSoft, glow: glow)

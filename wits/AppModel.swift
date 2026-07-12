@@ -112,7 +112,7 @@ final class AppModel {
                                      challenge: WeeklyChallenge) -> WeeklyRunOutcome {
         precondition(result.game == challenge.game)
         let scoredResult: GameResult
-        if result.game == .split {
+        if result.game.isStandalone {
             scoredResult = result
         } else {
             let fixed = DifficultyScale.initialState(for: challenge.game,

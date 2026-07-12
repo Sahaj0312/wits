@@ -18,8 +18,9 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     case arrowStorm, crowdControl, echoGrid
     case colorClash, tileShift, lastSeen
     case slidePuzzle, blockEscape, pegSolitaire
-    // Standalone survival mode.
+    // Standalone survival modes.
     case split
+    case blockFit
 
     var id: String { rawValue }
 
@@ -30,7 +31,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     }
     var isLive: Bool { Self.live.contains(self) }
 
-    static var standalone: [GameID] { [.split] }
+    static var standalone: [GameID] { [.split, .blockFit] }
     var isStandalone: Bool { Self.standalone.contains(self) }
 
     /// Tappable in the library (has some playable mode).
@@ -79,6 +80,7 @@ extension GameID {
         case .colorClash, .tileShift: .flexibility
         case .slidePuzzle, .blockEscape, .pegSolitaire: .reasoning
         case .split: .multitasking
+        case .blockFit: .reasoning
         }
     }
 
@@ -94,6 +96,7 @@ extension GameID {
         case .blockEscape: "block escape"
         case .pegSolitaire: "peg solitaire"
         case .split: "split"
+        case .blockFit: "block fit"
         }
     }
 
@@ -110,6 +113,7 @@ extension GameID {
         case .blockEscape: "free the big block."
         case .pegSolitaire: "jump pegs. leave just one."
         case .split: "fly and pick at once. one slip ends it."
+        case .blockFit: "fit the pieces. clear the lines."
         }
     }
 
@@ -119,7 +123,7 @@ extension GameID {
         case .arrowStorm, .crowdControl: "attention"
         case .echoGrid, .lastSeen: "memory"
         case .colorClash, .tileShift: "flexibility"
-        case .slidePuzzle, .blockEscape, .pegSolitaire: "problem solving"
+        case .slidePuzzle, .blockEscape, .pegSolitaire, .blockFit: "problem solving"
         case .split: "attention"
         }
     }
@@ -137,6 +141,7 @@ extension GameID {
         case .blockEscape: "forward planning"
         case .pegSolitaire: "strategic planning"
         case .split: "dual-tasking"
+        case .blockFit: "spatial packing"
         }
     }
 
@@ -153,6 +158,7 @@ extension GameID {
         case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit — in as few moves as you can."
         case .pegSolitaire: "every jump leaps one peg over a neighbour into an empty hole, and the jumped peg is removed. keep jumping until a single peg remains — on the marked hole at higher levels."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
+        case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate — the run ends the moment nothing in your hand fits."
         }
     }
 
@@ -169,6 +175,7 @@ extension GameID {
         case .blockEscape: "forward planning is simulating moves in your head — seeing how each slide opens or closes the big block's path several steps ahead."
         case .pegSolitaire: "strategic planning is ordering moves so nothing gets stranded — every jump has to leave the rest of the board still clearable."
         case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
+        case .blockFit: "spatial packing is planning placements ahead — keeping the board open so future pieces still have somewhere to live."
         }
     }
 
@@ -185,6 +192,7 @@ extension GameID {
         case .blockEscape: "square.split.2x2.fill"
         case .pegSolitaire: "circle.grid.cross.fill"
         case .split: "rectangle.split.1x2.fill"
+        case .blockFit: "square.grid.2x2.fill"
         }
     }
 
@@ -208,6 +216,7 @@ extension GameID {
         case .blockEscape: "efficiency"
         case .pegSolitaire: "clearPct"
         case .split: "maxLevel"
+        case .blockFit: "score"
         default: "bestStreak"
         }
     }
@@ -223,6 +232,7 @@ extension GameID {
         case .blockEscape: "\(Int(v))% of par"
         case .pegSolitaire: "\(Int(v))% cleared"
         case .split: "level \(Int(v))"
+        case .blockFit: "\(Int(v)) points"
         default: "streak \(Int(v))"
         }
     }

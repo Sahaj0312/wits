@@ -213,14 +213,16 @@ struct DifficultySelectView: View {
     }
 }
 
-struct SplitModeSelectView: View {
+/// Mode selector for the standalone survival games (Split, Block Fit):
+/// one endless mode plus the weekly challenge, no difficulty tracks.
+struct StandaloneModeSelectView: View {
+    let game: GameID
     var onSurvival: () -> Void
     var onWeekly: (WeeklyChallenge) -> Void
     var onClose: () -> Void
 
     @Environment(AppModel.self) private var app
 
-    private let game = GameID.split
     private var world: GameWorld { game.world }
     private var challenge: WeeklyChallenge { .current(for: game) }
 
@@ -232,7 +234,7 @@ struct SplitModeSelectView: View {
                     HStack {
                         iconButton("chevron.left", label: "Close", action: onClose)
                         Spacer()
-                        Text("DUAL-TASKING")
+                        Text(game.subskill.uppercased())
                             .font(.system(size: 10.5, weight: .black, design: world.bodyDesign))
                             .foregroundStyle(world.muted)
                         Spacer()
@@ -253,7 +255,7 @@ struct SplitModeSelectView: View {
                         .multilineTextAlignment(.center)
                         .padding(.top, 7)
 
-                    modeButton(title: "SURVIVAL",
+                    modeButton(title: game == .split ? "SURVIVAL" : "ENDLESS",
                                subtitle: survivalSubtitle,
                                symbol: "infinity",
                                color: world.accent,
@@ -278,7 +280,9 @@ struct SplitModeSelectView: View {
 
     private var survivalSubtitle: String {
         guard let best = app.levels.marathonBest(for: game) else { return "all-time run" }
-        return "all-time best · \(WeeklyChallengeScorer.splitLabel(rankValue: best.leaderboardScore))"
+        return game == .split
+            ? "all-time best · \(WeeklyChallengeScorer.splitLabel(rankValue: best.leaderboardScore))"
+            : "all-time best · \(best.score) points"
     }
 
     private var weeklySubtitle: String {
