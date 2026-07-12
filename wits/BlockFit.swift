@@ -112,6 +112,9 @@ final class BlockFitGame {
 
     private(set) var board: [Int]           // side*side; 0 empty, else color
     private(set) var hand: [BlockPiece?]
+    /// The hand that will be dealt once the current one is used up. Shown in
+    /// the UI so deep planning is information, not a gamble.
+    private(set) var nextHand: [BlockPiece] = []
     private(set) var score = 0
     private(set) var linesCleared = 0
     private(set) var combo = 0              // consecutive clearing placements
@@ -243,10 +246,16 @@ final class BlockFitGame {
                          comboAfter: combo)
     }
 
+    /// Hands come off one deterministic stream: the preview is always drawn
+    /// ahead, so what the player sees as "next" is exactly what they'll get.
     private func deal() {
-        for index in 0..<Self.handSize {
-            hand[index] = draw()
+        if nextHand.isEmpty {
+            nextHand = (0..<Self.handSize).map { _ in draw() }
         }
+        for index in 0..<Self.handSize {
+            hand[index] = nextHand[index]
+        }
+        nextHand = (0..<Self.handSize).map { _ in draw() }
     }
 
     private func draw() -> BlockPiece {
@@ -360,10 +369,14 @@ struct BlockFitScreen: View {
             boardView
                 .padding(.horizontal, 18)
 
-            Spacer(minLength: 10)
+            Spacer(minLength: 8)
+
+            nextRow
+                .padding(.horizontal, 22)
 
             tray
                 .padding(.horizontal, 18)
+                .padding(.top, 8)
                 .padding(.bottom, 14)
         }
         .coordinateSpace(name: Self.space)
@@ -487,6 +500,26 @@ struct BlockFitScreen: View {
         if value != 0 { return BlockFitPalette.color(value) }
         if isGhost, let ghost { return BlockFitPalette.color(ghost.color).opacity(0.42) }
         return world.raised.opacity(0.5)
+    }
+
+    // MARK: Next preview
+
+    /// The upcoming hand, dimmed and small: information for planners without
+    /// competing visually with the live tray.
+    private var nextRow: some View {
+        HStack(spacing: 14) {
+            Text("NEXT")
+                .font(.system(size: 9.5, weight: .black, design: world.bodyDesign))
+                .foregroundStyle(world.muted)
+            ForEach(model.nextHand) { piece in
+                pieceView(piece, cellSize: min(8, 30 / CGFloat(max(piece.rows, piece.cols))))
+                    .opacity(0.5)
+                    .saturation(0.7)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(height: 30)
+        .animation(.easeOut(duration: 0.2), value: model.nextHand.map(\.id))
     }
 
     // MARK: Tray

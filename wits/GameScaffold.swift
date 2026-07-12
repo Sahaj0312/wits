@@ -377,7 +377,7 @@ extension GameID {
             [
                 "drag pieces from the tray onto the board.",
                 "fill a full row or column to clear it.",
-                "pieces never rotate — the run ends when nothing fits."
+                "pieces never rotate — use the NEXT row to plan ahead; the run ends when nothing fits."
             ]
         }
     }

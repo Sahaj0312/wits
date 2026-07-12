@@ -158,7 +158,7 @@ extension GameID {
         case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit — in as few moves as you can."
         case .pegSolitaire: "every jump leaps one peg over a neighbour into an empty hole, and the jumped peg is removed. keep jumping until a single peg remains — on the marked hole at higher levels."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
-        case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate — the run ends the moment nothing in your hand fits."
+        case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate, but the next hand is always shown — the run ends the moment nothing in your hand fits."
         }
     }
 

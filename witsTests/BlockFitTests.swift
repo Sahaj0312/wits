@@ -122,6 +122,24 @@ final class BlockFitTests: XCTestCase {
         XCTAssertEqual(a.hand.map { $0?.color }, b.hand.map { $0?.color })
     }
 
+    func testNextHandPreviewBecomesTheNextDeal() {
+        let game = BlockFitGame(seed: 9)
+        let previewIDs = game.nextHand.map(\.id)
+        XCTAssertEqual(previewIDs.count, 3)
+
+        let ones: [BlockPiece?] = [piece([(0, 0)], id: 101),
+                                   piece([(0, 0)], id: 102),
+                                   piece([(0, 0)], id: 103)]
+        game.load(board: emptyBoard(), hand: ones)
+        for slot in 0..<3 {
+            XCTAssertNotNil(game.place(handIndex: slot, atRow: 0, col: slot))
+        }
+
+        XCTAssertEqual(game.hand.map { $0?.id }, previewIDs,
+                       "the shown preview must be exactly the hand that gets dealt")
+        XCTAssertEqual(game.nextHand.count, 3, "a fresh preview is drawn after the deal")
+    }
+
     // MARK: Sudden death
 
     func testDeadWhenNothingInHandFits() {
