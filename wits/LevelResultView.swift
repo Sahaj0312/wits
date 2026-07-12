@@ -247,23 +247,25 @@ struct WeeklyChallengeResultView: View {
                 }
                 .buttonStyle(PressScale())
 
-                Button {
-                    GameCenterManager.shared.presentDashboard()
-                } label: {
-                    Label("LEADERBOARD", systemImage: "trophy")
-                        .font(.system(size: 14, weight: .black, design: world.bodyDesign))
-                        .foregroundStyle(world.ink)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 50)
-                        .background(world.surface,
-                                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 7)
-                                .strokeBorder(world.accent.opacity(0.42), lineWidth: 1)
-                        )
+                if GameCenterManager.isEnabled {
+                    Button {
+                        GameCenterManager.shared.presentDashboard()
+                    } label: {
+                        Label("LEADERBOARD", systemImage: "trophy")
+                            .font(.system(size: 14, weight: .black, design: world.bodyDesign))
+                            .foregroundStyle(world.ink)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .background(world.surface,
+                                        in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 7)
+                                    .strokeBorder(world.accent.opacity(0.42), lineWidth: 1)
+                            )
+                    }
+                    .buttonStyle(PressScale())
+                    .padding(.top, 10)
                 }
-                .buttonStyle(PressScale())
-                .padding(.top, 10)
 
                 Button(action: onDone) {
                     Text("BACK TO MODES")

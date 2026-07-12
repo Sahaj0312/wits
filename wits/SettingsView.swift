@@ -32,21 +32,23 @@ struct SettingsView: View {
                                       isOn: $hapticsEnabled)
                 }
 
-                settingsSection("game center") {
-                    Button {
-                        if GameCenterManager.shared.isAuthenticated {
-                            GameCenterManager.shared.presentDashboard()
-                        } else {
-                            GameCenterManager.shared.authenticate()
+                if GameCenterManager.isEnabled {
+                    settingsSection("game center") {
+                        Button {
+                            if GameCenterManager.shared.isAuthenticated {
+                                GameCenterManager.shared.presentDashboard()
+                            } else {
+                                GameCenterManager.shared.authenticate()
+                            }
+                        } label: {
+                            settingsValueRow(icon: "trophy.fill",
+                                             tint: .witsGold,
+                                             title: "leaderboards & achievements",
+                                             value: GameCenterManager.shared.isAuthenticated ? "" : "sign in",
+                                             showsChevron: true)
                         }
-                    } label: {
-                        settingsValueRow(icon: "trophy.fill",
-                                         tint: .witsGold,
-                                         title: "leaderboards & achievements",
-                                         value: GameCenterManager.shared.isAuthenticated ? "" : "sign in",
-                                         showsChevron: true)
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
                 }
 
                 settingsSection("subscription") {

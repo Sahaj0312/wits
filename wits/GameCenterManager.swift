@@ -22,6 +22,12 @@ import UIKit
 @Observable
 @MainActor
 final class GameCenterManager {
+    /// Master switch for all Game Center surfaces (sign-in, leaderboards,
+    /// achievements, access point). Personal bests are tracked locally in
+    /// LevelProgressStore either way. Flip to true and follow
+    /// docs/game-center-setup.md to go live.
+    static let isEnabled = false
+
     static let shared = GameCenterManager()
 
     private(set) var isAuthenticated = false
@@ -41,6 +47,7 @@ final class GameCenterManager {
     // MARK: Auth
 
     func authenticate() {
+        guard Self.isEnabled else { return }
         GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, _ in
             Task { @MainActor in
                 guard let self else { return }
@@ -65,6 +72,7 @@ final class GameCenterManager {
 
     /// Open the Game Center overlay on the leaderboards page.
     func presentDashboard() {
+        guard Self.isEnabled else { return }
         GKAccessPoint.shared.trigger(state: .leaderboards) {}
     }
 
