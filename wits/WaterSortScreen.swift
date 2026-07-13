@@ -7,8 +7,22 @@
 //  is generated behind a spinner with an exact A* par (WaterSort.swift), and
 //  the clock starts once the tubes are on screen.
 //
+//  A pour physically animates: the source tube flies over the destination,
+//  tilts to ~55–70° while a stream falls from its lip, and the liquid inside
+//  stays level with the world (drawn as a diagonal cut across the tilted
+//  tube). Engine state updates at tap time; the animation is display-only.
+//
 
 import SwiftUI
+
+/// Reports each tube's resting frame in the board coordinate space so a pour
+/// can be choreographed between two slots.
+private struct TubeFramesKey: PreferenceKey {
+    nonisolated static let defaultValue: [Int: CGRect] = [:]
+    nonisolated static func reduce(value: inout [Int: CGRect], nextValue: () -> [Int: CGRect]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
 
 struct WaterSortScreen: View {
     var cfg: GameConfig
@@ -24,6 +38,9 @@ struct WaterSortScreen: View {
     @State private var hint = "tap a tube, then tap where to pour"
     @State private var selected: Int?
     @State private var finished = false
+    @State private var pour: ActivePour?
+    @State private var preTubes: [WaterSortEngine.Tube]?
+    @State private var tubeFrames: [Int: CGRect] = [:]
 
     private let startedAt = Date()
     private let level: Double
@@ -161,7 +178,96 @@ struct WaterSortScreen: View {
         }
     }
 
+    // MARK: Pour animation
+
+    /// One in-flight pour. The engine has already moved the liquid; this
+    /// drives the display-only choreography: fly to the destination, tilt and
+    /// stream, fly home.
+    private struct ActivePour {
+        let source: Int
+        let dest: Int
+        let color: UInt8
+        let units: Int
+        /// +1 pours over the right lip (destination to the right), -1 mirrored.
+        let side: CGFloat
+        let start: Date
+
+        let travelDur = 0.22
+        let returnDur = 0.22
+        /// A bigger run streams longer, like the reference: ~0.35s for one
+        /// unit, +0.14s per extra unit.
+        var pourDur: Double { 0.35 + 0.14 * Double(units - 1) }
+        var total: Double { travelDur + pourDur + returnDur }
+
+        /// Tilt when the stream starts; deepens as the run drains so the
+        /// liquid keeps reaching the lip.
+        let baseAngle = 55.0
+        let extraAngle = 14.0
+    }
+
+    /// Everything the renderer needs for one frame of the pour.
+    private struct PourFrame {
+        var angle = 0.0
+        var offset = CGSize.zero
+        var drained = 0.0
+        var added: CGFloat = 0
+        var stream: (x: CGFloat, top: CGFloat, bottom: CGFloat)?
+    }
+
+    private static func easeInOut(_ t: Double) -> Double {
+        t < 0.5 ? 2 * t * t : 1 - pow(-2 * t + 2, 2) / 2
+    }
+
+    private func pourFrame(_ p: ActivePour, at date: Date, tubeW: CGFloat, tubeH: CGFloat) -> PourFrame {
+        guard let slot = tubeFrames[p.source], let dest = tubeFrames[p.dest] else { return PourFrame() }
+        var f = PourFrame()
+        let t = date.timeIntervalSince(p.start)
+        let unitH = (tubeH - 6) / CGFloat(capacity)
+
+        // Park the mouth above the destination's opening, shifted so the low
+        // lip — where the stream leaves — sits over the destination's centre.
+        let midTilt = (p.baseAngle + p.extraAngle / 2) * .pi / 180
+        let mouthStart = CGPoint(x: slot.midX, y: slot.minY)
+        let mouthTarget = CGPoint(x: dest.midX - p.side * tubeW / 2 * cos(midTilt),
+                                  y: dest.minY - tubeH * 0.30)
+
+        let travelF: Double
+        var pourP = 0.0
+        var lift = 0.0
+        if t < p.travelDur {
+            travelF = Self.easeInOut(t / p.travelDur)
+            f.angle = p.baseAngle * travelF
+            lift = selectedLift * (1 - travelF)
+        } else if t < p.travelDur + p.pourDur {
+            travelF = 1
+            pourP = (t - p.travelDur) / p.pourDur
+            f.angle = p.baseAngle + p.extraAngle * pourP
+        } else {
+            let back = Self.easeInOut(min(1, (t - p.travelDur - p.pourDur) / p.returnDur))
+            travelF = 1 - back
+            pourP = 1
+            f.angle = (p.baseAngle + p.extraAngle) * travelF
+        }
+        f.angle *= p.side
+        f.offset = CGSize(width: (mouthTarget.x - mouthStart.x) * travelF,
+                          height: (mouthTarget.y - mouthStart.y) * travelF + lift)
+        f.drained = Double(p.units) * pourP
+        f.added = CGFloat(f.drained)
+
+        if pourP > 0, pourP < 1 {
+            let tilt = f.angle * .pi / 180
+            let mouth = CGPoint(x: mouthStart.x + f.offset.width, y: mouthStart.y + f.offset.height)
+            let surface = dest.maxY - 3 - (CGFloat(preTubes?[p.dest].count ?? 0) + f.added) * unitH
+            f.stream = (x: mouth.x + p.side * tubeW / 2 * cos(tilt),
+                        top: mouth.y + p.side * tubeW / 2 * sin(tilt),
+                        bottom: surface)
+        }
+        return f
+    }
+
     // MARK: Tubes
+
+    private let selectedLift = -14.0
 
     private func tubesView(_ tubes: [WaterSortEngine.Tube], in size: CGSize) -> some View {
         let count = tubes.count
@@ -172,18 +278,69 @@ struct WaterSortScreen: View {
         let tubeW = min(56, (maxW - hGap * CGFloat(perRow - 1)) / CGFloat(perRow))
         let tubeH = min(size.height * (rows == 1 ? 0.34 : 0.24), tubeW * 3.4)
 
-        return VStack(spacing: 34) {
-            ForEach(0..<rows, id: \.self) { row in
-                HStack(spacing: hGap) {
-                    ForEach(rowIndices(row: row, perRow: perRow, count: count), id: \.self) { index in
-                        tubeView(tubes[index], width: tubeW, height: tubeH)
-                            .offset(y: selected == index ? -14 : 0)
-                            .onTapGesture { tap(index) }
-                            .accessibilityLabel(tubeLabel(tubes[index], index: index))
-                            .accessibilityAddTraits(selected == index ? [.isButton, .isSelected] : .isButton)
+        // During a pour the board renders the pre-pour snapshot; the frame
+        // math drains the source and raises the destination display-only.
+        let shown = (pour != nil ? preTubes : nil) ?? tubes
+
+        return TimelineView(.animation(paused: pour == nil)) { timeline in
+            let frame = pour.map { pourFrame($0, at: timeline.date, tubeW: tubeW, tubeH: tubeH) }
+
+            VStack(spacing: 34) {
+                ForEach(0..<rows, id: \.self) { row in
+                    let indices = rowIndices(row: row, perRow: perRow, count: count)
+                    HStack(spacing: hGap) {
+                        ForEach(indices, id: \.self) { index in
+                            tubeCell(index: index, shown: shown, frame: frame,
+                                     width: tubeW, height: tubeH)
+                        }
                     }
+                    .zIndex(pour.map { indices.contains($0.source) ? 2.0 : 1.0 } ?? 1)
                 }
             }
+            .overlay { streamOverlay(frame) }
+        }
+        .coordinateSpace(name: "waterBoard")
+        .onPreferenceChange(TubeFramesKey.self) { tubeFrames = $0 }
+    }
+
+    @ViewBuilder
+    private func tubeCell(index: Int, shown: [WaterSortEngine.Tube], frame: PourFrame?,
+                          width: CGFloat, height: CGFloat) -> some View {
+        Group {
+            if let pour, let frame, index == pour.source {
+                pouringTubeView(shown[index], drained: frame.drained, angle: frame.angle,
+                                width: width, height: height)
+                    .rotationEffect(.degrees(frame.angle), anchor: .top)
+                    .offset(frame.offset)
+            } else if let pour, let frame, index == pour.dest {
+                tubeView(shown[index], width: width, height: height,
+                         extraFill: (Self.liquid[(Int(pour.color) - 1) % Self.liquid.count], frame.added))
+            } else {
+                tubeView(shown[index], width: width, height: height)
+                    .offset(y: selected == index ? selectedLift : 0)
+                    .animation(.spring(duration: 0.22), value: selected == index)
+            }
+        }
+        .background(GeometryReader { geo in
+            Color.clear.preference(key: TubeFramesKey.self,
+                                   value: [index: geo.frame(in: .named("waterBoard"))])
+        })
+        .zIndex(index == pour?.source ? 2 : 1)
+        .onTapGesture { tap(index) }
+        .accessibilityLabel(tubeLabel(shown[index], index: index))
+        .accessibilityAddTraits(selected == index ? [.isButton, .isSelected] : .isButton)
+    }
+
+    @ViewBuilder
+    private func streamOverlay(_ frame: PourFrame?) -> some View {
+        if let pour, let stream = frame?.stream, stream.bottom > stream.top {
+            Path { path in
+                path.addRoundedRect(in: CGRect(x: stream.x - 2.5, y: stream.top,
+                                               width: 5, height: stream.bottom - stream.top),
+                                    cornerSize: CGSize(width: 2.5, height: 2.5))
+            }
+            .fill(Self.liquid[(Int(pour.color) - 1) % Self.liquid.count])
+            .allowsHitTesting(false)
         }
     }
 
@@ -192,7 +349,8 @@ struct WaterSortScreen: View {
         return start..<min(count, start + perRow)
     }
 
-    private func tubeView(_ tube: WaterSortEngine.Tube, width: CGFloat, height: CGFloat) -> some View {
+    private func tubeView(_ tube: WaterSortEngine.Tube, width: CGFloat, height: CGFloat,
+                          extraFill: (color: Color, units: CGFloat)? = nil) -> some View {
         let shape = UnevenRoundedRectangle(topLeadingRadius: width * 0.16,
                                            bottomLeadingRadius: width * 0.5,
                                            bottomTrailingRadius: width * 0.5,
@@ -200,11 +358,18 @@ struct WaterSortScreen: View {
                                            style: .continuous)
         let unitH = (height - 6) / CGFloat(capacity)
         let complete = WaterSortEngine.isComplete(tube, capacity: capacity)
+        let fillUnits = CGFloat(tube.count) + (extraFill?.units ?? 0)
 
         return ZStack(alignment: .bottom) {
             shape.fill(.white.opacity(0.07))
 
             VStack(spacing: 0) {
+                // liquid landing mid-pour rises smoothly above the stack
+                if let extraFill, extraFill.units > 0 {
+                    Rectangle()
+                        .fill(extraFill.color)
+                        .frame(height: unitH * extraFill.units)
+                }
                 ForEach(Array(tube.enumerated().reversed()), id: \.offset) { _, color in
                     Rectangle()
                         .fill(Self.liquid[(Int(color) - 1) % Self.liquid.count])
@@ -215,15 +380,68 @@ struct WaterSortScreen: View {
             .clipShape(shape.inset(by: 3))
 
             // resting-surface sheen on the top unit
-            if !tube.isEmpty {
+            if fillUnits > 0 {
                 Rectangle()
                     .fill(.white.opacity(0.22))
                     .frame(height: 3)
                     .padding(.horizontal, 5)
-                    .offset(y: -(CGFloat(tube.count) * unitH))
+                    .offset(y: -(fillUnits * unitH))
             }
 
             shape.strokeBorder(.white.opacity(complete ? 0.55 : 0.28), lineWidth: 2)
+        }
+        .frame(width: width, height: height)
+        .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
+    }
+
+    /// The tilted, draining source tube. The whole view is rotated by the
+    /// caller, so liquid surfaces are drawn with the opposite slope to stay
+    /// level with the world — the signature water sort look.
+    private func pouringTubeView(_ tube: WaterSortEngine.Tube, drained: Double, angle: Double,
+                                 width: CGFloat, height: CGFloat) -> some View {
+        let shape = UnevenRoundedRectangle(topLeadingRadius: width * 0.16,
+                                           bottomLeadingRadius: width * 0.5,
+                                           bottomTrailingRadius: width * 0.5,
+                                           topTrailingRadius: width * 0.16,
+                                           style: .continuous)
+        let capacity = self.capacity
+
+        return ZStack {
+            shape.fill(.white.opacity(0.07))
+
+            Canvas { ctx, size in
+                ctx.clip(to: shape.inset(by: 3).path(in: CGRect(origin: .zero, size: size)))
+                let w = size.width
+                let unitH = (size.height - 6) / CGFloat(capacity)
+                let slope = CGFloat(tan(angle * .pi / 180))
+                let total = Double(tube.count) - drained
+                guard total > 0 else { return }
+
+                // Paint each colour as everything below its level surface,
+                // top colour first, so deeper colours overwrite from below.
+                func surface(at units: Double, x: CGFloat) -> CGFloat {
+                    let yMid = (size.height - 3) - CGFloat(units) * unitH
+                    return yMid - (x - w / 2) * slope
+                }
+                for layer in stride(from: tube.count - 1, through: 0, by: -1) {
+                    let units = min(Double(layer + 1), total)
+                    guard units > 0 else { continue }
+                    var path = Path()
+                    path.move(to: CGPoint(x: 0, y: surface(at: units, x: 0)))
+                    path.addLine(to: CGPoint(x: w, y: surface(at: units, x: w)))
+                    path.addLine(to: CGPoint(x: w, y: size.height))
+                    path.addLine(to: CGPoint(x: 0, y: size.height))
+                    path.closeSubpath()
+                    ctx.fill(path, with: .color(Self.liquid[(Int(tube[layer]) - 1) % Self.liquid.count]))
+                }
+
+                var sheen = Path()
+                sheen.move(to: CGPoint(x: 0, y: surface(at: total, x: 0)))
+                sheen.addLine(to: CGPoint(x: w, y: surface(at: total, x: w)))
+                ctx.stroke(sheen, with: .color(.white.opacity(0.22)), lineWidth: 3)
+            }
+
+            shape.strokeBorder(.white.opacity(0.28), lineWidth: 2)
         }
         .frame(width: width, height: height)
         .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
@@ -238,7 +456,7 @@ struct WaterSortScreen: View {
     // MARK: Interaction
 
     private func tap(_ index: Int) {
-        guard !finished, var current = tubes else { return }
+        guard !finished, pour == nil, let current = tubes else { return }
 
         if let source = selected {
             if source == index {
@@ -246,14 +464,7 @@ struct WaterSortScreen: View {
                 return
             }
             if WaterSortEngine.canPour(current, from: source, to: index, capacity: capacity) {
-                WaterSortEngine.pour(&current, from: source, to: index, capacity: capacity)
-                tubes = current
-                moves += 1
-                hint = ""
-                selected = nil
-                let completed = WaterSortEngine.isComplete(current[index], capacity: capacity)
-                GameFeel.shared.play(.correct(combo: completed ? 3 : 1))
-                checkCompletion()
+                startPour(from: source, to: index)
                 return
             }
         }
@@ -264,6 +475,46 @@ struct WaterSortScreen: View {
         } else if selected != nil {
             selected = nil
         }
+    }
+
+    /// Applies the pour to the engine immediately, then runs the flight
+    /// choreography against a pre-pour snapshot. Taps are ignored until the
+    /// tube is home (< 1s).
+    private func startPour(from source: Int, to dest: Int) {
+        guard var current = tubes, let color = current[source].last else { return }
+        let snapshot = current
+        let moved = WaterSortEngine.pour(&current, from: source, to: dest, capacity: capacity)
+        guard moved > 0 else { return }
+        tubes = current
+        moves += 1
+        hint = ""
+        selected = nil
+        preTubes = snapshot
+
+        let side: CGFloat
+        if let s = tubeFrames[source], let d = tubeFrames[dest], d.midX < s.midX {
+            side = -1
+        } else {
+            side = 1
+        }
+        let active = ActivePour(source: source, dest: dest, color: color,
+                                units: moved, side: side, start: Date())
+        pour = active
+        GameFeel.shared.play(.correct(combo: 1))
+        Task {
+            try? await Task.sleep(for: .seconds(active.total))
+            finishPour()
+        }
+    }
+
+    private func finishPour() {
+        guard let p = pour else { return }
+        pour = nil
+        preTubes = nil
+        if let tubes, WaterSortEngine.isComplete(tubes[p.dest], capacity: capacity) {
+            GameFeel.shared.play(.correct(combo: 3))
+        }
+        checkCompletion()
     }
 
     // MARK: Flow
