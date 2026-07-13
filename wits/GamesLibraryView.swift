@@ -277,7 +277,6 @@ private struct GameLauncher: View {
                     seed: isWeekly ? challenge.seed : nil,
                     isWeekly: isWeekly,
                     weeklyBestScore: app.levels.weeklyBest(for: challenge)?.score ?? 0,
-                    startsImmediately: false,
                     onRunComplete: { level, depth, trials in
                         let result = splitResult(level: level, depth: depth, trials: trials)
                         if isWeekly {

@@ -367,14 +367,13 @@ struct SplitSurvivalScreen: View {
     /// False while a death sits unrecorded behind a pending continue offer.
     @State private var runRecorded = true
 
-    private enum Phase { case intro, playing, over }
+    private enum Phase { case playing, over }
 
     init(best: Int,
          bestDepthFraction: Double = 0,
          seed: UInt64? = nil,
          isWeekly: Bool = false,
          weeklyBestScore: Int = 0,
-         startsImmediately: Bool = false,
          onRunComplete: @escaping (Int, Double, Int) -> Void,
          onQuit: @escaping () -> Void) {
         self.best = best
@@ -384,14 +383,13 @@ struct SplitSurvivalScreen: View {
         self.onRunComplete = onRunComplete
         self.onQuit = onQuit
         _model = State(initialValue: SplitGame(seed: seed))
-        _phase = State(initialValue: startsImmediately ? .playing : .intro)
+        _phase = State(initialValue: .playing)
     }
 
     var body: some View {
         ZStack {
             Color.witsBg.ignoresSafeArea()
             switch phase {
-            case .intro:   intro
             case .playing: playing
             case .over:    gameOver
             }
@@ -425,60 +423,6 @@ struct SplitSurvivalScreen: View {
             finalizeRun()   // no-op unless a death sat behind a continue offer
             pauseController.reset()
             GameFeel.shared.teardown()
-        }
-    }
-
-    // MARK: Intro
-
-    private var intro: some View {
-        VStack(spacing: 0) {
-            GameTopTag(text: isWeekly ? "weekly challenge" : "survival")
-                .padding(.bottom, 18)
-            SplitIntroHero(target: model.target, lookAlike: model.lookAlike)
-                .rise()
-            Spacer(minLength: 18)
-            VStack(spacing: 13) {
-                Text("split")
-                    .font(.witsDisplay(30))
-                    .foregroundStyle(Color.witsInk)
-                Text("two hands, two jobs. tap the LEFT side to keep the flyer up. on the RIGHT, tap every \(model.target) — but never the \(model.lookAlike).")
-                    .font(.witsBody(15.5))
-                    .foregroundStyle(Color.witsMuted)
-                    .multilineTextAlignment(.center)
-                Text("one slip — a crash, a wrong tap, or a missed \(model.target) — ends the run. levels get longer and faster. how far can you get?")
-                    .font(.witsBody(14))
-                    .foregroundStyle(Color.witsFaint)
-                    .multilineTextAlignment(.center)
-                splitIntroStats
-                    .padding(.top, 2)
-            }
-            .padding(.horizontal, 4)
-            .rise(0.08)
-            Spacer()
-            Cta(title: "start", action: startRun)
-                .rise(0.1)
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 16)
-        .overlay(alignment: .topTrailing) {
-            Button(action: onQuit) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 19, weight: .heavy))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .accessibilityLabel("close")
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 8)
-            .padding(.trailing, 12)
-        }
-    }
-
-    private var splitIntroStats: some View {
-        HStack(spacing: 10) {
-            SplitStatPill(title: "mode", value: isWeekly ? "weekly" : "survival")
-            SplitStatPill(title: "best", value: best > 0 ? "level \(best)" : "—")
-            SplitStatPill(title: "rule", value: "1 slip")
         }
     }
 
@@ -696,67 +640,6 @@ struct SplitSurvivalScreen: View {
             model.revive()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
         }
-    }
-}
-
-private struct SplitIntroHero: View {
-    var target: String
-    var lookAlike: String
-
-    var body: some View {
-        HeroPanel {
-            GeometryReader { geo in
-                let w = geo.size.width
-                let h = geo.size.height
-                let mid = w * 0.5
-
-                ZStack {
-                    Rectangle()
-                        .fill(.white.opacity(0.045))
-                        .frame(width: 1)
-                        .position(x: mid, y: h / 2)
-
-                    ForEach(0..<3, id: \.self) { i in
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(Color.witsAccent.opacity(0.64 - Double(i) * 0.12))
-                            .frame(width: 22, height: 76 - CGFloat(i) * 10)
-                            .position(x: 72 + CGFloat(i) * 48, y: i == 1 ? 138 : 50)
-                            .shadow(color: Color.witsAccent.opacity(0.28), radius: 10)
-                    }
-
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 27, weight: .heavy))
-                        .foregroundStyle(.white)
-                        .rotationEffect(.degrees(33))   // flying right, a touch nose-up
-                        .shadow(color: Color.witsAccent.opacity(0.7), radius: 12)
-                        .position(x: 52, y: 98)
-
-                    SplitHeroChip(text: target, accent: .witsAccent)
-                        .position(x: mid + 64, y: 66)
-                    SplitHeroChip(text: lookAlike, accent: .witsWarm)
-                        .position(x: mid + 134, y: 126)
-                    SplitHeroChip(text: target, accent: .witsAccent)
-                        .position(x: mid + 196, y: 84)
-                }
-            }
-        }
-    }
-}
-
-private struct SplitHeroChip: View {
-    var text: String
-    var accent: Color
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 28))
-            .frame(width: 48, height: 48)
-            .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(accent.opacity(0.9), lineWidth: 2)
-            )
-            .shadow(color: accent.opacity(0.35), radius: 12)
     }
 }
 
