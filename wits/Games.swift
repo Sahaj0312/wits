@@ -76,6 +76,13 @@ enum PegSolitaire: Game {
     }
 }
 
+enum WaterSort: Game {
+    static let id = GameID.waterSort
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(WaterSortScreen(cfg: config, onResult: onComplete))
+    }
+}
+
 /// Single dispatch the launcher uses to open any game.
 @MainActor
 func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -89,6 +96,7 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .slidePuzzle: SlidePuzzle.makeView(config: config, onComplete: onComplete)
     case .blockEscape: BlockEscape.makeView(config: config, onComplete: onComplete)
     case .pegSolitaire: PegSolitaire.makeView(config: config, onComplete: onComplete)
+    case .waterSort:   WaterSort.makeView(config: config, onComplete: onComplete)
     // Standalone survival modes are hosted directly by the launcher.
     case .split, .blockFit: AnyView(EmptyView())
     }

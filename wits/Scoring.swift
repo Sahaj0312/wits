@@ -105,6 +105,8 @@ enum ScoringPolicies {
             BlockEscapePolicy()
         case .pegSolitaire:
             PegSolitairePolicy()
+        case .waterSort:
+            WaterSortPolicy()
         default:
             AccuracyPolicy()
         }
@@ -316,6 +318,30 @@ struct BlockEscapePolicy: GameScoringPolicy {
             confidence: 1.0,
             // The challenge actually served this run (tray + exact par).
             abilitySignal: result.raw["blockLevel"] ?? prior.level,
+            metrics: ["moveEfficiency": moveEfficiency, "timeEfficiency": timeEfficiency]
+        )
+    }
+}
+
+struct WaterSortPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.20 }
+
+    /// A run only completes on a solve (WaterSort's par is an exact A*
+    /// minimum), so quality is pure efficiency: pours against par (dominant)
+    /// plus time against par.
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let moves = max(1, result.raw["moves"] ?? Double(result.trials))
+        let par = max(1, result.raw["parMoves"] ?? moves)
+        let seconds = max(1, result.raw["seconds"] ?? Double(result.durationMs) / 1000.0)
+        let parSeconds = max(10, result.raw["parSeconds"] ?? (par * 5 + 30))
+        let moveEfficiency = min(1, par / moves)
+        let timeEfficiency = min(1, parSeconds / seconds)
+        let quality = ScoringMath.clamp(0.70 * moveEfficiency + 0.30 * timeEfficiency, 0, 1)
+        return ScoredRun(
+            performance: quality,
+            confidence: 1.0,
+            // The challenge actually served this run (colour count + exact par).
+            abilitySignal: result.raw["waterLevel"] ?? prior.level,
             metrics: ["moveEfficiency": moveEfficiency, "timeEfficiency": timeEfficiency]
         )
     }

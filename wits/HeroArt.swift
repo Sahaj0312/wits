@@ -65,6 +65,8 @@ enum HeroPattern {
             escape(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .pegSolitaire:
             pegs(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
+        case .waterSort:
+            tubes(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         }
     }
 
@@ -288,6 +290,36 @@ enum HeroPattern {
 
     /// Peg solitaire mid-jump: a diamond of holes, a few pegs, one arcing
     /// over its neighbour into the empty hole.
+    /// Three standing tubes with fill lines; one top segment glows (the run
+    /// about to pour) and a bubble drifts between them.
+    private static func tubes(_ ctx: inout GraphicsContext, _ size: CGSize,
+                              ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
+                              glow: GraphicsContext.Shading) {
+        let tubeW: CGFloat = 44
+        let tubeH: CGFloat = 128
+        let baseY = size.height / 2 - tubeH / 2 + 6
+        for (index, x) in [size.width - 210, size.width - 148, size.width - 86].enumerated() {
+            let rect = CGRect(x: x, y: baseY + CGFloat(index.isMultiple(of: 2) ? 0 : 14),
+                              width: tubeW, height: tubeH)
+            ctx.stroke(Path(roundedRect: rect, cornerRadii: RectangleCornerRadii(topLeading: 8,
+                                                                                 bottomLeading: tubeW / 2,
+                                                                                 bottomTrailing: tubeW / 2,
+                                                                                 topTrailing: 8)),
+                       with: index == 1 ? ink : soft, lineWidth: 3)
+            // fill lines: the tube's liquid levels
+            for line in 1...3 {
+                let y = rect.maxY - CGFloat(line) * tubeH / 4.6
+                var path = Path()
+                path.move(to: CGPoint(x: rect.minX + 6, y: y))
+                path.addLine(to: CGPoint(x: rect.maxX - 6, y: y))
+                ctx.stroke(path, with: index == 1 && line == 3 ? glow : soft, lineWidth: 2.5)
+            }
+        }
+        // a rising bubble
+        ctx.stroke(Path(ellipseIn: CGRect(x: size.width - 122, y: baseY - 26, width: 12, height: 12)),
+                   with: glow, lineWidth: 2.5)
+    }
+
     private static func pegs(_ ctx: inout GraphicsContext, _ size: CGSize,
                              ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
                              glow: GraphicsContext.Shading) {

@@ -367,6 +367,12 @@ extension GameID {
                 "the peg you jumped over is removed.",
                 "clear the board down to a single peg."
             ]
+        case .waterSort:
+            [
+                "tap a tube to pick it up, tap another to pour.",
+                "a pour lands only on a matching colour or an empty tube.",
+                "sort every colour into its own tube in as few pours as you can."
+            ]
         case .split:
             [
                 "tap the left side to keep the flyer up.",

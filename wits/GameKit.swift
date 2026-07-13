@@ -18,6 +18,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     case arrowStorm, crowdControl, echoGrid
     case colorClash, tileShift, lastSeen
     case slidePuzzle, blockEscape, pegSolitaire
+    case waterSort
     // Standalone survival modes.
     case split
     case blockFit
@@ -27,7 +28,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     /// Difficulty-track games (everything but the standalone survival modes).
     static var live: [GameID] {
         [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .tileShift, .lastSeen,
-         .slidePuzzle, .blockEscape, .pegSolitaire]
+         .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort]
     }
     var isLive: Bool { Self.live.contains(self) }
 
@@ -44,7 +45,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     /// their own top/bottom spacing.
     var ownsSafeAreaSurface: Bool {
         switch self {
-        case .echoGrid, .slidePuzzle, .blockEscape, .pegSolitaire: true
+        case .echoGrid, .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort: true
         default: false
         }
     }
@@ -78,7 +79,7 @@ extension GameID {
         case .crowdControl: .multitasking
         case .echoGrid, .lastSeen: .memory
         case .colorClash, .tileShift: .flexibility
-        case .slidePuzzle, .blockEscape, .pegSolitaire: .reasoning
+        case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort: .reasoning
         case .split: .multitasking
         case .blockFit: .reasoning
         }
@@ -95,6 +96,7 @@ extension GameID {
         case .slidePuzzle: "slide puzzle"
         case .blockEscape: "block escape"
         case .pegSolitaire: "peg solitaire"
+        case .waterSort: "water sort"
         case .split: "split"
         case .blockFit: "block fit"
         }
@@ -112,6 +114,7 @@ extension GameID {
         case .slidePuzzle: "slide the tiles back into order."
         case .blockEscape: "free the big block."
         case .pegSolitaire: "jump pegs. leave just one."
+        case .waterSort: "pour until every tube is one colour."
         case .split: "fly and pick at once. one slip ends it."
         case .blockFit: "fit the pieces. clear the lines."
         }
@@ -123,7 +126,7 @@ extension GameID {
         case .arrowStorm, .crowdControl: "attention"
         case .echoGrid, .lastSeen: "memory"
         case .colorClash, .tileShift: "flexibility"
-        case .slidePuzzle, .blockEscape, .pegSolitaire, .blockFit: "problem solving"
+        case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .blockFit: "problem solving"
         case .split: "attention"
         }
     }
@@ -140,6 +143,7 @@ extension GameID {
         case .slidePuzzle: "spatial planning"
         case .blockEscape: "forward planning"
         case .pegSolitaire: "strategic planning"
+        case .waterSort: "sequencing"
         case .split: "dual-tasking"
         case .blockFit: "spatial packing"
         }
@@ -157,6 +161,7 @@ extension GameID {
         case .slidePuzzle: "the numbered tiles are scrambled around one empty square. slide them through the gap until they read in order — in as few moves as you can."
         case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit — in as few moves as you can."
         case .pegSolitaire: "every jump leaps one peg over a neighbour into an empty hole, and the jumped peg is removed. keep jumping until a single peg remains — on the marked hole at higher levels."
+        case .waterSort: "the tubes come scrambled. pour the top colour onto a matching colour or into an empty tube until every tube holds a single colour — in as few pours as you can."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate, but the next hand is always shown — the run ends the moment nothing in your hand fits."
         }
@@ -174,6 +179,7 @@ extension GameID {
         case .slidePuzzle: "spatial planning is seeing moves ahead — how each slide reshapes the board and which tile it frees up next."
         case .blockEscape: "forward planning is simulating moves in your head — seeing how each slide opens or closes the big block's path several steps ahead."
         case .pegSolitaire: "strategic planning is ordering moves so nothing gets stranded — every jump has to leave the rest of the board still clearable."
+        case .waterSort: "sequencing is ordering steps under constraints — every pour opens some moves and blocks others, so the whole plan matters before the first tube tips."
         case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
         case .blockFit: "spatial packing is planning placements ahead — keeping the board open so future pieces still have somewhere to live."
         }
@@ -191,6 +197,7 @@ extension GameID {
         case .slidePuzzle: "square.grid.3x3.topleft.filled"
         case .blockEscape: "square.split.2x2.fill"
         case .pegSolitaire: "circle.grid.cross.fill"
+        case .waterSort: "testtube.2"
         case .split: "rectangle.split.1x2.fill"
         case .blockFit: "square.grid.2x2.fill"
         }
@@ -199,7 +206,7 @@ extension GameID {
     /// Starting difficulty level for a brand-new player (1…10).
     var seedLevel: Double {
         switch self {
-        case .crowdControl, .echoGrid, .lastSeen, .slidePuzzle, .blockEscape, .pegSolitaire: 1
+        case .crowdControl, .echoGrid, .lastSeen, .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort: 1
         default: 2
         }
     }
@@ -214,6 +221,7 @@ extension GameID {
         case .lastSeen: "remembered"
         case .slidePuzzle: "efficiency"
         case .blockEscape: "efficiency"
+        case .waterSort: "efficiency"
         case .pegSolitaire: "clearPct"
         case .split: "maxLevel"
         case .blockFit: "score"
@@ -230,6 +238,7 @@ extension GameID {
         case .lastSeen: "\(Int(v)) recalled"
         case .slidePuzzle: "\(Int(v))% of par"
         case .blockEscape: "\(Int(v))% of par"
+        case .waterSort: "\(Int(v))% of par"
         case .pegSolitaire: "\(Int(v))% cleared"
         case .split: "level \(Int(v))"
         case .blockFit: "\(Int(v)) points"

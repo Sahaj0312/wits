@@ -96,6 +96,13 @@ extension GameID {
                       accent: Color(hexAny: 0xE9B949), secondary: Color(hexAny: 0xD85B4B),
                       difficultyColors: [0x91D6A8, 0xE9D45C, 0xE9A449, 0xD85B4B].map { Color(hexAny: $0) },
                       titleDesign: .serif, bodyDesign: .serif, uppercaseTitles: false)
+        case .waterSort:
+            GameWorld(background: Color(hexAny: 0x201134),
+                      surface: Color(hexAny: 0x321D4E), raised: Color(hexAny: 0x422865),
+                      ink: Color(hexAny: 0xF6EEFF), muted: Color(hexAny: 0xB2A0CC),
+                      accent: Color(hexAny: 0x5EE6D0), secondary: Color(hexAny: 0xFFB84D),
+                      difficultyColors: [0x7DEBC9, 0x6FB1FF, 0xFFB84D, 0xFF6E8A].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: false)
         case .split:
             GameWorld(background: Color(hexAny: 0x090713),
                       surface: Color(hexAny: 0x191329), raised: Color(hexAny: 0x251B3B),
@@ -216,6 +223,25 @@ private struct GameWorldPattern: View {
                                        with: .color(world.ink.opacity(0.09)), lineWidth: 2)
                     }
                 }
+            case .waterSort:
+                // faint standing tubes with rising bubbles
+                for index in 0..<5 {
+                    let tubeW: CGFloat = 26
+                    let x = CGFloat((index * 83) % 340) / 340 * (size.width - tubeW)
+                    let y = CGFloat((index * 173) % 620) / 620 * size.height * 0.75
+                    let rect = CGRect(x: x, y: y, width: tubeW, height: 88)
+                    context.stroke(Path(roundedRect: rect, cornerRadius: 12),
+                                   with: .color((index.isMultiple(of: 2) ? world.accent : world.secondary).opacity(0.10)),
+                                   lineWidth: 3)
+                }
+                for index in 0..<9 {
+                    let radius: CGFloat = index.isMultiple(of: 3) ? 5 : 3
+                    let x = CGFloat((index * 127) % 360) / 360 * size.width
+                    let y = CGFloat((index * 211) % 740) / 740 * size.height
+                    context.stroke(Path(ellipseIn: CGRect(x: x - radius, y: y - radius,
+                                                          width: radius * 2, height: radius * 2)),
+                                   with: .color(world.ink.opacity(0.10)), lineWidth: 2)
+                }
             case .split:
                 context.fill(Path(CGRect(x: 0, y: 0, width: size.width / 2, height: size.height)),
                              with: .color(world.accent.opacity(0.06)))
@@ -266,6 +292,7 @@ struct GamePosterArt: View {
                 case .slidePuzzle: SlidePuzzlePoster(w: w, h: h)
                 case .blockEscape: BlockEscapePoster(w: w, h: h)
                 case .pegSolitaire: PegSolitairePoster(w: w, h: h)
+                case .waterSort: WaterSortPoster(w: w, h: h)
                 case .split: SplitPoster(w: w, h: h)
                 case .blockFit: BlockFitPoster(w: w, h: h)
                 }
@@ -587,6 +614,62 @@ private struct PegSolitairePoster: View {
                 .frame(width: r * 2, height: r * 2)
                 .position(center(1, 1))
         }
+    }
+}
+
+// MARK: - Water sort — pour the top colours until every tube runs clean.
+
+private struct WaterSortPoster: View {
+    let w: CGFloat, h: CGFloat
+
+    // Segments bottom → top per tube; the middle tube is one pour from done.
+    private let fills: [[Int]] = [[0, 2, 1, 2], [1, 1, 1], [2, 0, 0]]
+    private static let liquid: [Color] = [
+        Color(hexAny: 0xF25757), Color(hexAny: 0x3ED8C3), Color(hexAny: 0xF8E14B)
+    ]
+
+    var body: some View {
+        let tubeW = w * 0.155
+        let tubeH = h * 0.46
+        let unit = tubeH / 4.6
+        let xs: [CGFloat] = [0.28, 0.50, 0.72]
+        let cy = h * 0.66
+
+        ZStack {
+            ForEach(0..<fills.count, id: \.self) { i in
+                tube(fills[i], tubeW: tubeW, tubeH: tubeH, unit: unit)
+                    .position(x: w * xs[i], y: cy)
+            }
+
+            // the pour: a teal drop falling toward the middle tube
+            Capsule()
+                .fill(Self.liquid[1])
+                .frame(width: w * 0.035, height: h * 0.085)
+                .position(x: w * 0.50, y: cy - tubeH * 0.68)
+                .shadow(color: Self.liquid[1].opacity(0.7), radius: 5)
+        }
+    }
+
+    private func tube(_ segments: [Int], tubeW: CGFloat, tubeH: CGFloat, unit: CGFloat) -> some View {
+        let shape = UnevenRoundedRectangle(topLeadingRadius: tubeW * 0.18,
+                                           bottomLeadingRadius: tubeW * 0.5,
+                                           bottomTrailingRadius: tubeW * 0.5,
+                                           topTrailingRadius: tubeW * 0.18,
+                                           style: .continuous)
+        return ZStack(alignment: .bottom) {
+            shape.fill(.white.opacity(0.08))
+            VStack(spacing: 0) {
+                ForEach(Array(segments.reversed().enumerated()), id: \.offset) { _, color in
+                    Rectangle()
+                        .fill(Self.liquid[color])
+                        .frame(height: unit)
+                }
+            }
+            .padding(2.5)
+            .clipShape(shape.inset(by: 2.5))
+            shape.strokeBorder(.white.opacity(0.30), lineWidth: 2)
+        }
+        .frame(width: tubeW, height: tubeH)
     }
 }
 
