@@ -98,6 +98,6 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .pegSolitaire: PegSolitaire.makeView(config: config, onComplete: onComplete)
     case .waterSort:   WaterSort.makeView(config: config, onComplete: onComplete)
     // Standalone survival modes are hosted directly by the launcher.
-    case .split, .blockFit: AnyView(EmptyView())
+    case .split, .blockFit, .fuse: AnyView(EmptyView())
     }
 }

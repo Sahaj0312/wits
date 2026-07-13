@@ -22,6 +22,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     // Standalone survival modes.
     case split
     case blockFit
+    case fuse
 
     var id: String { rawValue }
 
@@ -32,7 +33,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     }
     var isLive: Bool { Self.live.contains(self) }
 
-    static var standalone: [GameID] { [.split, .blockFit] }
+    static var standalone: [GameID] { [.split, .blockFit, .fuse] }
     var isStandalone: Bool { Self.standalone.contains(self) }
 
     /// Tappable in the library (has some playable mode).
@@ -82,6 +83,7 @@ extension GameID {
         case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort: .reasoning
         case .split: .multitasking
         case .blockFit: .reasoning
+        case .fuse: .reasoning
         }
     }
 
@@ -99,6 +101,7 @@ extension GameID {
         case .waterSort: "water sort"
         case .split: "split"
         case .blockFit: "block fit"
+        case .fuse: "fuse"
         }
     }
 
@@ -117,6 +120,7 @@ extension GameID {
         case .waterSort: "pour until every tube is one colour."
         case .split: "fly and pick at once. one slip ends it."
         case .blockFit: "fit the pieces. clear the lines."
+        case .fuse: "slide, fuse, double. don't jam the board."
         }
     }
 
@@ -126,7 +130,7 @@ extension GameID {
         case .arrowStorm, .crowdControl: "attention"
         case .echoGrid, .lastSeen: "memory"
         case .colorClash, .tileShift: "flexibility"
-        case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .blockFit: "problem solving"
+        case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .blockFit, .fuse: "problem solving"
         case .split: "attention"
         }
     }
@@ -146,6 +150,7 @@ extension GameID {
         case .waterSort: "sequencing"
         case .split: "dual-tasking"
         case .blockFit: "spatial packing"
+        case .fuse: "lookahead planning"
         }
     }
 
@@ -164,6 +169,7 @@ extension GameID {
         case .waterSort: "the tubes come scrambled. pour the top colour onto a matching colour or into an empty tube until every tube holds a single colour — in as few pours as you can."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate, but the next hand is always shown — the run ends the moment nothing in your hand fits."
+        case .fuse: "every swipe slides the whole board. matching cells fuse and double, and each fusion pays its new value. keep space open and build the biggest cell you can — the run ends when no swipe can move anything."
         }
     }
 
@@ -182,6 +188,7 @@ extension GameID {
         case .waterSort: "sequencing is ordering steps under constraints — every pour opens some moves and blocks others, so the whole plan matters before the first tube tips."
         case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
         case .blockFit: "spatial packing is planning placements ahead — keeping the board open so future pieces still have somewhere to live."
+        case .fuse: "lookahead planning is thinking several swipes ahead — where each merge leaves the board decides whether the next one is even possible."
         }
     }
 
@@ -200,6 +207,7 @@ extension GameID {
         case .waterSort: "testtube.2"
         case .split: "rectangle.split.1x2.fill"
         case .blockFit: "square.grid.2x2.fill"
+        case .fuse: "atom"
         }
     }
 
@@ -225,6 +233,7 @@ extension GameID {
         case .pegSolitaire: "clearPct"
         case .split: "maxLevel"
         case .blockFit: "score"
+        case .fuse: "bestTile"
         default: "bestStreak"
         }
     }
@@ -242,6 +251,7 @@ extension GameID {
         case .pegSolitaire: "\(Int(v))% cleared"
         case .split: "level \(Int(v))"
         case .blockFit: "\(Int(v)) points"
+        case .fuse: "\(Int(v)) tile"
         default: "streak \(Int(v))"
         }
     }

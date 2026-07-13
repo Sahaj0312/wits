@@ -65,7 +65,7 @@ extension GameID {
     var weeklyTrackLevel: Int {
         switch self {
         case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort: 5
-        case .split, .blockFit: 1
+        case .split, .blockFit, .fuse: 1
         default: 8
         }
     }
@@ -171,6 +171,11 @@ enum WeeklyChallengeScorer {
             return WeeklyChallengeScore(rankValue: points,
                                         headline: "\(points) points",
                                         detail: "\(lines) lines cleared")
+        case .fuse:
+            let tile = Int(result.raw["bestTile"] ?? 0)
+            return WeeklyChallengeScore(rankValue: points,
+                                        headline: "\(points) points",
+                                        detail: "best tile \(tile)")
         default:
             let correct = Int(result.raw["correct"] ?? 0)
             return WeeklyChallengeScore(rankValue: points,

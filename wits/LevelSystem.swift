@@ -80,7 +80,7 @@ enum DifficultyScale {
         case .crowdControl, .echoGrid, .lastSeen,
              .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort:
             40
-        case .split, .blockFit:
+        case .split, .blockFit, .fuse:
             30
         }
     }

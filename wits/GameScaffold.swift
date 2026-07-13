@@ -385,6 +385,12 @@ extension GameID {
                 "fill a full row or column to clear it.",
                 "pieces never rotate — use the NEXT row to plan ahead; the run ends when nothing fits."
             ]
+        case .fuse:
+            [
+                "swipe in any direction — every cell slides as far as it can.",
+                "matching numbers fuse into one and double.",
+                "keep the board open and build the biggest cell you can — the run ends when nothing can move."
+            ]
         }
     }
 }

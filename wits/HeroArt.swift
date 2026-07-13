@@ -59,7 +59,7 @@ enum HeroPattern {
             shiftTiles(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .lastSeen:
             sparks(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .slidePuzzle:
+        case .slidePuzzle, .fuse:
             slide(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .blockEscape, .blockFit:
             escape(&ctx, size, ink: ink, soft: inkSoft, glow: glow)

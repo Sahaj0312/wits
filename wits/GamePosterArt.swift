@@ -117,6 +117,14 @@ extension GameID {
                       accent: Color(hexAny: 0xFFB13B), secondary: Color(hexAny: 0x4BE3A9),
                       difficultyColors: [0x4BE3A9, 0x58B4FF, 0xFFB13B, 0xFF5E7A].map { Color(hexAny: $0) },
                       titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: true)
+        case .fuse:
+            // The reactor room: near-black steel with charged teal and amber.
+            GameWorld(background: Color(hexAny: 0x0D141F),
+                      surface: Color(hexAny: 0x1A2333), raised: Color(hexAny: 0x263248),
+                      ink: Color(hexAny: 0xEDF3FF), muted: Color(hexAny: 0x8A97B0),
+                      accent: Color(hexAny: 0x4DD9C6), secondary: Color(hexAny: 0xFFA13B),
+                      difficultyColors: [0x4DD9C6, 0x6E8BFF, 0xFFA13B, 0xFF5FA8].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .monospaced, uppercaseTitles: true)
         }
     }
 
@@ -265,6 +273,29 @@ private struct GameWorldPattern: View {
                     context.fill(Path(roundedRect: cell, cornerRadius: 6),
                                  with: .color((index.isMultiple(of: 2) ? world.accent : world.secondary).opacity(0.10)))
                 }
+            case .fuse:
+                // Charged cells drifting in the dark; a few carry the doubles.
+                let step: CGFloat = 72
+                for x in stride(from: 8 as CGFloat, through: size.width, by: step) {
+                    for y in stride(from: 8 as CGFloat, through: size.height, by: step) {
+                        let cell = CGRect(x: x, y: y, width: step - 14, height: step - 14)
+                        context.stroke(Path(roundedRect: cell, cornerRadius: 10),
+                                       with: .color(world.accent.opacity(0.07)), lineWidth: 1.5)
+                    }
+                }
+                let numbers = ["2", "4", "8", "16", "32"]
+                for index in 0..<numbers.count {
+                    let x = (CGFloat((index * 131) % 320) / 320) * (size.width - step) + step / 2
+                    let y = (CGFloat((index * 223) % 680) / 680) * (size.height - step) + step / 2
+                    let cell = CGRect(x: x - (step - 14) / 2, y: y - (step - 14) / 2,
+                                      width: step - 14, height: step - 14)
+                    context.fill(Path(roundedRect: cell, cornerRadius: 10),
+                                 with: .color((index.isMultiple(of: 2) ? world.accent : world.secondary).opacity(0.09)))
+                    context.draw(Text(numbers[index])
+                                    .font(.system(size: 24, weight: .black, design: .rounded))
+                                    .foregroundStyle(world.ink.opacity(0.12)),
+                                 at: CGPoint(x: x, y: y), anchor: .center)
+                }
             }
         }
     }
@@ -295,6 +326,7 @@ struct GamePosterArt: View {
                 case .waterSort: WaterSortPoster(w: w, h: h)
                 case .split: SplitPoster(w: w, h: h)
                 case .blockFit: BlockFitPoster(w: w, h: h)
+                case .fuse: FusePoster(w: w, h: h)
                 }
             }
         }
@@ -798,5 +830,81 @@ private struct BlockFitPoster: View {
                     .frame(width: size * 0.42, height: size * 0.42)
                     .offset(x: -size * 0.16, y: -size * 0.16)
             )
+    }
+}
+
+// MARK: - Fuse — two 32s about to fuse under the charged result.
+
+private struct FusePoster: View {
+    let w: CGFloat, h: CGFloat
+
+    // (col, row, value) on the 4×4 board; the bottom row stages the fusion.
+    private let placed: [(Int, Int, Int)] = [
+        (1, 1, 2), (3, 1, 8),
+        (0, 2, 4), (2, 2, 16),
+        (0, 3, 32), (1, 3, 32), (3, 3, 128),
+    ]
+
+    var body: some View {
+        let s = w * 0.16
+        let gap = w * 0.018
+        let step = s + gap
+        let originX = w * 0.5 - step * 2 + gap / 2
+        let originY = h * 0.90 - step * 4
+
+        func position(_ col: Int, _ row: Int) -> CGPoint {
+            CGPoint(x: originX + (CGFloat(col) + 0.5) * step,
+                    y: originY + (CGFloat(row) + 0.5) * step)
+        }
+
+        return ZStack {
+            // The steel board with its empty wells.
+            RoundedRectangle(cornerRadius: s * 0.22, style: .continuous)
+                .fill(Color(hexAny: 0x1A2333))
+                .frame(width: step * 4 + gap * 2, height: step * 4 + gap * 2)
+                .position(x: originX + step * 2, y: originY + step * 2)
+            ForEach(0..<16, id: \.self) { i in
+                RoundedRectangle(cornerRadius: s * 0.16, style: .continuous)
+                    .fill(Color(hexAny: 0x263248))
+                    .frame(width: s, height: s)
+                    .position(position(i % 4, i / 4))
+            }
+            ForEach(0..<placed.count, id: \.self) { i in
+                let cell = placed[i]
+                FusePosterTile(value: cell.2, size: s)
+                    .position(position(cell.0, cell.1))
+            }
+
+            // The fusion arrow between the two 32s.
+            Image(systemName: "arrow.right")
+                .font(.system(size: s * 0.34, weight: .black))
+                .foregroundStyle(.white)
+                .shadow(color: Color(hexAny: 0x4DD9C6).opacity(0.8), radius: 4)
+                .position(x: originX + step, y: originY + step * 3.5)
+
+            // The charged result, floating above the board with a glow.
+            FusePosterTile(value: 64, size: s * 1.28)
+                .shadow(color: Color(hexAny: 0xFF5FA8).opacity(0.6), radius: 10)
+                .rotationEffect(.degrees(-4))
+                .position(x: w * 0.62, y: originY - s * 0.62)
+        }
+    }
+}
+
+private struct FusePosterTile: View {
+    let value: Int
+    let size: CGFloat
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: size * 0.16, style: .continuous)
+            .fill(FusePalette.fill(value))
+            .frame(width: size, height: size)
+            .overlay {
+                Text("\(value)")
+                    .font(.system(size: size * (value < 100 ? 0.5 : 0.4),
+                                  weight: .black, design: .rounded))
+                    .foregroundStyle(FusePalette.ink(value))
+                    .minimumScaleFactor(0.5)
+            }
     }
 }

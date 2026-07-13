@@ -267,6 +267,25 @@ private struct GameLauncher: View {
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
+            } else if game == .fuse {
+                let challenge = weeklyChallenge ?? .current(for: .fuse)
+                let isWeekly = runKind == .weekly
+                FuseScreen(
+                    best: app.levels.marathonBest(for: .fuse)?.score ?? 0,
+                    seed: isWeekly ? challenge.seed : nil,
+                    isWeekly: isWeekly,
+                    weeklyBestScore: app.levels.weeklyBest(for: challenge)?.score ?? 0,
+                    onRunComplete: { score, bestTile, moves in
+                        let result = fuseResult(score: score, bestTile: bestTile, moves: moves)
+                        if isWeekly {
+                            _ = app.recordWeeklyChallengeResult(result, challenge: challenge)
+                        } else {
+                            app.recordStandaloneGameResult(result)
+                            app.recordMarathon(game: .fuse, depth: score, score: score)
+                        }
+                    },
+                    onQuit: { withAnimation { phase = .selector } }
+                )
             } else if game == .split {
                 let challenge = weeklyChallenge ?? .current(for: .split)
                 let isWeekly = runKind == .weekly
@@ -445,6 +464,20 @@ private struct GameLauncher: View {
             "score": Double(score),
             "lines": Double(lines),
             "pieces": Double(pieces)
+        ]
+        return result
+    }
+
+    private func fuseResult(score: Int, bestTile: Int, moves: Int) -> GameResult {
+        var result = GameResult(game: .fuse,
+                                score: score,
+                                baseScore: score,
+                                accuracy: 0,
+                                trials: max(1, moves))
+        result.raw = [
+            "score": Double(score),
+            "bestTile": Double(bestTile),
+            "moves": Double(moves)
         ]
         return result
     }
