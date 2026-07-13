@@ -41,6 +41,11 @@ struct WaterSortScreen: View {
     @State private var pour: ActivePour?
     @State private var preTubes: [WaterSortEngine.Tube]?
     @State private var tubeFrames: [Int: CGRect] = [:]
+    @State private var initialTubes: [WaterSortEngine.Tube]?
+    @State private var history: [[WaterSortEngine.Tube]] = []
+    @State private var undos = 0
+    @State private var restarts = 0
+    @State private var deadEnd = false
 
     private let startedAt = Date()
     private let level: Double
@@ -112,6 +117,11 @@ struct WaterSortScreen: View {
                             .padding(.horizontal, WitsMetrics.screenPadding)
                             .padding(.bottom, 12)
                     }
+
+                    if deadEnd {
+                        deadEndCard
+                            .transition(.scale(scale: 0.9).combined(with: .opacity))
+                    }
                 } else {
                     VStack(spacing: 14) {
                         ProgressView()
@@ -129,37 +139,111 @@ struct WaterSortScreen: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
+            // clears the pause button the host overlays at top-leading
             Spacer()
                 .frame(width: 38)
 
-            HStack(spacing: 16) {
+            HStack(spacing: 12) {
                 Text(Self.clock(elapsed))
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .monospacedDigit()
-                    .frame(minWidth: 66, alignment: .leading)
                 Spacer(minLength: 0)
-                Text("pours: \(moves)")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                Text("pours \(moves)")
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 14)
             .frame(height: 42)
             .background(Color.black.opacity(0.35), in: Capsule())
+
+            Button {
+                undo()
+            } label: {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 16, weight: .heavy))
+                    .foregroundStyle(.white.opacity(history.isEmpty ? 0.35 : 1))
+                    .frame(width: 44, height: 44)
+                    .background(.white.opacity(0.18), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(history.isEmpty || finished || pour != nil)
+            .accessibilityLabel("Undo last pour")
+
+            Button {
+                restart()
+            } label: {
+                Image(systemName: "arrow.counterclockwise")
+                    .font(.system(size: 16, weight: .heavy))
+                    .foregroundStyle(.white.opacity(moves == 0 ? 0.35 : 1))
+                    .frame(width: 44, height: 44)
+                    .background(.white.opacity(0.18), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(moves == 0 || finished || pour != nil)
+            .accessibilityLabel("Restart this board")
 
             Button {
                 showHelp()
             } label: {
                 Image(systemName: "questionmark")
-                    .font(.system(size: 20, weight: .heavy))
+                    .font(.system(size: 18, weight: .heavy))
                     .foregroundStyle(.white)
-                    .frame(width: 48, height: 48)
+                    .frame(width: 44, height: 44)
                     .background(.white.opacity(0.18), in: Circle())
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Show rule reminder")
         }
+    }
+
+    /// Shown when no player-legal pour remains: every top colour is blocked
+    /// and no tube is empty. Undo rewinds into the mistake; restart re-deals
+    /// the same board.
+    private var deadEndCard: some View {
+        VStack(spacing: 14) {
+            Text("no pours left")
+                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+            Text("every tube is blocked — rewind a pour or start this board over")
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white.opacity(0.75))
+                .multilineTextAlignment(.center)
+            HStack(spacing: 10) {
+                Button {
+                    undo()
+                } label: {
+                    Label("undo pour", systemImage: "arrow.uturn.backward")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .frame(height: 44)
+                        .background(.white.opacity(0.18), in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    restart()
+                } label: {
+                    Label("restart", systemImage: "arrow.counterclockwise")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.black.opacity(0.85))
+                        .padding(.horizontal, 18)
+                        .frame(height: 44)
+                        .background(world.accent, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(22)
+        .frame(maxWidth: 320)
+        .background(Color.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.15), lineWidth: 1))
+        .shadow(color: .black.opacity(0.4), radius: 18, y: 8)
+        .padding(.horizontal, WitsMetrics.screenPadding)
     }
 
     private var progressStrip: some View {
@@ -490,6 +574,7 @@ struct WaterSortScreen: View {
         hint = ""
         selected = nil
         preTubes = snapshot
+        history.append(snapshot)
 
         let side: CGFloat
         if let s = tubeFrames[source], let d = tubeFrames[dest], d.midX < s.midX {
@@ -515,6 +600,55 @@ struct WaterSortScreen: View {
             GameFeel.shared.play(.correct(combo: 3))
         }
         checkCompletion()
+        if let tubes, !finished, !playerCanPour(tubes) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                deadEnd = true
+            }
+            GameFeel.shared.play(.wrong)
+        }
+    }
+
+    /// A pour the player could actually make: complete tubes can't be picked
+    /// up, so a technically-legal complete → empty pour doesn't count.
+    private func playerCanPour(_ tubes: [WaterSortEngine.Tube]) -> Bool {
+        for source in tubes.indices
+        where !tubes[source].isEmpty && !WaterSortEngine.isComplete(tubes[source], capacity: capacity) {
+            for dest in tubes.indices
+            where WaterSortEngine.canPour(tubes, from: source, to: dest, capacity: capacity) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Rewinds one pour. The spent move is not refunded — undo is an escape
+    /// hatch, not a free trial-and-error loop toward par.
+    private func undo() {
+        guard pour == nil, !finished, let last = history.popLast() else { return }
+        undos += 1
+        selected = nil
+        hint = ""
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.85)) {
+            deadEnd = false
+            tubes = last
+        }
+    }
+
+    /// A fresh attempt at the same deal: board, pours, and clock all reset,
+    /// exactly as if the level had just loaded.
+    private func restart() {
+        guard pour == nil, !finished, let initialTubes else { return }
+        restarts += 1
+        history = []
+        selected = nil
+        moves = 0
+        hint = ""
+        elapsed = 0
+        timerStartedAt = Date()
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.85)) {
+            deadEnd = false
+            tubes = initialTubes
+        }
     }
 
     // MARK: Flow
@@ -527,6 +661,7 @@ struct WaterSortScreen: View {
                 WaterSortEngine.generate(mapLevel: target, seed: seed)
             }.value
             tubes = generated.tubes
+            initialTubes = generated.tubes
             par = generated.par
             capacity = generated.spec.capacity
             colorCount = generated.spec.colors
@@ -572,6 +707,8 @@ struct WaterSortScreen: View {
             "seconds": seconds.rounded(),
             "colors": Double(colorCount),
             "tubes": Double(tubes?.count ?? 0),
+            "undos": Double(undos),
+            "restarts": Double(restarts),
             "waterLevel": level
         ]
         onResult(result)
