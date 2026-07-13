@@ -139,24 +139,26 @@ struct WaterSortScreen: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             // clears the pause button the host overlays at top-leading
             Spacer()
                 .frame(width: 38)
 
-            HStack(spacing: 12) {
+            HStack(spacing: 10) {
                 Text(Self.clock(elapsed))
                     .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
                 Text("pours \(moves)")
                     .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 12)
             .frame(height: 42)
             .background(Color.black.opacity(0.35), in: Capsule())
 
@@ -166,7 +168,7 @@ struct WaterSortScreen: View {
                 Image(systemName: "arrow.uturn.backward")
                     .font(.system(size: 16, weight: .heavy))
                     .foregroundStyle(.white.opacity(history.isEmpty ? 0.35 : 1))
-                    .frame(width: 44, height: 44)
+                    .frame(width: 42, height: 42)
                     .background(.white.opacity(0.18), in: Circle())
             }
             .buttonStyle(.plain)
@@ -179,7 +181,7 @@ struct WaterSortScreen: View {
                 Image(systemName: "arrow.counterclockwise")
                     .font(.system(size: 16, weight: .heavy))
                     .foregroundStyle(.white.opacity(moves == 0 ? 0.35 : 1))
-                    .frame(width: 44, height: 44)
+                    .frame(width: 42, height: 42)
                     .background(.white.opacity(0.18), in: Circle())
             }
             .buttonStyle(.plain)
@@ -192,7 +194,7 @@ struct WaterSortScreen: View {
                 Image(systemName: "questionmark")
                     .font(.system(size: 18, weight: .heavy))
                     .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
+                    .frame(width: 42, height: 42)
                     .background(.white.opacity(0.18), in: Circle())
             }
             .buttonStyle(.plain)
