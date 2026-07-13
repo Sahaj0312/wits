@@ -343,16 +343,20 @@ struct FuseScreen: View {
                 Text("SCORE")
                     .font(.system(size: 10, weight: .black, design: world.bodyDesign))
                     .foregroundStyle(world.muted)
-                Text("\(model.score)")
+                Text(String(model.score))
                     .font(.system(size: 34, weight: .black, design: world.titleDesign))
                     .foregroundStyle(world.ink)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .contentTransition(.numericText())
                     .animation(.snappy(duration: 0.25), value: model.score)
             }
 
             if model.bestTile >= 128 {
-                Text("CELL \(model.bestTile)")
+                Text("CELL \(String(model.bestTile))")
+                    .lineLimit(1)
+                    .fixedSize()
                     .font(.system(size: 11, weight: .black, design: world.bodyDesign))
                     .foregroundStyle(FusePalette.ink(model.bestTile))
                     .padding(.horizontal, 9)
@@ -367,10 +371,12 @@ struct FuseScreen: View {
                 Text(newBest ? "NEW BEST" : "BEST")
                     .font(.system(size: 10, weight: .black, design: world.bodyDesign))
                     .foregroundStyle(newBest ? world.accent : world.muted)
-                Text("\(max(referenceBest, model.score))")
+                Text(String(max(referenceBest, model.score)))
                     .font(.system(size: 20, weight: .black, design: world.titleDesign))
                     .foregroundStyle(newBest ? world.accent : world.ink)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.bestTile)
@@ -421,13 +427,14 @@ struct FuseScreen: View {
         RoundedRectangle(cornerRadius: cell * 0.13, style: .continuous)
             .fill(FusePalette.fill(tile.value))
             .overlay {
-                Text("\(tile.value)")
+                Text(String(tile.value))
                     .font(.system(size: cell * fontScale(tile.value),
                                   weight: .black,
                                   design: world.titleDesign))
                     .foregroundStyle(FusePalette.ink(tile.value))
-                    .minimumScaleFactor(0.5)
-                    .padding(cell * 0.06)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.4)
+                    .padding(cell * 0.08)
             }
             .shadow(color: FusePalette.glow(tile.value), radius: cell * 0.16)
             .frame(width: cell, height: cell)
@@ -505,10 +512,11 @@ struct FuseScreen: View {
         VStack(spacing: 0) {
             Spacer(minLength: 18)
 
-            Text("\(model.bestTile)")
+            Text(String(model.bestTile))
                 .font(.system(size: 30, weight: .black, design: world.titleDesign))
                 .foregroundStyle(FusePalette.ink(model.bestTile))
-                .minimumScaleFactor(0.4)
+                .lineLimit(1)
+                .minimumScaleFactor(0.3)
                 .padding(10)
                 .frame(width: 86, height: 86)
                 .background(FusePalette.fill(model.bestTile),
@@ -525,16 +533,18 @@ struct FuseScreen: View {
                 .foregroundStyle(world.ink)
                 .padding(.top, 5)
 
-            Text("\(model.score)")
+            Text(String(model.score))
                 .font(.system(size: 58, weight: .black, design: world.titleDesign))
                 .foregroundStyle(newBest ? world.accent : world.ink)
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.4)
                 .padding(.top, 16)
 
             HStack(spacing: 10) {
-                statPill("BEST", value: "\(max(referenceBest, model.score))")
-                statPill("CELL", value: "\(model.bestTile)")
-                statPill("MOVES", value: "\(model.moves)")
+                statPill("BEST", value: String(max(referenceBest, model.score)))
+                statPill("CELL", value: String(model.bestTile))
+                statPill("MOVES", value: String(model.moves))
             }
             .padding(.top, 18)
 
@@ -581,6 +591,9 @@ struct FuseScreen: View {
                 .font(.system(size: 16, weight: .black, design: world.titleDesign))
                 .foregroundStyle(world.ink)
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .padding(.horizontal, 6)
         }
         .frame(maxWidth: .infinity)
         .frame(height: 52)
