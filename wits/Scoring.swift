@@ -107,6 +107,8 @@ enum ScoringPolicies {
             PegSolitairePolicy()
         case .waterSort:
             WaterSortPolicy()
+        case .mahjong:
+            MahjongPolicy()
         default:
             AccuracyPolicy()
         }
@@ -343,6 +345,42 @@ struct WaterSortPolicy: GameScoringPolicy {
             // The challenge actually served this run (colour count + exact par).
             abilitySignal: result.raw["waterLevel"] ?? prior.level,
             metrics: ["moveEfficiency": moveEfficiency, "timeEfficiency": timeEfficiency]
+        )
+    }
+}
+
+struct MahjongPolicy: GameScoringPolicy {
+    var abilitySignalWeight: Double { 0.20 }
+
+    /// A cleared board grades on play cleanliness: undos are the real
+    /// mistakes (a pick that trapped the rack), blocked-tile taps cost a
+    /// little, and time keeps a small weight against a generous scanning
+    /// budget. A run that died out of space grades purely on how far it got,
+    /// capped below the pass line.
+    func score(_ result: GameResult, prior: DifficultyState) -> ScoredRun {
+        let pairs = max(1, result.raw["pairs"] ?? Double(result.trials))
+        let solved = (result.raw["solved"] ?? 1) >= 1
+        if !solved {
+            let clear = ScoringMath.clamp((result.raw["clearedPairs"] ?? 0) / pairs, 0, 1)
+            return ScoredRun(
+                performance: ScoringMath.clamp(0.55 * clear, 0, 0.55),
+                confidence: 0.9,
+                abilitySignal: result.raw["mahjongLevel"] ?? prior.level,
+                metrics: ["clearFraction": clear]
+            )
+        }
+        let undos = max(0, result.raw["undos"] ?? 0)
+        let blockedTaps = max(0, result.raw["blockedTaps"] ?? 0)
+        let seconds = max(1, result.raw["seconds"] ?? Double(result.durationMs) / 1000.0)
+        let parSeconds = max(10, result.raw["parSeconds"] ?? (pairs * 6 + 25))
+        let cleanliness = min(1, pairs / (pairs + undos + blockedTaps * 0.25))
+        let timeEfficiency = min(1, parSeconds / seconds)
+        let quality = ScoringMath.clamp(0.30 + 0.60 * cleanliness + 0.10 * timeEfficiency, 0, 1)
+        return ScoredRun(
+            performance: quality,
+            confidence: 1.0,
+            abilitySignal: result.raw["mahjongLevel"] ?? prior.level,
+            metrics: ["cleanliness": cleanliness, "timeEfficiency": timeEfficiency]
         )
     }
 }

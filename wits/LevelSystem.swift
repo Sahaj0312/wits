@@ -78,7 +78,7 @@ enum DifficultyScale {
         case .arrowStorm, .colorClash, .tileShift:
             50
         case .crowdControl, .echoGrid, .lastSeen,
-             .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort:
+             .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong:
             40
         case .split, .blockFit, .fuse:
             30

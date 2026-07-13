@@ -103,6 +103,14 @@ extension GameID {
                       accent: Color(hexAny: 0x5EE6D0), secondary: Color(hexAny: 0xFFB84D),
                       difficultyColors: [0x7DEBC9, 0x6FB1FF, 0xFFB84D, 0xFF6E8A].map { Color(hexAny: $0) },
                       titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: false)
+        case .mahjong:
+            // Lacquer and ivory: deep red-brown table, gold and jade accents.
+            GameWorld(background: Color(hexAny: 0x2E1013),
+                      surface: Color(hexAny: 0x451B1F), raised: Color(hexAny: 0x59262B),
+                      ink: Color(hexAny: 0xFFF3E0), muted: Color(hexAny: 0xC79E92),
+                      accent: Color(hexAny: 0xF2C14E), secondary: Color(hexAny: 0x5BC08D),
+                      difficultyColors: [0x5BC08D, 0xF2C14E, 0xF08A4B, 0xE05563].map { Color(hexAny: $0) },
+                      titleDesign: .serif, bodyDesign: .rounded, uppercaseTitles: false)
         case .split:
             GameWorld(background: Color(hexAny: 0x090713),
                       surface: Color(hexAny: 0x191329), raised: Color(hexAny: 0x251B3B),
@@ -250,6 +258,27 @@ private struct GameWorldPattern: View {
                                                           width: radius * 2, height: radius * 2)),
                                    with: .color(world.ink.opacity(0.10)), lineWidth: 2)
                 }
+            case .mahjong:
+                // Sparse ivory tile backs resting on the lacquer, a few pips.
+                for index in 0..<6 {
+                    let tileW: CGFloat = 42
+                    let x = CGFloat((index * 127) % 330) / 330 * (size.width - tileW)
+                    let y = CGFloat((index * 211) % 700) / 700 * size.height * 0.9
+                    let rect = CGRect(x: x, y: y, width: tileW, height: tileW * 1.24)
+                    context.fill(Path(roundedRect: rect, cornerRadius: 7),
+                                 with: .color(world.ink.opacity(0.05)))
+                    context.stroke(Path(roundedRect: rect, cornerRadius: 7),
+                                   with: .color((index.isMultiple(of: 2) ? world.accent : world.secondary).opacity(0.14)),
+                                   lineWidth: 1.5)
+                }
+                for index in 0..<8 {
+                    let radius: CGFloat = index.isMultiple(of: 3) ? 6 : 3.5
+                    let x = CGFloat((index * 149) % 360) / 360 * size.width
+                    let y = CGFloat((index * 233) % 760) / 760 * size.height
+                    context.stroke(Path(ellipseIn: CGRect(x: x - radius, y: y - radius,
+                                                          width: radius * 2, height: radius * 2)),
+                                   with: .color(world.ink.opacity(0.10)), lineWidth: 2)
+                }
             case .split:
                 context.fill(Path(CGRect(x: 0, y: 0, width: size.width / 2, height: size.height)),
                              with: .color(world.accent.opacity(0.06)))
@@ -324,6 +353,7 @@ struct GamePosterArt: View {
                 case .blockEscape: BlockEscapePoster(w: w, h: h)
                 case .pegSolitaire: PegSolitairePoster(w: w, h: h)
                 case .waterSort: WaterSortPoster(w: w, h: h)
+                case .mahjong: MahjongPoster(w: w, h: h)
                 case .split: SplitPoster(w: w, h: h)
                 case .blockFit: BlockFitPoster(w: w, h: h)
                 case .fuse: FusePoster(w: w, h: h)
@@ -702,6 +732,47 @@ private struct WaterSortPoster: View {
             shape.strokeBorder(.white.opacity(0.30), lineWidth: 2)
         }
         .frame(width: tubeW, height: tubeH)
+    }
+}
+
+// MARK: - Mahjong — a small stack with a matched pair glowing gold.
+
+private struct MahjongPoster: View {
+    let w: CGFloat, h: CGFloat
+
+    var body: some View {
+        let tileW = w * 0.165
+        let tileH = tileW * 1.24
+        let depth = tileW * 0.13
+        // (x, y in tile-position fractions, face, selected)
+        let placed: [(CGFloat, CGFloat, MahjongFace, Bool)] = [
+            (0.16, 0.52, MahjongFace(suit: .bamboo, rank: 3), false),
+            (0.36, 0.50, MahjongFace(suit: .dots, rank: 5), true),
+            (0.57, 0.55, MahjongFace(suit: .characters, rank: 3), false),
+            (0.78, 0.50, MahjongFace(suit: .winds, rank: 1), false),
+            (0.22, 0.74, MahjongFace(suit: .dragons, rank: 1), false),
+            (0.44, 0.76, MahjongFace(suit: .bamboo, rank: 7), false),
+            (0.68, 0.75, MahjongFace(suit: .dots, rank: 5), true),
+        ]
+
+        return ZStack {
+            // one straddling tile on top sells the stack
+            ForEach(0..<placed.count, id: \.self) { index in
+                let tile = placed[index]
+                MahjongTileView(face: tile.2,
+                                width: tileW,
+                                height: tileH,
+                                depth: depth)
+                    .shadow(color: tile.3 ? Color(hexAny: 0xF2C14E).opacity(0.55) : .clear, radius: 8)
+                    .position(x: tile.0 * w + tileW / 2, y: tile.1 * h + tileH / 2)
+            }
+            MahjongTileView(face: MahjongFace(suit: .dragons, rank: 2),
+                            width: tileW,
+                            height: tileH,
+                            depth: depth)
+                .rotationEffect(.degrees(-3))
+                .position(x: w * 0.52, y: h * 0.44)
+        }
     }
 }
 

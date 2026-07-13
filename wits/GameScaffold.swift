@@ -373,6 +373,12 @@ extension GameID {
                 "a pour lands only on a matching colour or an empty tube.",
                 "sort every colour into its own tube in as few pours as you can."
             ]
+        case .mahjong:
+            [
+                "tap a free tile — one with an open side and nothing on top — to lift it into the rack.",
+                "when its twin lands in the rack, the pair vanishes.",
+                "clear every tile before the rack fills with singles. undo rewinds a risky pick."
+            ]
         case .split:
             [
                 "tap the left side to keep the flyer up.",
