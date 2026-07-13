@@ -34,6 +34,10 @@ struct MahjongScreen: View {
     @State private var dealt = false
     /// Per-tile jiggle trigger: bumped when a blocked tile is tapped.
     @State private var shakes: [Int: Int] = [:]
+    /// Drag-to-peek: slide any tile aside to see what's underneath; it snaps
+    /// home on release and never counts as a move.
+    @State private var peekID: Int?
+    @State private var peekOffset: CGSize = .zero
     /// One-deep undo: only the immediately previous move can be taken back,
     /// and taking it back consumes it until the next move.
     @State private var lastMove: Move?
@@ -110,11 +114,7 @@ struct MahjongScreen: View {
 
                         boardView(tiles, in: geo.size)
 
-                        Spacer(minLength: 8)
-
-                        progressStrip
-                            .padding(.horizontal, WitsMetrics.screenPadding)
-                            .padding(.bottom, 12)
+                        Spacer(minLength: 12)
                     }
 
                     if outOfSpace {
@@ -137,18 +137,14 @@ struct MahjongScreen: View {
             Spacer()
                 .frame(width: 38)
 
-            HStack(spacing: 10) {
+            HStack {
+                Spacer(minLength: 0)
                 Text(Self.clock(elapsed))
                     .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
-                Text("left \((tiles?.count ?? 0) - clearedIDs.count)")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 12)
@@ -303,22 +299,6 @@ struct MahjongScreen: View {
         .disabled(adBusy)
     }
 
-    private var progressStrip: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Label("\(tiles?.count ?? 0) tiles", systemImage: "square.stack.3d.up.fill")
-                Spacer()
-                Text("cleared \(clearedIDs.count / 2) of \(pairs)")
-            }
-            .font(.system(size: 13, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white.opacity(0.78))
-
-            ProgressView(value: Double(clearedIDs.count) / Double(max(1, tiles?.count ?? 1)))
-                .tint(world.secondary)
-                .background(.white.opacity(0.16), in: Capsule())
-        }
-    }
-
     // MARK: Board
 
     private func boardView(_ tiles: [MahjongTile], in size: CGSize) -> some View {
@@ -329,10 +309,10 @@ struct MahjongScreen: View {
 
         let vAspect: CGFloat = 1.24                    // tiles run taller than wide
         let availW = size.width - WitsMetrics.screenPadding * 2
-        let availH = size.height * 0.58
+        let availH = size.height * 0.72
         let u = min(availW / widthUnits,
                     availH / (heightUnits * vAspect + maxZ * 0.4 + 0.6),
-                    56)
+                    62)
         let tileW = u * 2
         let tileH = u * 2 * vAspect
         let depth = u * 0.24
@@ -347,11 +327,14 @@ struct MahjongScreen: View {
                 return a.slot.x < b.slot.x
             }
         let present = boardIDs
-        let covered = coveredIDs(tiles, present: present)
+        // Training wheels: only the first band spotlights what's playable —
+        // after that, reading the stack (and peeking under it) is the skill.
+        let covered = mapLevel <= 4 ? coveredIDs(tiles, present: present) : []
 
         return ZStack(alignment: .topLeading) {
-            ForEach(ordered) { tile in
+            ForEach(Array(ordered.enumerated()), id: \.element.id) { index, tile in
                 let lift = CGFloat(tile.slot.z)
+                let peeking = peekID == tile.id
                 MahjongTileView(face: tile.face,
                                 width: tileW,
                                 height: tileH,
@@ -359,20 +342,46 @@ struct MahjongScreen: View {
                                 dimmed: covered.contains(tile.id))
                     .matchedGeometryEffect(id: tile.id, in: rackSpace)
                     .modifier(TileShake(shakes: CGFloat(shakes[tile.id] ?? 0)))
-                    .offset(x: CGFloat(tile.slot.x) * u - lift * depth * 0.6,
-                            y: CGFloat(tile.slot.y) * u * vAspect - lift * depth)
+                    .scaleEffect(peeking ? 1.06 : 1)
+                    .shadow(color: .black.opacity(peeking ? 0.4 : 0), radius: 10, y: 6)
+                    .offset(x: CGFloat(tile.slot.x) * u - lift * depth * 0.6 + (peeking ? peekOffset.width : 0),
+                            y: CGFloat(tile.slot.y) * u * vAspect - lift * depth + (peeking ? peekOffset.height : 0))
+                    .zIndex(peeking ? 1_000 : Double(index))
                     // the deal rains in: each tile springs on with a tiny stagger
                     .scaleEffect(dealt ? 1 : 0.2, anchor: .center)
                     .opacity(dealt ? 1 : 0)
                     .animation(.spring(response: 0.42, dampingFraction: 0.72)
                         .delay(dealt ? Double(tile.id) * 0.016 : 0), value: dealt)
                     .onTapGesture { tap(tile, present: present) }
+                    .gesture(peekGesture(tile))
                     .accessibilityLabel(tileLabel(tile, present: present))
                     .accessibilityAddTraits(.isButton)
             }
         }
         .frame(width: boardW, height: boardH, alignment: .topLeading)
         .frame(maxWidth: .infinity)
+    }
+
+    /// Slide a tile aside to inspect the layers beneath it; on release it
+    /// springs back. Pure reconnaissance — the engine never hears about it.
+    private func peekGesture(_ tile: MahjongTile) -> some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                guard !finished, !outOfSpace, popping.isEmpty else { return }
+                if peekID == nil { peekID = tile.id }
+                guard peekID == tile.id else { return }
+                peekOffset = value.translation
+            }
+            .onEnded { _ in
+                guard peekID == tile.id else { return }
+                withAnimation(.spring(response: 0.34, dampingFraction: 0.66)) {
+                    peekOffset = .zero
+                }
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(340))
+                    if peekOffset == .zero { peekID = nil }
+                }
+            }
     }
 
     /// Tiles with anything resting on them render dimmed — the depth cue that
@@ -607,7 +616,7 @@ struct MahjongScreen: View {
     }
 
     private func showHelp() {
-        hint = "free tiles have an open side and nothing on top. bank them in the rack — twins pair off. don't fill it"
+        hint = "free tiles have an open side and nothing on top — bank them, twins pair off. drag any tile aside to peek underneath"
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
             if !finished {
                 hint = ""
