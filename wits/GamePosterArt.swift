@@ -1160,9 +1160,10 @@ private struct CrosswordPoster: View {
     ]
 
     var body: some View {
-        let side = w * 0.15
+        // Sized and dropped to clear the two-line title above the vignette.
+        let side = w * 0.122
         let originX = w * 0.5 - side * 2.5
-        let originY = h * 0.5 - side * 2.5
+        let originY = h * 0.60 - side * 2.5
 
         ZStack {
             ForEach(0..<25, id: \.self) { index in
