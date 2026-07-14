@@ -114,9 +114,10 @@ final class TowerEngine {
     /// only the base (index 0) present this is 0.
     var towerTopY: Double { Double(layers.count - 1) * Self.layerHeight }
 
-    /// Units/sec on the active axis; quickens as the tower grows.
+    /// Units/sec on the active axis; quickens gently as the tower grows,
+    /// reaching full pace around fifty blocks.
     private var speed: Double {
-        baseSpeed * (1 + min(0.55, Double(score) * 0.02))
+        baseSpeed * (1 + min(0.35, Double(score) * 0.007))
     }
 
     /// How far the block's center travels before bouncing back.
