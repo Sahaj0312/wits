@@ -173,6 +173,9 @@ final class AppModel {
     }
 
     private func recordStats(for result: GameResult) {
+        // Every finished run of every mode lands here — the one funnel for
+        // "the player just finished a game".
+        ReviewPrompter.gameFinished()
         let id = result.game
         var st = gameStats[id] ?? GameStats()
         st.totalPlays += 1
