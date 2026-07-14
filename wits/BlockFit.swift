@@ -373,15 +373,16 @@ struct BlockFitScreen: View {
                 .padding(.trailing, 16)
                 .padding(.top, 44)
 
+            nextRow
+                .padding(.horizontal, 22)
+                .padding(.top, 12)
+
             Spacer(minLength: 10)
 
             boardView
                 .padding(.horizontal, 18)
 
             Spacer(minLength: 8)
-
-            nextRow
-                .padding(.horizontal, 22)
 
             tray
                 .padding(.horizontal, 18)
