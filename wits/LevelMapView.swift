@@ -33,10 +33,12 @@ struct DifficultySelectView: View {
                     difficultyControl
                     playButton
                         .padding(.top, 28)
-                    weeklyButton
-                        .padding(.top, 11)
-                        .padding(.bottom, 30)
+                    if GameCenterManager.isEnabled {
+                        weeklyButton
+                            .padding(.top, 11)
+                    }
                 }
+                .padding(.bottom, 30)
                 .padding(.horizontal, 22)
                 .frame(maxWidth: 620)
                 .frame(maxWidth: .infinity)
@@ -262,15 +264,17 @@ struct StandaloneModeSelectView: View {
                                action: onSurvival)
                         .padding(.top, 30)
 
-                    modeButton(title: "WEEKLY CHALLENGE",
-                               subtitle: weeklySubtitle,
-                               symbol: "calendar.badge.clock",
-                               color: world.secondary) {
-                        onWeekly(challenge)
+                    if GameCenterManager.isEnabled {
+                        modeButton(title: "WEEKLY CHALLENGE",
+                                   subtitle: weeklySubtitle,
+                                   symbol: "calendar.badge.clock",
+                                   color: world.secondary) {
+                            onWeekly(challenge)
+                        }
+                        .padding(.top, 11)
                     }
-                    .padding(.top, 11)
-                    .padding(.bottom, 30)
                 }
+                .padding(.bottom, 30)
                 .padding(.horizontal, 22)
                 .frame(maxWidth: 620)
                 .frame(maxWidth: .infinity)
