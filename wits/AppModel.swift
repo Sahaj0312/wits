@@ -160,6 +160,13 @@ final class AppModel {
         return improved
     }
 
+    /// Per-mode best for standalone games with speed modes (Snake). The
+    /// all-time best across modes goes through `recordMarathon`.
+    @discardableResult
+    func recordModeBest(game: GameID, difficulty: ChallengeDifficulty, score: Int) -> Bool {
+        levels.recordModeBest(game: game, difficulty: difficulty, score: score)
+    }
+
     private func recordStats(for result: GameResult) {
         let id = result.game
         var st = gameStats[id] ?? GameStats()

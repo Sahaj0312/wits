@@ -80,7 +80,7 @@ enum DifficultyScale {
         case .crowdControl, .echoGrid, .lastSeen,
              .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong:
             40
-        case .split, .blockFit, .fuse:
+        case .split, .blockFit, .fuse, .snake:
             30
         }
     }
@@ -205,6 +205,9 @@ final class LevelProgressStore {
     /// Retained for Split, the app's standalone endless mode.
     private(set) var marathonBests: [GameID: MarathonBest] = [:]
     private(set) var weeklyBests: [GameID: WeeklyChallengeBest] = [:]
+    /// Standalone games with speed modes (Snake) keep one best per mode;
+    /// the all-time best across modes lives in `marathonBests`.
+    private(set) var modeBests: [GameID: [ChallengeDifficulty: Int]] = [:]
 
     private static let storageKey = "wits.difficultyProgress.v2"
     private static let migrationKey = "wits.difficultyProgress.migrated.v2"
@@ -249,6 +252,10 @@ final class LevelProgressStore {
     func weeklyBest(for challenge: WeeklyChallenge) -> WeeklyChallengeBest? {
         guard let best = weeklyBests[challenge.game], best.weekID == challenge.weekID else { return nil }
         return best
+    }
+
+    func modeBest(for game: GameID, difficulty: ChallengeDifficulty) -> Int {
+        modeBests[game]?[difficulty] ?? 0
     }
 
     // MARK: Mutations
@@ -299,6 +306,16 @@ final class LevelProgressStore {
             save()
         }
         return newBest
+    }
+
+    @discardableResult
+    func recordModeBest(game: GameID, difficulty: ChallengeDifficulty, score: Int) -> Bool {
+        guard score > modeBest(for: game, difficulty: difficulty) else { return false }
+        var perGame = modeBests[game] ?? [:]
+        perGame[difficulty] = score
+        modeBests[game] = perGame
+        save()
+        return true
     }
 
     @discardableResult
@@ -403,11 +420,18 @@ final class LevelProgressStore {
         var best: WeeklyChallengeBest
     }
 
+    private struct StoredModeBest: Codable {
+        var game: GameID
+        var difficulty: ChallengeDifficulty
+        var score: Int
+    }
+
     private struct Snapshot: Codable {
         var tracks: [StoredTrack]
         var selections: [StoredSelection]
         var marathon: [StoredMarathon]
         var weekly: [StoredWeekly]?
+        var modes: [StoredModeBest]?
     }
 
     private func load() {
@@ -428,10 +452,15 @@ final class LevelProgressStore {
         for entry in snapshot.weekly ?? [] {
             weeklyBests[entry.game] = entry.best
         }
+        for entry in snapshot.modes ?? [] {
+            var perGame = modeBests[entry.game] ?? [:]
+            perGame[entry.difficulty] = entry.score
+            modeBests[entry.game] = perGame
+        }
     }
 
     private func save() {
-        var snapshot = Snapshot(tracks: [], selections: [], marathon: [], weekly: [])
+        var snapshot = Snapshot(tracks: [], selections: [], marathon: [], weekly: [], modes: [])
         for (game, values) in tracks {
             for (difficulty, progress) in values {
                 snapshot.tracks.append(StoredTrack(game: game,
@@ -447,6 +476,13 @@ final class LevelProgressStore {
         }
         for (game, best) in weeklyBests {
             snapshot.weekly?.append(StoredWeekly(game: game, best: best))
+        }
+        for (game, values) in modeBests {
+            for (difficulty, score) in values {
+                snapshot.modes?.append(StoredModeBest(game: game,
+                                                      difficulty: difficulty,
+                                                      score: score))
+            }
         }
         if let data = try? JSONEncoder().encode(snapshot) {
             UserDefaults.standard.set(data, forKey: Self.storageKey)

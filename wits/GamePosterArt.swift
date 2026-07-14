@@ -133,6 +133,14 @@ extension GameID {
                       accent: Color(hexAny: 0x4DD9C6), secondary: Color(hexAny: 0xFFA13B),
                       difficultyColors: [0x4DD9C6, 0x6E8BFF, 0xFFA13B, 0xFF5FA8].map { Color(hexAny: $0) },
                       titleDesign: .rounded, bodyDesign: .monospaced, uppercaseTitles: true)
+        case .snake:
+            // The night garden: green-black pitch, leaf greens, one red apple.
+            GameWorld(background: Color(hexAny: 0x0B120C),
+                      surface: Color(hexAny: 0x18251A), raised: Color(hexAny: 0x243727),
+                      ink: Color(hexAny: 0xEFFFEF), muted: Color(hexAny: 0x97B69B),
+                      accent: Color(hexAny: 0x5FE868), secondary: Color(hexAny: 0xFF5F52),
+                      difficultyColors: [0x5FE868, 0xFFC93B, 0xFF8A3B, 0xFF5F52].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: true)
         }
     }
 
@@ -325,6 +333,30 @@ private struct GameWorldPattern: View {
                                     .foregroundStyle(world.ink.opacity(0.12)),
                                  at: CGPoint(x: x, y: y), anchor: .center)
                 }
+            case .snake:
+                // Faint checkerboard with a dotted snake winding toward an apple.
+                let step: CGFloat = 40
+                for x in stride(from: 0 as CGFloat, through: size.width, by: step) {
+                    for y in stride(from: 0 as CGFloat, through: size.height, by: step)
+                    where (Int(x / step) + Int(y / step)).isMultiple(of: 2) {
+                        context.fill(Path(CGRect(x: x, y: y, width: step, height: step)),
+                                     with: .color(world.ink.opacity(0.03)))
+                    }
+                }
+                let trail: [(CGFloat, CGFloat)] = [(0.16, 0.78), (0.24, 0.72), (0.32, 0.68),
+                                                   (0.40, 0.62), (0.46, 0.54), (0.50, 0.44),
+                                                   (0.56, 0.36), (0.64, 0.32), (0.72, 0.28)]
+                for (index, point) in trail.enumerated() {
+                    let radius: CGFloat = index == trail.count - 1 ? 9 : 7
+                    let rect = CGRect(x: point.0 * size.width - radius,
+                                      y: point.1 * size.height - radius,
+                                      width: radius * 2, height: radius * 2)
+                    context.fill(Path(ellipseIn: rect), with: .color(world.accent.opacity(0.12)))
+                }
+                context.fill(Path(ellipseIn: CGRect(x: size.width * 0.84 - 8,
+                                                    y: size.height * 0.24 - 8,
+                                                    width: 16, height: 16)),
+                             with: .color(world.secondary.opacity(0.22)))
             }
         }
     }
@@ -357,6 +389,7 @@ struct GamePosterArt: View {
                 case .split: SplitPoster(w: w, h: h)
                 case .blockFit: BlockFitPoster(w: w, h: h)
                 case .fuse: FusePoster(w: w, h: h)
+                case .snake: SnakePoster(w: w, h: h)
                 }
             }
         }
@@ -977,5 +1010,78 @@ private struct FusePosterTile: View {
                     .foregroundStyle(FusePalette.ink(value))
                     .minimumScaleFactor(0.5)
             }
+    }
+}
+
+// MARK: - Snake — a green snake winds across the pitch toward one red apple.
+
+private struct SnakePoster: View {
+    let w: CGFloat, h: CGFloat
+
+    // Body path in relative coords, head last.
+    private let trail: [(CGFloat, CGFloat)] = [
+        (0.20, 0.86), (0.30, 0.86), (0.40, 0.86), (0.50, 0.86), (0.60, 0.86),
+        (0.70, 0.86), (0.70, 0.74), (0.70, 0.62),
+        (0.60, 0.62), (0.50, 0.62), (0.40, 0.62), (0.30, 0.62),
+        (0.30, 0.50), (0.30, 0.38),
+        (0.40, 0.38), (0.50, 0.38),
+    ]
+
+    var body: some View {
+        let r = w * 0.062
+
+        ZStack {
+            // A soft checkerboard patch behind the action.
+            ForEach(0..<24, id: \.self) { i in
+                let col = i % 6, row = i / 6
+                if (col + row).isMultiple(of: 2) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.03))
+                        .frame(width: w * 0.14, height: w * 0.14)
+                        .position(x: w * (0.16 + 0.14 * CGFloat(col)),
+                                  y: h * 0.34 + w * 0.14 * CGFloat(row))
+                }
+            }
+
+            ForEach(0..<trail.count, id: \.self) { i in
+                let isHead = i == trail.count - 1
+                Circle()
+                    .fill(Color(hexAny: i.isMultiple(of: 2) ? 0x58C452 : 0x6ED95F))
+                    .frame(width: r * (isHead ? 2.4 : 2), height: r * (isHead ? 2.4 : 2))
+                    .overlay {
+                        if isHead {
+                            HStack(spacing: r * 0.34) {
+                                ForEach(0..<2, id: \.self) { _ in
+                                    ZStack {
+                                        Circle().fill(.white)
+                                            .frame(width: r * 0.8, height: r * 0.8)
+                                        Circle().fill(.black)
+                                            .frame(width: r * 0.4, height: r * 0.4)
+                                            .offset(x: r * 0.14)
+                                    }
+                                }
+                            }
+                            .offset(y: -r * 0.1)
+                        }
+                    }
+                    .shadow(color: isHead ? Color(hexAny: 0x5FE868).opacity(0.5) : .clear,
+                            radius: 6)
+                    .position(x: trail[i].0 * w, y: trail[i].1 * h)
+            }
+
+            // The apple just out of reach.
+            ZStack {
+                Circle()
+                    .fill(Color(hexAny: 0xF05B4C))
+                Ellipse()
+                    .fill(Color(hexAny: 0x1F4A22))
+                    .frame(width: r * 0.7, height: r * 0.36)
+                    .rotationEffect(.degrees(-24))
+                    .offset(x: r * 0.16, y: -r * 0.9)
+            }
+            .frame(width: r * 2.1, height: r * 2.1)
+            .shadow(color: Color(hexAny: 0xF05B4C).opacity(0.6), radius: 7)
+            .position(x: 0.70 * w, y: 0.38 * h)
+        }
     }
 }

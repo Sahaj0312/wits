@@ -209,7 +209,17 @@ private struct GameLauncher: View {
     var body: some View {
         switch phase {
         case .selector:
-            if game.isStandalone {
+            if game == .snake {
+                SnakeModeSelectView(
+                    onPlay: { difficulty in
+                        runKind = .survival
+                        weeklyChallenge = nil
+                        playDifficulty = difficulty
+                        startRun()
+                    },
+                    onClose: { dismiss() }
+                )
+            } else if game.isStandalone {
                 StandaloneModeSelectView(
                     game: game,
                     onSurvival: {
@@ -283,6 +293,21 @@ private struct GameLauncher: View {
                             app.recordStandaloneGameResult(result)
                             app.recordMarathon(game: .fuse, depth: score, score: score)
                         }
+                    },
+                    onQuit: { withAnimation { phase = .selector } }
+                )
+            } else if game == .snake {
+                SnakeScreen(
+                    difficulty: playDifficulty,
+                    modeBest: app.levels.modeBest(for: .snake, difficulty: playDifficulty),
+                    allTimeBest: app.levels.marathonBest(for: .snake)?.score ?? 0,
+                    onRunComplete: { score, length in
+                        let result = snakeResult(score: score, length: length)
+                        app.recordStandaloneGameResult(result)
+                        app.recordModeBest(game: .snake,
+                                           difficulty: playDifficulty,
+                                           score: score)
+                        app.recordMarathon(game: .snake, depth: score, score: score)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
@@ -478,6 +503,20 @@ private struct GameLauncher: View {
             "score": Double(score),
             "bestTile": Double(bestTile),
             "moves": Double(moves)
+        ]
+        return result
+    }
+
+    private func snakeResult(score: Int, length: Int) -> GameResult {
+        var result = GameResult(game: .snake,
+                                score: score,
+                                baseScore: score,
+                                accuracy: 0,
+                                trials: max(1, score))
+        result.raw = [
+            "score": Double(score),
+            "apples": Double(score),
+            "length": Double(length)
         ]
         return result
     }

@@ -23,6 +23,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     case split
     case blockFit
     case fuse
+    case snake
 
     var id: String { rawValue }
 
@@ -33,7 +34,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     }
     var isLive: Bool { Self.live.contains(self) }
 
-    static var standalone: [GameID] { [.split, .blockFit, .fuse] }
+    static var standalone: [GameID] { [.split, .blockFit, .fuse, .snake] }
     var isStandalone: Bool { Self.standalone.contains(self) }
 
     /// Tappable in the library (has some playable mode).
@@ -85,6 +86,7 @@ extension GameID {
         case .split: .multitasking
         case .blockFit: .reasoning
         case .fuse: .reasoning
+        case .snake: .focus
         }
     }
 
@@ -104,6 +106,7 @@ extension GameID {
         case .split: "split"
         case .blockFit: "block fit"
         case .fuse: "fuse"
+        case .snake: "snake"
         }
     }
 
@@ -124,6 +127,7 @@ extension GameID {
         case .split: "fly and pick at once. one slip ends it."
         case .blockFit: "fit the pieces. clear the lines."
         case .fuse: "slide, fuse, double. don't jam the board."
+        case .snake: "eat, grow, never bite yourself."
         }
     }
 
@@ -134,7 +138,7 @@ extension GameID {
         case .echoGrid, .lastSeen: "memory"
         case .colorClash, .tileShift: "flexibility"
         case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .blockFit, .fuse: "problem solving"
-        case .split: "attention"
+        case .split, .snake: "attention"
         }
     }
 
@@ -155,6 +159,7 @@ extension GameID {
         case .split: "dual-tasking"
         case .blockFit: "spatial packing"
         case .fuse: "lookahead planning"
+        case .snake: "sustained attention"
         }
     }
 
@@ -175,6 +180,7 @@ extension GameID {
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
         case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate, but the next hand is always shown — the run ends the moment nothing in your hand fits."
         case .fuse: "every swipe slides the whole board. matching cells fuse and double, and each fusion pays its new value. keep space open and build the biggest cell you can — the run ends when no swipe can move anything."
+        case .snake: "swipe to steer a snake that never stops. every apple adds a segment and quickens the pace — the run ends the moment you clip a wall or your own body."
         }
     }
 
@@ -195,6 +201,7 @@ extension GameID {
         case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
         case .blockFit: "spatial packing is planning placements ahead — keeping the board open so future pieces still have somewhere to live."
         case .fuse: "lookahead planning is thinking several swipes ahead — where each merge leaves the board decides whether the next one is even possible."
+        case .snake: "sustained attention is holding steady focus as pressure builds — the longer the run, the less room there is for a single lapse."
         }
     }
 
@@ -215,6 +222,7 @@ extension GameID {
         case .split: "rectangle.split.1x2.fill"
         case .blockFit: "square.grid.2x2.fill"
         case .fuse: "atom"
+        case .snake: "scribble.variable"
         }
     }
 
@@ -242,6 +250,7 @@ extension GameID {
         case .split: "maxLevel"
         case .blockFit: "score"
         case .fuse: "bestTile"
+        case .snake: "length"
         default: "bestStreak"
         }
     }
@@ -261,6 +270,7 @@ extension GameID {
         case .split: "level \(Int(v))"
         case .blockFit: "\(Int(v)) points"
         case .fuse: "\(Int(v)) tile"
+        case .snake: "\(Int(v)) long"
         default: "streak \(Int(v))"
         }
     }

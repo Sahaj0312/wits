@@ -106,6 +106,6 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .waterSort:   WaterSort.makeView(config: config, onComplete: onComplete)
     case .mahjong:     Mahjong.makeView(config: config, onComplete: onComplete)
     // Standalone survival modes are hosted directly by the launcher.
-    case .split, .blockFit, .fuse: AnyView(EmptyView())
+    case .split, .blockFit, .fuse, .snake: AnyView(EmptyView())
     }
 }

@@ -10,6 +10,7 @@
 //    wits.split.survival.depth.v2   Split level plus fractional depth
 //    wits.marathon.blockFit         Block Fit endless best score
 //    wits.marathon.fuse             Fuse endless best score
+//    wits.marathon.snake            Snake endless best score (all modes)
 //    wits.weekly.<game-id>    recurring every Monday at 00:00 UTC for 7 days
 //  Achievement IDs:
 //    wits.ach.levels.50 / .150 / .300     lifetime level-clear milestones

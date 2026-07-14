@@ -397,6 +397,12 @@ extension GameID {
                 "matching numbers fuse into one and double.",
                 "keep the board open and build the biggest cell you can — the run ends when nothing can move."
             ]
+        case .snake:
+            [
+                "swipe to steer — the snake never stops moving.",
+                "eat the apples: every one adds a segment and speeds you up.",
+                "don't hit the walls or your own body — one clip ends the run."
+            ]
         }
     }
 }
