@@ -63,7 +63,7 @@ enum HeroPattern {
             slide(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .blockEscape, .blockFit:
             escape(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .pegSolitaire, .snake:
+        case .pegSolitaire, .snake, .tower:
             pegs(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .waterSort:
             tubes(&ctx, size, ink: ink, soft: inkSoft, glow: glow)

@@ -141,6 +141,14 @@ extension GameID {
                       accent: Color(hexAny: 0x5FE868), secondary: Color(hexAny: 0xFF5F52),
                       difficultyColors: [0x5FE868, 0xFFC93B, 0xFF8A3B, 0xFF5F52].map { Color(hexAny: $0) },
                       titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: true)
+        case .tower:
+            // The stratosphere: twilight indigo sky, block pink, one mint ring.
+            GameWorld(background: Color(hexAny: 0x161C38),
+                      surface: Color(hexAny: 0x242D55), raised: Color(hexAny: 0x303B6E),
+                      ink: Color(hexAny: 0xF2F4FF), muted: Color(hexAny: 0x9AA3C9),
+                      accent: Color(hexAny: 0xFF8FA8), secondary: Color(hexAny: 0x6FD6C3),
+                      difficultyColors: [0x7FE3B4, 0xFFC24D, 0xFF9D5C, 0xFF5C7A].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: true)
         }
     }
 
@@ -357,6 +365,28 @@ private struct GameWorldPattern: View {
                                                     y: size.height * 0.24 - 8,
                                                     width: 16, height: 16)),
                              with: .color(world.secondary.opacity(0.22)))
+            case .tower:
+                // High-altitude sky: a soft glow band, scattered stars, clouds.
+                context.fill(Path(CGRect(origin: .zero, size: size)),
+                             with: .linearGradient(
+                                Gradient(colors: [world.accent.opacity(0.10), .clear, world.secondary.opacity(0.06)]),
+                                startPoint: .zero,
+                                endPoint: CGPoint(x: 0, y: size.height)))
+                for index in 0..<18 {
+                    let radius: CGFloat = index.isMultiple(of: 5) ? 1.8 : 1.1
+                    let x = CGFloat((index * 97) % 360) / 360 * size.width
+                    let y = CGFloat((index * 173) % 760) / 760 * size.height
+                    context.fill(Path(ellipseIn: CGRect(x: x - radius, y: y - radius,
+                                                        width: radius * 2, height: radius * 2)),
+                                 with: .color(world.ink.opacity(index.isMultiple(of: 3) ? 0.22 : 0.12)))
+                }
+                for index in 0..<3 {
+                    let w = size.width * 0.34
+                    let x = CGFloat((index * 151) % 300) / 300 * (size.width - w)
+                    let y = size.height * (0.24 + 0.27 * CGFloat(index))
+                    context.fill(Path(ellipseIn: CGRect(x: x, y: y, width: w, height: w * 0.22)),
+                                 with: .color(world.ink.opacity(0.045)))
+                }
             }
         }
     }
@@ -390,6 +420,7 @@ struct GamePosterArt: View {
                 case .blockFit: BlockFitPoster(w: w, h: h)
                 case .fuse: FusePoster(w: w, h: h)
                 case .snake: SnakePoster(w: w, h: h)
+                case .tower: TowerPoster(w: w, h: h)
                 }
             }
         }
@@ -1083,5 +1114,73 @@ private struct SnakePoster: View {
             .shadow(color: Color(hexAny: 0xF05B4C).opacity(0.6), radius: 7)
             .position(x: 0.70 * w, y: 0.38 * h)
         }
+    }
+}
+
+// MARK: - Tower — an isometric stack climbing the sky, one block sliding in.
+
+private struct TowerPoster: View {
+    let w: CGFloat, h: CGFloat
+
+    var body: some View {
+        Canvas { context, size in
+            let s = Double(size.width) * 0.26
+            let cx = Double(size.width) * 0.5
+            let baseY = Double(size.height) * 0.92
+            let layerH = 0.30
+            // (hue-walked pinks, bottom to top; footprints shrink slightly.)
+            let hues: [Double] = [0.955, 0.965, 0.978, 0.99, 0.005]
+
+            func project(_ x: Double, _ y: Double, _ z: Double) -> CGPoint {
+                CGPoint(x: cx + (x - z) * 0.866 * s,
+                        y: baseY - y * s + (x + z) * 0.5 * s)
+            }
+
+            func quad(_ points: [CGPoint], _ color: Color) {
+                var path = Path()
+                path.move(to: points[0])
+                for point in points.dropFirst() { path.addLine(to: point) }
+                path.closeSubpath()
+                context.fill(path, with: .color(color))
+            }
+
+            func box(cx bx: Double, cz bz: Double, size half: Double,
+                     yBottom: Double, yTop: Double, hue: Double) {
+                let x0 = bx - half, x1 = bx + half
+                let z0 = bz - half, z1 = bz + half
+                quad([project(x0, yTop, z0), project(x1, yTop, z0),
+                      project(x1, yTop, z1), project(x0, yTop, z1)],
+                     Color(hue: hue, saturation: 0.48, brightness: 0.94))
+                quad([project(x1, yTop, z0), project(x1, yTop, z1),
+                      project(x1, yBottom, z1), project(x1, yBottom, z0)],
+                     Color(hue: hue, saturation: 0.48, brightness: 0.58))
+                quad([project(x0, yTop, z1), project(x1, yTop, z1),
+                      project(x1, yBottom, z1), project(x0, yBottom, z1)],
+                     Color(hue: hue, saturation: 0.48, brightness: 0.74))
+            }
+
+            // Pedestal and the stacked slabs.
+            box(cx: 0, cz: 0, size: 0.5, yBottom: -1.2, yTop: 0, hue: hues[0])
+            for i in 0..<4 {
+                box(cx: 0, cz: 0, size: 0.5 - Double(i) * 0.05,
+                    yBottom: Double(i) * layerH, yTop: Double(i + 1) * layerH,
+                    hue: hues[min(i + 1, hues.count - 1)])
+            }
+
+            // The next block slides in from the upper left.
+            box(cx: -0.85, cz: 0, size: 0.35,
+                yBottom: 4 * layerH, yTop: 5 * layerH, hue: hues[4])
+
+            // A perfect-drop ring around the current top.
+            let top = 4 * layerH
+            var ring = Path()
+            ring.move(to: project(-0.55, top, -0.55))
+            ring.addLine(to: project(0.55, top, -0.55))
+            ring.addLine(to: project(0.55, top, 0.55))
+            ring.addLine(to: project(-0.55, top, 0.55))
+            ring.closeSubpath()
+            context.stroke(ring, with: .color(.white.opacity(0.5)), lineWidth: 2)
+        }
+        .allowsHitTesting(false)
     }
 }

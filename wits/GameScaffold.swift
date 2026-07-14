@@ -403,6 +403,12 @@ extension GameID {
                 "eat the apples: every one adds a segment and speeds you up.",
                 "don't hit the walls or your own body — one clip ends the run."
             ]
+        case .tower:
+            [
+                "tap to drop the sliding block onto the stack.",
+                "the overhang is sliced off — what's left is your new top.",
+                "land dead-center to keep the block whole; miss the stack entirely and the run ends."
+            ]
         }
     }
 }

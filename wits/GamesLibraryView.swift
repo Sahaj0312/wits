@@ -219,6 +219,16 @@ private struct GameLauncher: View {
                     },
                     onClose: { dismiss() }
                 )
+            } else if game == .tower {
+                TowerModeSelectView(
+                    onPlay: { difficulty in
+                        runKind = .survival
+                        weeklyChallenge = nil
+                        playDifficulty = difficulty
+                        startRun()
+                    },
+                    onClose: { dismiss() }
+                )
             } else if game.isStandalone {
                 StandaloneModeSelectView(
                     game: game,
@@ -308,6 +318,21 @@ private struct GameLauncher: View {
                                            difficulty: playDifficulty,
                                            score: score)
                         app.recordMarathon(game: .snake, depth: score, score: score)
+                    },
+                    onQuit: { withAnimation { phase = .selector } }
+                )
+            } else if game == .tower {
+                TowerScreen(
+                    difficulty: playDifficulty,
+                    modeBest: app.levels.modeBest(for: .tower, difficulty: playDifficulty),
+                    allTimeBest: app.levels.marathonBest(for: .tower)?.score ?? 0,
+                    onRunComplete: { score, perfects, bestStreak in
+                        let result = towerResult(score: score, perfects: perfects, bestStreak: bestStreak)
+                        app.recordStandaloneGameResult(result)
+                        app.recordModeBest(game: .tower,
+                                           difficulty: playDifficulty,
+                                           score: score)
+                        app.recordMarathon(game: .tower, depth: score, score: score)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
@@ -517,6 +542,21 @@ private struct GameLauncher: View {
             "score": Double(score),
             "apples": Double(score),
             "length": Double(length)
+        ]
+        return result
+    }
+
+    private func towerResult(score: Int, perfects: Int, bestStreak: Int) -> GameResult {
+        var result = GameResult(game: .tower,
+                                score: score,
+                                baseScore: score,
+                                accuracy: 0,
+                                trials: max(1, score))
+        result.raw = [
+            "score": Double(score),
+            "blocks": Double(score),
+            "perfects": Double(perfects),
+            "bestStreak": Double(bestStreak)
         ]
         return result
     }

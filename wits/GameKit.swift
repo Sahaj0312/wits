@@ -24,6 +24,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     case blockFit
     case fuse
     case snake
+    case tower
 
     var id: String { rawValue }
 
@@ -34,7 +35,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     }
     var isLive: Bool { Self.live.contains(self) }
 
-    static var standalone: [GameID] { [.split, .blockFit, .fuse, .snake] }
+    static var standalone: [GameID] { [.split, .blockFit, .fuse, .snake, .tower] }
     var isStandalone: Bool { Self.standalone.contains(self) }
 
     /// Tappable in the library (has some playable mode).
@@ -87,6 +88,7 @@ extension GameID {
         case .blockFit: .reasoning
         case .fuse: .reasoning
         case .snake: .focus
+        case .tower: .focus
         }
     }
 
@@ -107,6 +109,7 @@ extension GameID {
         case .blockFit: "block fit"
         case .fuse: "fuse"
         case .snake: "snake"
+        case .tower: "tower"
         }
     }
 
@@ -128,6 +131,7 @@ extension GameID {
         case .blockFit: "fit the pieces. clear the lines."
         case .fuse: "slide, fuse, double. don't jam the board."
         case .snake: "eat, grow, never bite yourself."
+        case .tower: "time the drop. stack to the sky."
         }
     }
 
@@ -138,7 +142,7 @@ extension GameID {
         case .echoGrid, .lastSeen: "memory"
         case .colorClash, .tileShift: "flexibility"
         case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .blockFit, .fuse: "problem solving"
-        case .split, .snake: "attention"
+        case .split, .snake, .tower: "attention"
         }
     }
 
@@ -160,6 +164,7 @@ extension GameID {
         case .blockFit: "spatial packing"
         case .fuse: "lookahead planning"
         case .snake: "sustained attention"
+        case .tower: "response timing"
         }
     }
 
@@ -181,6 +186,7 @@ extension GameID {
         case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate, but the next hand is always shown — the run ends the moment nothing in your hand fits."
         case .fuse: "every swipe slides the whole board. matching cells fuse and double, and each fusion pays its new value. keep space open and build the biggest cell you can — the run ends when no swipe can move anything."
         case .snake: "swipe to steer a snake that never stops. every apple adds a segment and quickens the pace — the run ends the moment you clip a wall or your own body."
+        case .tower: "a block glides across the top of the tower — tap to drop it. whatever hangs over the edge is sliced away, so every miss leaves less to land on. the run ends when a block misses the stack completely."
         }
     }
 
@@ -202,6 +208,7 @@ extension GameID {
         case .blockFit: "spatial packing is planning placements ahead — keeping the board open so future pieces still have somewhere to live."
         case .fuse: "lookahead planning is thinking several swipes ahead — where each merge leaves the board decides whether the next one is even possible."
         case .snake: "sustained attention is holding steady focus as pressure builds — the longer the run, the less room there is for a single lapse."
+        case .tower: "response timing is committing at exactly the right instant — anticipation and rhythm under pressure, with the target shrinking after every slip."
         }
     }
 
@@ -223,6 +230,7 @@ extension GameID {
         case .blockFit: "square.grid.2x2.fill"
         case .fuse: "atom"
         case .snake: "scribble.variable"
+        case .tower: "square.stack.fill"
         }
     }
 
@@ -251,6 +259,7 @@ extension GameID {
         case .blockFit: "score"
         case .fuse: "bestTile"
         case .snake: "length"
+        case .tower: "perfects"
         default: "bestStreak"
         }
     }
@@ -271,6 +280,7 @@ extension GameID {
         case .blockFit: "\(Int(v)) points"
         case .fuse: "\(Int(v)) tile"
         case .snake: "\(Int(v)) long"
+        case .tower: "\(Int(v)) perfect"
         default: "streak \(Int(v))"
         }
     }
