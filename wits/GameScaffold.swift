@@ -333,9 +333,9 @@ extension GameID {
             ]
         case .colorClash:
             [
-                "look at the ink colour, not the word.",
-                "tap the matching colour button.",
-                "answer before the timer bar drains."
+                "look at the ink colour, not the word — tap the matching colour button.",
+                "beat the shrinking deadline: too slow counts as a miss.",
+                "you have three hearts. every miss costs one — lose them all and the run ends."
             ]
         case .tileShift:
             [

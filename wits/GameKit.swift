@@ -31,12 +31,14 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
 
     /// Difficulty-track games (everything but the standalone survival modes).
     static var live: [GameID] {
-        [.echoGrid, .colorClash, .tileShift, .lastSeen,
+        [.echoGrid, .tileShift, .lastSeen,
          .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong, .crossword]
     }
     var isLive: Bool { Self.live.contains(self) }
 
-    static var standalone: [GameID] { [.arrowStorm, .crowdControl, .split, .blockFit, .fuse, .snake, .tower] }
+    static var standalone: [GameID] {
+        [.arrowStorm, .crowdControl, .colorClash, .split, .blockFit, .fuse, .snake, .tower]
+    }
     var isStandalone: Bool { Self.standalone.contains(self) }
 
     /// Tappable in the library (has some playable mode).
@@ -180,7 +182,7 @@ extension GameID {
         case .arrowStorm: "spot which way the middle arrow points while the crowd around it tries to pull your answer the other way. the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
         case .crowdControl: "keep your eyes on a few glowing dots as they scatter into an identical crowd, then pick them back out. every round the crowd grows and speeds up, and you have three hearts — every target you lose costs one."
         case .echoGrid: "watch a path of tiles light up, then tap them back in reverse order."
-        case .colorClash: "tap the colour a word is printed in, not the word it spells."
+        case .colorClash: "tap the colour a word is printed in, not the word it spells. the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
         case .tileShift: "follow the rule on screen — sometimes match by colour, sometimes by shape. it keeps flipping."
         case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
         case .slidePuzzle: "the numbered tiles are scrambled around one empty square. slide them through the gap until they read in order — in as few moves as you can."

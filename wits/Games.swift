@@ -20,13 +20,6 @@ enum EchoGrid: Game {
     }
 }
 
-enum ColorClash: Game {
-    static let id = GameID.colorClash
-    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(ColorClashScreen(cfg: config, onResult: onComplete))
-    }
-}
-
 enum TileShift: Game {
     static let id = GameID.tileShift
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -88,7 +81,6 @@ enum Crossword: Game {
 func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
     switch id {
     case .echoGrid:    EchoGrid.makeView(config: config, onComplete: onComplete)
-    case .colorClash:  ColorClash.makeView(config: config, onComplete: onComplete)
     case .tileShift:   TileShift.makeView(config: config, onComplete: onComplete)
     case .lastSeen:    LastSeen.makeView(config: config, onComplete: onComplete)
     case .slidePuzzle: SlidePuzzle.makeView(config: config, onComplete: onComplete)
@@ -98,6 +90,6 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .mahjong:     Mahjong.makeView(config: config, onComplete: onComplete)
     case .crossword:   Crossword.makeView(config: config, onComplete: onComplete)
     // Standalone survival modes are hosted directly by the launcher.
-    case .arrowStorm, .crowdControl, .split, .blockFit, .fuse, .snake, .tower: AnyView(EmptyView())
+    case .arrowStorm, .crowdControl, .colorClash, .split, .blockFit, .fuse, .snake, .tower: AnyView(EmptyView())
     }
 }

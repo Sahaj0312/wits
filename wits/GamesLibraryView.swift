@@ -225,6 +225,16 @@ private struct GameLauncher: View {
                     },
                     onClose: { dismiss() }
                 )
+            } else if game == .colorClash {
+                ColorClashModeSelectView(
+                    onPlay: { difficulty in
+                        runKind = .survival
+                        weeklyChallenge = nil
+                        playDifficulty = difficulty
+                        startRun()
+                    },
+                    onClose: { dismiss() }
+                )
             } else if game.isStandalone {
                 StandaloneModeSelectView(
                     game: game,
@@ -386,6 +396,25 @@ private struct GameLauncher: View {
                                            score: score)
                         app.recordMarathon(game: .crowdControl, depth: score, score: score)
                         app.recordRunBests(game: .crowdControl, difficulty: playDifficulty, score: score)
+                    },
+                    onQuit: { withAnimation { phase = .selector } }
+                )
+            } else if game == .colorClash {
+                let runBests = app.levels.runBests(for: .colorClash, difficulty: playDifficulty)
+                ColorClashScreen(
+                    difficulty: playDifficulty,
+                    modeBest: app.levels.modeBest(for: .colorClash, difficulty: playDifficulty),
+                    allTimeBest: app.levels.marathonBest(for: .colorClash)?.score ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
+                    onRunComplete: { score, bestStreak, misses in
+                        let result = colorClashResult(score: score, bestStreak: bestStreak, misses: misses)
+                        app.recordStandaloneGameResult(result)
+                        app.recordModeBest(game: .colorClash,
+                                           difficulty: playDifficulty,
+                                           score: score)
+                        app.recordMarathon(game: .colorClash, depth: score, score: score)
+                        app.recordRunBests(game: .colorClash, difficulty: playDifficulty, score: score)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
@@ -588,6 +617,22 @@ private struct GameLauncher: View {
     private func arrowStormResult(score: Int, bestStreak: Int, misses: Int) -> GameResult {
         let trials = score + misses
         var result = GameResult(game: .arrowStorm,
+                                score: score,
+                                baseScore: score,
+                                accuracy: trials > 0 ? Double(score) / Double(trials) : 0,
+                                trials: max(1, trials))
+        result.raw = [
+            "score": Double(score),
+            "correct": Double(score),
+            "wrong": Double(misses),
+            "bestStreak": Double(bestStreak)
+        ]
+        return result
+    }
+
+    private func colorClashResult(score: Int, bestStreak: Int, misses: Int) -> GameResult {
+        let trials = score + misses
+        var result = GameResult(game: .colorClash,
                                 score: score,
                                 baseScore: score,
                                 accuracy: trials > 0 ? Double(score) / Double(trials) : 0,
