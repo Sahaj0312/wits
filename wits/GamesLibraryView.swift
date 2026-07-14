@@ -183,6 +183,18 @@ private struct GameLauncher: View {
     @State private var runKind = RunKind.campaign
 
     var body: some View {
+        content
+            .onChange(of: phase) { _, newPhase in
+                // Endless runs have no dedicated result phase in this host —
+                // the selector is the first static screen after a run, so the
+                // interstitial slot (counted in each onRunComplete) is here.
+                guard newPhase == .selector else { return }
+                AdManager.shared.maybeShowInterstitial()
+            }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         switch phase {
         case .selector:
             if game == .snake {
@@ -268,6 +280,7 @@ private struct GameLauncher: View {
                     weekBest: runBests.week,
                     onRunComplete: { score, lines, pieces in
                         let result = blockFitResult(score: score, lines: lines, pieces: pieces)
+                        AdManager.shared.gameCompleted()
                         if isWeekly {
                             _ = app.recordWeeklyChallengeResult(result, challenge: challenge)
                         } else {
@@ -291,6 +304,7 @@ private struct GameLauncher: View {
                     weekBest: runBests.week,
                     onRunComplete: { score, bestTile, moves in
                         let result = fuseResult(score: score, bestTile: bestTile, moves: moves)
+                        AdManager.shared.gameCompleted()
                         if isWeekly {
                             _ = app.recordWeeklyChallengeResult(result, challenge: challenge)
                         } else {
@@ -311,6 +325,7 @@ private struct GameLauncher: View {
                     weekBest: runBests.week,
                     onRunComplete: { score, length in
                         let result = snakeResult(score: score, length: length)
+                        AdManager.shared.gameCompleted()
                         app.recordStandaloneGameResult(result)
                         app.recordModeBest(game: .snake,
                                            difficulty: playDifficulty,
@@ -330,6 +345,7 @@ private struct GameLauncher: View {
                     weekBest: runBests.week,
                     onRunComplete: { score, perfects, bestStreak in
                         let result = towerResult(score: score, perfects: perfects, bestStreak: bestStreak)
+                        AdManager.shared.gameCompleted()
                         app.recordStandaloneGameResult(result)
                         app.recordModeBest(game: .tower,
                                            difficulty: playDifficulty,
@@ -349,6 +365,7 @@ private struct GameLauncher: View {
                     weekBest: runBests.week,
                     onRunComplete: { score, bestStreak, misses in
                         let result = arrowStormResult(score: score, bestStreak: bestStreak, misses: misses)
+                        AdManager.shared.gameCompleted()
                         app.recordStandaloneGameResult(result)
                         app.recordModeBest(game: .arrowStorm,
                                            difficulty: playDifficulty,
@@ -371,6 +388,7 @@ private struct GameLauncher: View {
                                                         totalTargets: totalTargets,
                                                         rounds: rounds,
                                                         perfectRounds: perfectRounds)
+                        AdManager.shared.gameCompleted()
                         app.recordStandaloneGameResult(result)
                         app.recordModeBest(game: .crowdControl,
                                            difficulty: playDifficulty,
@@ -390,6 +408,7 @@ private struct GameLauncher: View {
                     weekBest: runBests.week,
                     onRunComplete: { score, bestStreak, misses in
                         let result = colorClashResult(score: score, bestStreak: bestStreak, misses: misses)
+                        AdManager.shared.gameCompleted()
                         app.recordStandaloneGameResult(result)
                         app.recordModeBest(game: .colorClash,
                                            difficulty: playDifficulty,
@@ -409,6 +428,7 @@ private struct GameLauncher: View {
                     weekBest: runBests.week,
                     onRunComplete: { score, bestStreak, misses in
                         let result = tileShiftResult(score: score, bestStreak: bestStreak, misses: misses)
+                        AdManager.shared.gameCompleted()
                         app.recordStandaloneGameResult(result)
                         app.recordModeBest(game: .tileShift,
                                            difficulty: playDifficulty,
@@ -428,6 +448,7 @@ private struct GameLauncher: View {
                     weekBest: runBests.week,
                     onRunComplete: { score, remembered, misses in
                         let result = lastSeenResult(score: score, remembered: remembered, misses: misses)
+                        AdManager.shared.gameCompleted()
                         app.recordStandaloneGameResult(result)
                         app.recordModeBest(game: .lastSeen,
                                            difficulty: playDifficulty,

@@ -44,6 +44,23 @@ final class PurchasesManager {
         return try? await Purchases.shared.offerings().current
     }
 
+    /// The one-time "ad-free forever" package, when RevenueCat is configured
+    /// and the current offering carries a lifetime product.
+    func adFreeLifetimePackage() async -> Package? {
+        guard isConfigured else { return nil }
+        let offering = try? await Purchases.shared.offerings().current
+        return offering?.lifetime
+            ?? offering?.availablePackages.first { $0.packageType == .lifetime }
+    }
+
+    /// Purchase a package; returns true when the ad-free entitlement is now
+    /// active. A user cancel returns false without throwing.
+    func purchase(_ package: Package) async throws -> Bool {
+        let result = try await Purchases.shared.purchase(package: package)
+        if !result.userCancelled { apply(result.customerInfo) }
+        return isAdFree
+    }
+
     /// Restore purchases; returns true when the ad-free entitlement came back.
     func restore() async throws -> Bool {
         guard isConfigured else { return false }

@@ -47,6 +47,7 @@ final class AdManager {
     private var rewarded: RewardedAd?
     private var isLoadingRewarded = false
     private var rewardedWatcher: FullScreenAdWatcher?   // strong ref while presenting
+    private var interstitialWatcher: FullScreenAdWatcher?
 
     private init() {}
 
@@ -109,9 +110,34 @@ final class AdManager {
             loadInterstitial()   // not ready — make sure one is on the way
             return
         }
+        let priorCompleted = completedGames
+        let priorShownAt = lastAdShownAt
         completedGames = 0
         lastAdShownAt = Date()
         interstitial = nil
+        let watcher = FullScreenAdWatcher(
+            onDismiss: { [weak self] in
+                guard let self else { return }
+                self.interstitialWatcher = nil
+                AdFreeOfferGate.recordInterstitialShown()
+                if AdFreeOfferGate.shouldOfferNow(isAdFree: self.adFreeProvider()) {
+                    // The pitch lands directly behind the ad it follows — the
+                    // moment the pain of the ad is most concrete.
+                    self.presentAdFreeOffer()
+                }
+            },
+            onFail: { [weak self] in
+                guard let self else { return }
+                self.interstitialWatcher = nil
+                // Never shown (expired ad, presentation mid-transition):
+                // give the frequency cap back so the next static screen
+                // retries, and keep the phantom ad out of the offer gate.
+                self.completedGames = priorCompleted
+                self.lastAdShownAt = priorShownAt
+                self.loadInterstitial()
+            })
+        interstitialWatcher = watcher
+        ad.fullScreenContentDelegate = watcher
         ad.present(from: top)
         loadInterstitial()       // prefetch the next one behind the ad
     }
@@ -126,6 +152,15 @@ final class AdManager {
         }
     }
 
+    /// Presents the one-time-purchase upsell over whatever is on screen —
+    /// UIKit presentation, like the ads themselves, so it works above the
+    /// game's fullScreenCover where a root SwiftUI sheet cannot appear.
+    private func presentAdFreeOffer() {
+        guard let top = Self.topViewController() else { return }
+        AdFreeOfferGate.recordOfferShown()
+        top.present(UIHostingController(rootView: AdFreeOfferView()), animated: true)
+    }
+
     private static func topViewController() -> UIViewController? {
         let scene = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -136,12 +171,16 @@ final class AdManager {
     }
 }
 
-/// Fires its callback when a full-screen ad closes (or fails to open).
+/// Fires onDismiss when a full-screen ad closes after really showing, and
+/// onFail when it never opened — callers that count impressions must not
+/// treat the two the same. Omitting onFail folds both into onDismiss.
 private final class FullScreenAdWatcher: NSObject, FullScreenContentDelegate {
     private let onDismiss: () -> Void
+    private let onFail: () -> Void
 
-    init(onDismiss: @escaping () -> Void) {
+    init(onDismiss: @escaping () -> Void, onFail: (() -> Void)? = nil) {
         self.onDismiss = onDismiss
+        self.onFail = onFail ?? onDismiss
     }
 
     func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
@@ -149,6 +188,6 @@ private final class FullScreenAdWatcher: NSObject, FullScreenContentDelegate {
     }
 
     func ad(_ ad: FullScreenPresentingAd, didFailToPresentFullScreenContentWithError error: Error) {
-        onDismiss()
+        onFail()
     }
 }

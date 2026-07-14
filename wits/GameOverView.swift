@@ -71,6 +71,11 @@ struct GameRunOverView: View {
             if celebrate { ConfettiBurst().ignoresSafeArea() }
         }
         .transition(.opacity.combined(with: .scale(scale: 1.04)))
+        .onAppear {
+            // Interstitial slot: this card is a static screen, but never
+            // interrupt a live rewarded-continue decision.
+            if onContinue == nil { AdManager.shared.maybeShowInterstitial() }
+        }
     }
 
     // MARK: Card
