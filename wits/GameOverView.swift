@@ -40,6 +40,11 @@ struct GameRunOverView: View {
     let bests: [RunBestLine]
     /// Confetti — the run set a new all-time best.
     var celebrate: Bool = false
+    /// Present → a "watch ad to keep playing" button sits above the buttons;
+    /// the host owns the rewarded-ad flow and revives the run on success.
+    var onContinue: (() -> Void)? = nil
+    /// Disables the continue button while the rewarded ad is presenting.
+    var continueBusy: Bool = false
     let onHome: () -> Void
     let onPlayAgain: () -> Void
 
@@ -176,6 +181,37 @@ struct GameRunOverView: View {
     // MARK: Buttons
 
     private var buttons: some View {
+        VStack(spacing: 12) {
+            if let onContinue {
+                Button(action: onContinue) {
+                    HStack(spacing: 9) {
+                        Image(systemName: "play.rectangle.fill")
+                            .font(.system(size: 18, weight: .black))
+                        Text(continueBusy ? "LOADING AD…" : "WATCH AD · KEEP PLAYING")
+                            .font(.system(size: 16, weight: .black, design: world.titleDesign))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                    }
+                    .foregroundStyle(world.ink)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(world.surface,
+                                in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .strokeBorder(world.accent, lineWidth: 2)
+                    )
+                }
+                .buttonStyle(PressScale())
+                .disabled(continueBusy)
+                .opacity(continueBusy ? 0.6 : 1)
+            }
+
+            homeAndPlayAgain
+        }
+    }
+
+    private var homeAndPlayAgain: some View {
         HStack(spacing: 12) {
             Button(action: onHome) {
                 Image(systemName: "house.fill")

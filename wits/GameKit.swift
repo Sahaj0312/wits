@@ -14,7 +14,8 @@ import Observation
 // MARK: - Identity
 
 enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
-    // Difficulty-track games.
+    // Declaration order sets the library grid order; live vs standalone is
+    // decided by the static lists below, not by this grouping.
     case arrowStorm, crowdControl, echoGrid
     case colorClash, tileShift, lastSeen
     case slidePuzzle, blockEscape, pegSolitaire
@@ -30,12 +31,12 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
 
     /// Difficulty-track games (everything but the standalone survival modes).
     static var live: [GameID] {
-        [.arrowStorm, .crowdControl, .echoGrid, .colorClash, .tileShift, .lastSeen,
+        [.crowdControl, .echoGrid, .colorClash, .tileShift, .lastSeen,
          .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong, .crossword]
     }
     var isLive: Bool { Self.live.contains(self) }
 
-    static var standalone: [GameID] { [.split, .blockFit, .fuse, .snake, .tower] }
+    static var standalone: [GameID] { [.arrowStorm, .split, .blockFit, .fuse, .snake, .tower] }
     var isStandalone: Bool { Self.standalone.contains(self) }
 
     /// Tappable in the library (has some playable mode).
@@ -176,7 +177,7 @@ extension GameID {
     /// First card paragraph — what you do.
     var cardHow: String {
         switch self {
-        case .arrowStorm: "spot which way the middle arrow points while the crowd around it tries to pull your answer the other way."
+        case .arrowStorm: "spot which way the middle arrow points while the crowd around it tries to pull your answer the other way. the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
         case .crowdControl: "keep your eyes on a few glowing dots as they scatter into an identical crowd, then pick them back out."
         case .echoGrid: "watch a path of tiles light up, then tap them back in reverse order."
         case .colorClash: "tap the colour a word is printed in, not the word it spells."
@@ -569,6 +570,9 @@ final class GamePauseController {
     /// Count the player back in, then resume for real.
     func beginResumeCountdown() {
         guard isPaused, resumeTask == nil else { return }
+        // Set synchronously so hosts that pause purely to count in (ad
+        // continues) never flash the pause menu for a frame first.
+        resumeCountdown = 3
         resumeTask = Task { @MainActor in
             for n in [3, 2, 1] {
                 resumeCountdown = n

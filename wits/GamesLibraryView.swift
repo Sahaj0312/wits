@@ -205,6 +205,16 @@ private struct GameLauncher: View {
                     },
                     onClose: { dismiss() }
                 )
+            } else if game == .arrowStorm {
+                ArrowStormModeSelectView(
+                    onPlay: { difficulty in
+                        runKind = .survival
+                        weeklyChallenge = nil
+                        playDifficulty = difficulty
+                        startRun()
+                    },
+                    onClose: { dismiss() }
+                )
             } else if game.isStandalone {
                 StandaloneModeSelectView(
                     game: game,
@@ -325,6 +335,25 @@ private struct GameLauncher: View {
                                            score: score)
                         app.recordMarathon(game: .tower, depth: score, score: score)
                         app.recordRunBests(game: .tower, difficulty: playDifficulty, score: score)
+                    },
+                    onQuit: { withAnimation { phase = .selector } }
+                )
+            } else if game == .arrowStorm {
+                let runBests = app.levels.runBests(for: .arrowStorm, difficulty: playDifficulty)
+                ArrowStormScreen(
+                    difficulty: playDifficulty,
+                    modeBest: app.levels.modeBest(for: .arrowStorm, difficulty: playDifficulty),
+                    allTimeBest: app.levels.marathonBest(for: .arrowStorm)?.score ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
+                    onRunComplete: { score, bestStreak, misses in
+                        let result = arrowStormResult(score: score, bestStreak: bestStreak, misses: misses)
+                        app.recordStandaloneGameResult(result)
+                        app.recordModeBest(game: .arrowStorm,
+                                           difficulty: playDifficulty,
+                                           score: score)
+                        app.recordMarathon(game: .arrowStorm, depth: score, score: score)
+                        app.recordRunBests(game: .arrowStorm, difficulty: playDifficulty, score: score)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
@@ -520,6 +549,22 @@ private struct GameLauncher: View {
             "score": Double(score),
             "bestTile": Double(bestTile),
             "moves": Double(moves)
+        ]
+        return result
+    }
+
+    private func arrowStormResult(score: Int, bestStreak: Int, misses: Int) -> GameResult {
+        let trials = score + misses
+        var result = GameResult(game: .arrowStorm,
+                                score: score,
+                                baseScore: score,
+                                accuracy: trials > 0 ? Double(score) / Double(trials) : 0,
+                                trials: max(1, trials))
+        result.raw = [
+            "score": Double(score),
+            "correct": Double(score),
+            "wrong": Double(misses),
+            "bestStreak": Double(bestStreak)
         ]
         return result
     }

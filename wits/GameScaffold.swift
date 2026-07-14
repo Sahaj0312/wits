@@ -315,9 +315,9 @@ extension GameID {
         switch self {
         case .arrowStorm:
             [
-                "watch the row of arrows.",
-                "answer only the middle arrow's direction.",
-                "go quickly, but wrong taps break your streak."
+                "watch the row of arrows — answer only the middle one's direction.",
+                "beat the shrinking deadline: too slow counts as a miss.",
+                "you have three hearts. every miss costs one — lose them all and the run ends."
             ]
         case .crowdControl:
             [

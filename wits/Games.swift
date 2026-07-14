@@ -9,13 +9,6 @@
 
 import SwiftUI
 
-enum ArrowStorm: Game {
-    static let id = GameID.arrowStorm
-    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
-        AnyView(FlankerScreen(cfg: config, onResult: onComplete))
-    }
-}
-
 enum CrowdControl: Game {
     static let id = GameID.crowdControl
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -101,7 +94,6 @@ enum Crossword: Game {
 @MainActor
 func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
     switch id {
-    case .arrowStorm:  ArrowStorm.makeView(config: config, onComplete: onComplete)
     case .crowdControl: CrowdControl.makeView(config: config, onComplete: onComplete)
     case .echoGrid:    EchoGrid.makeView(config: config, onComplete: onComplete)
     case .colorClash:  ColorClash.makeView(config: config, onComplete: onComplete)
@@ -114,6 +106,6 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .mahjong:     Mahjong.makeView(config: config, onComplete: onComplete)
     case .crossword:   Crossword.makeView(config: config, onComplete: onComplete)
     // Standalone survival modes are hosted directly by the launcher.
-    case .split, .blockFit, .fuse, .snake, .tower: AnyView(EmptyView())
+    case .arrowStorm, .split, .blockFit, .fuse, .snake, .tower: AnyView(EmptyView())
     }
 }
