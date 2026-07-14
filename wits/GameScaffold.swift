@@ -321,9 +321,9 @@ extension GameID {
             ]
         case .crowdControl:
             [
-                "memorize the glowing dots.",
-                "track them while every dot moves.",
-                "when they freeze, tap the original targets."
+                "memorize the glowing dots, then track them while every dot moves.",
+                "when they freeze, tap the ones you were tracking — each one you catch is a point.",
+                "you have three hearts. every target you lose costs one — lose them all and the run ends."
             ]
         case .echoGrid:
             [

@@ -2,10 +2,16 @@
 //  CrowdControlGame.swift
 //  wits
 //
-//  Crowd control (multiple object tracking — divided attention).
-//  A few dots flash, then turn identical to the rest and everything starts
-//  drifting. Track the marked ones through the chaos and point them out when
-//  the dots freeze. Based on the multiple-object-tracking paradigm (1988).
+//  Crowd control (multiple object tracking — divided attention), played as an
+//  endless run. A few dots flash, then turn identical to the rest and
+//  everything starts drifting. Track the marked ones through the chaos and
+//  point them out when the dots freeze. Based on the multiple-object-tracking
+//  paradigm (1988).
+//
+//  Pick a mode, then survive round after round as the crowd grows and speeds
+//  up. Every target you pick correctly is a point; every target you lose
+//  costs a heart. Out of hearts, a rewarded ad buys one last life — the
+//  hearts stay grey, and the next dropped target ends the run for good.
 //
 //  The crowd simulates in board points on a display-synced TimelineView:
 //  constant-speed dots steer along smooth wander curves, exchange velocity on
@@ -15,27 +21,139 @@
 
 import SwiftUI
 
-private struct TrackStats {
-    var correctPicks = 0
-    var totalTargets = 0
-    var rounds = 0
-    var perfectRounds = 0
-}
+// MARK: - Mode select
 
-struct TrackerScreen: View {
-    var cfg: GameConfig
-    var onResult: (GameResult) -> Void
+/// Crowd control's pre-game screen: no levels, just the three modes with
+/// their own bests and the all-time best underneath.
+struct CrowdControlModeSelectView: View {
+    var onPlay: (ChallengeDifficulty) -> Void
+    var onClose: () -> Void
 
-    init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
-        self.cfg = cfg
-        self.onResult = onResult
-        _rng = State(initialValue: cfg.makeRandomGenerator())
+    @Environment(AppModel.self) private var app
+
+    private let game = GameID.crowdControl
+    private var world: GameWorld { game.world }
+    private let modes: [ChallengeDifficulty] = [.easy, .medium, .hard]
+
+    var body: some View {
+        ZStack {
+            GameWorldBackdrop(game: game)
+            ScrollView(showsIndicators: false) {
+                VStack(spacing: 0) {
+                    HStack {
+                        iconButton("chevron.left", label: "Close", action: onClose)
+                        Spacer()
+                        Text(game.subskill.uppercased())
+                            .font(.system(size: 10.5, weight: .black, design: world.bodyDesign))
+                            .foregroundStyle(world.muted)
+                        Spacer()
+                        Color.clear.frame(width: 44, height: 44)
+                    }
+                    .padding(.top, 10)
+
+                    GamePosterArt(game: game)
+                        .frame(height: 250)
+                        .frame(maxWidth: 440)
+
+                    Text(game.worldTitle())
+                        .font(.system(size: 44, weight: .black, design: world.titleDesign))
+                        .foregroundStyle(world.ink)
+                    Text(game.tagline)
+                        .font(.system(size: 14.5, weight: .semibold, design: world.bodyDesign))
+                        .foregroundStyle(world.muted)
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 7)
+
+                    VStack(spacing: 11) {
+                        ForEach(modes) { mode in
+                            modeButton(mode)
+                        }
+                    }
+                    .padding(.top, 28)
+
+                    if allTimeBest > 0 {
+                        HStack(spacing: 6) {
+                            Image(systemName: "crown.fill")
+                                .font(.system(size: 11, weight: .black))
+                                .foregroundStyle(world.accent)
+                            Text("ALL TIME BEST · \(allTimeBest)")
+                                .font(.system(size: 12, weight: .black, design: world.bodyDesign))
+                                .foregroundStyle(world.ink)
+                                .monospacedDigit()
+                        }
+                        .padding(.top, 18)
+                    }
+                }
+                .padding(.bottom, 30)
+                .padding(.horizontal, 22)
+                .frame(maxWidth: 620)
+                .frame(maxWidth: .infinity)
+            }
+        }
     }
 
-    private var startedAt = Date()
-    private var world: GameWorld { GameID.crowdControl.world }
+    private var allTimeBest: Int {
+        app.levels.marathonBest(for: game)?.score ?? 0
+    }
 
-    private static let roundCount = 4
+    private func modeButton(_ mode: ChallengeDifficulty) -> some View {
+        let color = world.difficultyColor(mode)
+        let best = app.levels.modeBest(for: game, difficulty: mode)
+        return Button { onPlay(mode) } label: {
+            HStack(spacing: 14) {
+                Image(systemName: mode.symbol)
+                    .font(.system(size: 24, weight: .black))
+                    .frame(width: 45)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("\(mode.shortTitle.uppercased()) MODE")
+                        .font(.system(size: 18, weight: .black, design: world.titleDesign))
+                    Text(best > 0 ? "best · \(best)" : "no runs yet")
+                        .font(.system(size: 11.5, weight: .bold, design: world.bodyDesign))
+                        .opacity(0.72)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 15, weight: .black))
+                    .opacity(0.7)
+            }
+            .foregroundStyle(world.background)
+            .padding(.horizontal, 17)
+            .frame(maxWidth: .infinity)
+            .frame(height: 68)
+            .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        }
+        .buttonStyle(PressScale())
+        .shadow(color: color.opacity(0.22), radius: 10, y: 5)
+    }
+
+    private func iconButton(_ symbol: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 17, weight: .black))
+                .foregroundStyle(world.ink)
+                .frame(width: 44, height: 44)
+                .background(world.surface, in: Circle())
+                .overlay(Circle().strokeBorder(world.accent.opacity(0.42), lineWidth: 1))
+        }
+        .buttonStyle(PressScale())
+        .accessibilityLabel(label)
+    }
+}
+
+// MARK: - Screen
+
+struct CrowdControlScreen: View {
+    let difficulty: ChallengeDifficulty
+    let modeBest: Int
+    let allTimeBest: Int
+    var todayBest: Int = 0
+    var weekBest: Int = 0
+    /// (correct picks = score, total targets, rounds, perfect rounds) → persist.
+    let onRunComplete: (Int, Int, Int, Int) -> Void
+    let onQuit: () -> Void
+
+    private static let maxLives = 3
     private static let markSeconds = 1.5
     private static let moveSeconds = 6.5
     private static let pickSeconds = 9.0
@@ -43,9 +161,8 @@ struct TrackerScreen: View {
     private static let wallInset: CGFloat = 10
     private static let collisionIterations = 3
 
-    private enum RoundPhase {
-        case mark, move, pick, reveal
-    }
+    private enum Phase { case playing, over }
+    private enum RoundPhase { case mark, move, pick, reveal }
 
     private struct Dot: Identifiable {
         let id: Int
@@ -57,35 +174,63 @@ struct TrackerScreen: View {
         var picked = false
     }
 
+    @State private var phase: Phase = .playing
+    @State private var pauseController = GamePauseController()
     @State private var roundPhase = RoundPhase.mark
     @State private var dots: [Dot] = []
     @State private var round = 0
-    @State private var stats = TrackStats()
     @State private var pulse = false
     @State private var generation = 0
-    @State private var rng: SeededRandomNumberGenerator
+    @State private var rng = SystemRandomNumberGenerator()
     @State private var boardSize = CGSize.zero
     @State private var moveLeft = 0.0
     @State private var pickLeft = 0.0
     @State private var lastTick: Date?
 
-    private var config: (targets: Int, dots: Int, speed: Double) {
-        let level = cfg.difficulty.level
-        let baseTargets = 2 + Int(ceil(level / 2.5))
-        let targets = min(6, baseTargets + round / 2)
-        let dots = min(12, max(targets + 4, 8 + Int(level / 3)))
-        let speed = min(0.44, 0.18 + level * 0.018 + Double(round) * 0.016)
-        return (targets, dots, speed)
+    @State private var score = 0            // total targets picked correctly
+    @State private var totalTargets = 0
+    @State private var rounds = 0
+    @State private var perfectRounds = 0
+    @State private var lives = maxLives
+
+    /// One rewarded continue per run: hearts stay empty afterwards, and the
+    /// next dropped target ends the run with no second offer.
+    @State private var usedContinue = false
+    @State private var canContinue = false
+    @State private var adBusy = false
+    /// The run isn't recorded while a continue offer is on the table.
+    @State private var runRecorded = true
+
+    @State private var newAllTimeBest = false
+    /// Best across every run since this screen opened, so the bests rows stay
+    /// honest through PLAY AGAIN loops.
+    @State private var sessionBest = 0
+
+    private var world: GameWorld { GameID.crowdControl.world }
+
+    /// Per-round recipe: the mode sets the starting load, and every survived
+    /// round grows the pack, the crowd, and the drift speed toward its caps.
+    private var roundConfig: (targets: Int, dots: Int, speed: Double) {
+        let (baseTargets, targetCap, baseSpeed, speedRamp, speedCap): (Int, Int, Double, Double, Double) =
+            switch difficulty {
+            case .easy: (3, 5, 0.18, 0.012, 0.36)
+            case .medium: (4, 6, 0.24, 0.014, 0.42)
+            default: (5, 6, 0.30, 0.016, 0.46)
+            }
+        let targets = min(targetCap, baseTargets + round / 4)
+        let dotCount = min(12, targets + 5 + round / 3)
+        let speed = min(speedCap, baseSpeed + Double(round) * speedRamp)
+        return (targets, dotCount, speed)
     }
 
     /// Constant dot speed in points/sec, scaled off the short board side so a
     /// diagonal drift covers the same ground as a horizontal one.
     private var dotSpeed: Double {
-        config.speed * Double(min(boardSize.width, boardSize.height))
+        roundConfig.speed * Double(min(boardSize.width, boardSize.height))
     }
 
     private var picksLeft: Int {
-        max(0, config.targets - dots.filter(\.picked).count)
+        max(0, roundConfig.targets - dots.filter(\.picked).count)
     }
 
     private var statusLine: String {
@@ -93,7 +238,7 @@ struct TrackerScreen: View {
         case .mark: return "memorize the glowing dots"
         case .move: return "don't lose them"
         case .pick: return picksLeft == 1 ? "tap 1 more" : "tap the \(picksLeft) you were tracking"
-        case .reveal: return dots.filter { $0.picked && $0.isTarget }.count == config.targets
+        case .reveal: return dots.filter { $0.picked && $0.isTarget }.count == roundConfig.targets
             ? "all of them. nice." : "the rings show where they really went."
         }
     }
@@ -108,35 +253,56 @@ struct TrackerScreen: View {
     }
 
     var body: some View {
-        VStack(spacing: 12) {
-            if !cfg.isSurvival {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("round \(Text("\(min(round + 1, Self.roundCount))").foregroundStyle(world.accent)) of \(Self.roundCount)")
-                        .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(world.ink)
-                        .monospacedDigit()
-                    Spacer()
-                    Text("\(stats.correctPicks) of \(stats.totalTargets) held")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(world.muted)
-                        .monospacedDigit()
-                }
-                ProgressTrack(fraction: Double(round) / Double(Self.roundCount), animated: true,
-                              tint: world.accent, track: world.surface)
+        ZStack {
+            GameWorldBackdrop(game: .crowdControl, patternOpacity: 0.35)
+            // The playing view stays mounted behind the game-over card so the
+            // final board sits dimmed under the scrim.
+            playing
+            if phase == .over { runOver }
+        }
+        .overlay {
+            if phase == .playing, pauseController.isPaused {
+                GamePausedOverlay(game: .crowdControl,
+                                  controller: pauseController,
+                                  onQuit: {
+                                      pauseController.reset()
+                                      onQuit()
+                                  })
             }
+        }
+        .onAppear { GameFeel.shared.warmUp() }
+        .onDisappear {
+            pauseController.reset()
+            GameFeel.shared.teardown()
+        }
+    }
 
-            TimelineView(.animation(paused: !(roundPhase == .move || roundPhase == .pick) || cfg.isPaused)) { tl in
+    // MARK: Playing
+
+    private var playing: some View {
+        VStack(spacing: 12) {
+            hud
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+
+            heartsRow
+
+            TimelineView(.animation(paused: !(roundPhase == .move || roundPhase == .pick)
+                                            || pauseController.isPaused
+                                            || phase != .playing)) { tl in
                 boardView
                     .onChange(of: tl.date) { _, now in
                         tick(now)
                     }
             }
+            .padding(.horizontal, WitsMetrics.screenPadding)
 
             // phase countdown: teal while the crowd drifts, red while picks drain
             ProgressTrack(fraction: phaseFraction, animated: false,
                           tint: roundPhase == .pick ? world.secondary : world.accent,
                           track: world.surface)
                 .opacity(roundPhase == .move || roundPhase == .pick ? 1 : 0)
+                .padding(.horizontal, WitsMetrics.screenPadding)
 
             Text(statusLine)
                 .font(.system(size: 15, weight: .heavy, design: world.bodyDesign))
@@ -145,11 +311,96 @@ struct TrackerScreen: View {
                 .padding(.vertical, 9)
                 .frame(maxWidth: .infinity)
                 .background(Color.black.opacity(0.22), in: Capsule())
+                .padding(.horizontal, WitsMetrics.screenPadding)
+                .padding(.bottom, 12)
         }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.top, 24)
-        .padding(.bottom, 12)
+        .allowsHitTesting(phase == .playing && !pauseController.isPaused)
     }
+
+    private var hud: some View {
+        HStack(spacing: 10) {
+            Button(action: onQuit) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 17, weight: .black))
+                    .foregroundStyle(world.ink)
+                    .frame(width: 44, height: 44)
+                    .background(world.surface.opacity(0.9), in: Circle())
+            }
+            .buttonStyle(PressScale())
+            .accessibilityLabel("quit run")
+
+            Spacer(minLength: 0)
+
+            hudChip(title: "\(difficulty.shortTitle.uppercased()) MODE",
+                    value: score,
+                    tint: world.ink,
+                    crowned: false)
+            hudChip(title: "ALL TIME",
+                    value: max(allTimeBest, score),
+                    tint: world.accent,
+                    crowned: true)
+
+            Spacer(minLength: 0)
+
+            Button { pauseController.pause() } label: {
+                Image(systemName: "pause.fill")
+                    .font(.system(size: 16, weight: .heavy))
+                    .foregroundStyle(world.ink)
+                    .frame(width: 44, height: 44)
+                    .background(world.surface.opacity(0.9), in: Circle())
+            }
+            .buttonStyle(PressScale())
+            .accessibilityLabel("pause game")
+        }
+    }
+
+    private func hudChip(title: String, value: Int, tint: Color, crowned: Bool) -> some View {
+        VStack(spacing: 0) {
+            Text(title)
+                .font(.system(size: 10.5, weight: .black, design: world.bodyDesign))
+                .foregroundStyle(tint)
+                .lineLimit(1)
+            Text(String(value))
+                .font(.system(size: 21, weight: .black, design: world.titleDesign))
+                .foregroundStyle(tint)
+                .monospacedDigit()
+                .contentTransition(.numericText())
+                .animation(.snappy(duration: 0.2), value: value)
+        }
+        .frame(minWidth: 108)
+        .padding(.horizontal, 13)
+        .padding(.vertical, 6)
+        .background(world.surface.opacity(0.9),
+                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .overlay(alignment: .top) {
+            if crowned {
+                Image(systemName: "crown.fill")
+                    .font(.system(size: 10, weight: .black))
+                    .foregroundStyle(world.accent)
+                    .offset(y: -12)
+            }
+        }
+    }
+
+    private static let heartColor = Color(hexAny: 0xEF476F)
+
+    /// After a rewarded continue every heart shows grey — the player is
+    /// running on their last life.
+    private var heartsRow: some View {
+        HStack(spacing: 9) {
+            ForEach(0..<Self.maxLives, id: \.self) { i in
+                Image(systemName: i < lives ? "heart.fill" : "heart")
+                    .font(.system(size: 21, weight: .black))
+                    .foregroundStyle(i < lives ? Self.heartColor : world.muted.opacity(0.45))
+                    .scaleEffect(i < lives ? 1 : 0.88)
+                    .animation(.snappy(duration: 0.25), value: lives)
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(usedContinue ? "last life" : "\(lives) of \(Self.maxLives) lives left")
+    }
+
+    // MARK: Board
 
     private var boardView: some View {
         GeometryReader { geo in
@@ -217,7 +468,7 @@ struct TrackerScreen: View {
         }
         guard let hit, dist(dots[hit].pos, location) < 28, !dots[hit].picked else { return }
         dots[hit].picked = true
-        if dots.filter(\.picked).count == config.targets { finishPicks() }
+        if dots.filter(\.picked).count == roundConfig.targets { finishPicks() }
     }
 
     private func dist(_ a: CGPoint, _ b: CGPoint) -> Double {
@@ -226,43 +477,42 @@ struct TrackerScreen: View {
 
     private func finishPicks() {
         guard roundPhase == .pick else { return }
+        let targets = roundConfig.targets
         let correct = dots.filter { $0.picked && $0.isTarget }.count
-        let perfect = correct == config.targets
-        stats.correctPicks += correct
-        stats.totalTargets += config.targets
-        stats.rounds += 1
-        if perfect { stats.perfectRounds += 1 }
-        cfg.report(perfect ? .hit : .miss, points: correct * 80, combo: stats.perfectRounds)
+        let misses = targets - correct
+
+        score += correct
+        totalTargets += targets
+        rounds += 1
+        if misses == 0 { perfectRounds += 1 }
+
+        if misses == 0 {
+            GameFeel.shared.play(.correct(combo: perfectRounds))
+        }
+        if !newAllTimeBest, score > allTimeBest, allTimeBest > 0 {
+            newAllTimeBest = true
+            GameFeel.shared.play(.newBest)
+        }
+
+        // Every dropped target costs a heart. Past the rewarded continue the
+        // hearts are already gone, so any miss ends the run.
+        if misses > 0 {
+            lives = max(0, lives - misses)
+            GameFeel.shared.play(.lifeLost(remaining: lives))
+        }
+
         roundPhase = .reveal
         let gen = generation
         Task {
             try? await Task.sleep(for: .milliseconds(1400))
             guard gen == generation else { return }
-            if !cfg.isSurvival && round + 1 >= Self.roundCount {
-                finish()
+            if lives == 0, misses > 0 {
+                endRun()
             } else {
-                round = (round + 1) % Self.roundCount   // cycle rounds endlessly in survival
+                round += 1
                 startRound()
             }
         }
-    }
-
-    private func finish() {
-        let acc = stats.totalTargets > 0 ? Double(stats.correctPicks) / Double(stats.totalTargets) : 0
-        var r = GameResult(game: .crowdControl, score: stats.correctPicks * 250, accuracy: acc)
-        r.trials = stats.rounds
-        r.threshold = Double(stats.perfectRounds)
-        r.startedAt = startedAt
-        r.durationMs = Int(cfg.activeElapsed(since: startedAt) * 1000)
-        r.raw = [
-            "perfectRounds": Double(stats.perfectRounds),
-            "totalTargets": Double(stats.totalTargets),
-            "correctPicks": Double(stats.correctPicks),
-            // CrowdControlPolicy's contract: per-target hits and misses.
-            "correct": Double(stats.correctPicks),
-            "wrong": Double(max(0, stats.totalTargets - stats.correctPicks))
-        ]
-        onResult(r)
     }
 
     // MARK: Round flow
@@ -287,7 +537,7 @@ struct TrackerScreen: View {
         guard boardSize != .zero else { return }
         generation += 1
         let gen = generation
-        let c = config
+        let c = roundConfig
         let inset = Self.dotDiameter / 2 + Self.wallInset
         var seeded: [Dot] = []
         for i in 0..<c.dots {
@@ -317,6 +567,12 @@ struct TrackerScreen: View {
                 try? await Task.sleep(for: .milliseconds(320))
                 guard gen == generation else { return }
             }
+            // Hold before the mark while paused (or counting back in after an
+            // ad continue) — the player must actually see which dots glow.
+            while pauseController.isPaused {
+                try? await Task.sleep(for: .milliseconds(80))
+                guard gen == generation else { return }
+            }
             roundPhase = .mark
             pulse = false
             withAnimation(.easeOut(duration: 0.3)) { dots = fresh }
@@ -324,6 +580,11 @@ struct TrackerScreen: View {
             // mark: pulse the targets
             var markLeft = Self.markSeconds
             while markLeft > 0 {
+                if pauseController.isPaused {
+                    try? await Task.sleep(for: .milliseconds(80))
+                    guard gen == generation else { return }
+                    continue
+                }
                 pulse.toggle()
                 try? await Task.sleep(for: .milliseconds(450))
                 guard gen == generation else { return }
@@ -339,7 +600,7 @@ struct TrackerScreen: View {
     /// during pick. dt is measured and clamped so hitches slow the crowd
     /// instead of teleporting it.
     private func tick(_ now: Date) {
-        guard !cfg.isPaused else { return }
+        guard phase == .playing, !pauseController.isPaused else { return }
         let dt = min(1.0 / 30, now.timeIntervalSince(lastTick ?? now))
         lastTick = now
         guard dt > 0 else { return }
@@ -358,6 +619,84 @@ struct TrackerScreen: View {
         case .mark, .reveal:
             break
         }
+    }
+
+    // MARK: Run lifecycle
+
+    private func endRun() {
+        pauseController.reset()
+        if score > 0, allTimeBest == 0 || score > allTimeBest {
+            newAllTimeBest = true
+        }
+        sessionBest = max(sessionBest, score)
+        // A continue offer defers recording — the run isn't over until the
+        // player passes on it. No offer → record right away.
+        canContinue = !usedContinue && AdManager.shared.rewardedReady
+        runRecorded = false
+        if !canContinue { finalizeRun() }
+        GameFeel.shared.play(.gameOver)
+        withAnimation(.easeOut(duration: 0.3)) { phase = .over }
+    }
+
+    private func finalizeRun() {
+        guard !runRecorded else { return }
+        runRecorded = true
+        onRunComplete(score, totalTargets, rounds, perfectRounds)
+    }
+
+    private var runOver: some View {
+        var continueAction: (() -> Void)?
+        if canContinue { continueAction = { continueRun() } }
+        return GameRunOverView(game: .crowdControl,
+                               contextTitle: "\(difficulty.shortTitle) mode",
+                               badgeSymbol: difficulty.symbol,
+                               score: score,
+                               caption: "\(perfectRounds) perfect rounds",
+                               bests: RunBestLine.standard(today: max(todayBest, sessionBest),
+                                                           week: max(weekBest, sessionBest),
+                                                           allTime: max(allTimeBest, sessionBest)),
+                               celebrate: newAllTimeBest && !canContinue,
+                               onContinue: continueAction,
+                               continueBusy: adBusy,
+                               onHome: {
+                                   finalizeRun()
+                                   onQuit()
+                               },
+                               onPlayAgain: playAgain)
+    }
+
+    private func continueRun() {
+        guard !adBusy else { return }
+        adBusy = true
+        AdManager.shared.showRewarded { earned in
+            adBusy = false
+            guard earned else { return }   // closed early — offer stays on the table
+            usedContinue = true
+            canContinue = false
+            pauseController.reset()
+            withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+            // Count the player back in — the fresh round holds its mark phase
+            // until the 3…2…1 finishes.
+            pauseController.pause()
+            pauseController.beginResumeCountdown()
+            startRound()
+        }
+    }
+
+    private func playAgain() {
+        finalizeRun()
+        score = 0
+        totalTargets = 0
+        rounds = 0
+        perfectRounds = 0
+        round = 0
+        lives = Self.maxLives
+        usedContinue = false
+        canContinue = false
+        newAllTimeBest = false
+        pauseController.reset()
+        withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+        startRound()
     }
 
     // MARK: Physics

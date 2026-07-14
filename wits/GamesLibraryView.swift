@@ -215,6 +215,16 @@ private struct GameLauncher: View {
                     },
                     onClose: { dismiss() }
                 )
+            } else if game == .crowdControl {
+                CrowdControlModeSelectView(
+                    onPlay: { difficulty in
+                        runKind = .survival
+                        weeklyChallenge = nil
+                        playDifficulty = difficulty
+                        startRun()
+                    },
+                    onClose: { dismiss() }
+                )
             } else if game.isStandalone {
                 StandaloneModeSelectView(
                     game: game,
@@ -354,6 +364,28 @@ private struct GameLauncher: View {
                                            score: score)
                         app.recordMarathon(game: .arrowStorm, depth: score, score: score)
                         app.recordRunBests(game: .arrowStorm, difficulty: playDifficulty, score: score)
+                    },
+                    onQuit: { withAnimation { phase = .selector } }
+                )
+            } else if game == .crowdControl {
+                let runBests = app.levels.runBests(for: .crowdControl, difficulty: playDifficulty)
+                CrowdControlScreen(
+                    difficulty: playDifficulty,
+                    modeBest: app.levels.modeBest(for: .crowdControl, difficulty: playDifficulty),
+                    allTimeBest: app.levels.marathonBest(for: .crowdControl)?.score ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
+                    onRunComplete: { score, totalTargets, rounds, perfectRounds in
+                        let result = crowdControlResult(score: score,
+                                                        totalTargets: totalTargets,
+                                                        rounds: rounds,
+                                                        perfectRounds: perfectRounds)
+                        app.recordStandaloneGameResult(result)
+                        app.recordModeBest(game: .crowdControl,
+                                           difficulty: playDifficulty,
+                                           score: score)
+                        app.recordMarathon(game: .crowdControl, depth: score, score: score)
+                        app.recordRunBests(game: .crowdControl, difficulty: playDifficulty, score: score)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
@@ -565,6 +597,24 @@ private struct GameLauncher: View {
             "correct": Double(score),
             "wrong": Double(misses),
             "bestStreak": Double(bestStreak)
+        ]
+        return result
+    }
+
+    private func crowdControlResult(score: Int, totalTargets: Int, rounds: Int, perfectRounds: Int) -> GameResult {
+        var result = GameResult(game: .crowdControl,
+                                score: score,
+                                baseScore: score,
+                                accuracy: totalTargets > 0 ? Double(score) / Double(totalTargets) : 0,
+                                trials: max(1, rounds))
+        result.raw = [
+            "score": Double(score),
+            "correctPicks": Double(score),
+            "totalTargets": Double(totalTargets),
+            "rounds": Double(rounds),
+            "perfectRounds": Double(perfectRounds),
+            "correct": Double(score),
+            "wrong": Double(max(0, totalTargets - score))
         ]
         return result
     }
