@@ -122,12 +122,6 @@ struct GamesLibraryView: View {
                     .strokeBorder(g.world.accent.opacity(0.5), lineWidth: 1)
             )
             .shadow(color: g.world.accent.opacity(0.16), radius: 12, y: 6)
-            .overlay(alignment: .topTrailing) {
-                if g.isStandalone {
-                    survivalSticker(g == .split ? "survival!" : "endless!")
-                        .offset(x: 5, y: -5)
-                }
-            }
         }
         .buttonStyle(PressScale())
         .accessibilityLabel(Text("\(g.displayName). \(g.tagline)"))
@@ -163,19 +157,6 @@ struct GamesLibraryView: View {
         return "\(difficulty.title) · level \(level)"
     }
 
-    /// Tilted sticker in the reference-app spirit — marks the standalone
-    /// endless modes on the shelf.
-    private func survivalSticker(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Color(hexAny: 0xE84545), in: Capsule())
-            .overlay(Capsule().strokeBorder(.white, lineWidth: 2))
-            .rotationEffect(.degrees(7))
-            .shadow(color: .black.opacity(0.25), radius: 4, y: 2)
-    }
 }
 
 /// Pre-game difficulty selector followed by one unbounded track level.
