@@ -2,9 +2,12 @@
 //  TileShift.swift
 //  wits
 //
-//  Task switching. Match the target by the rule on screen — colour or shape —
-//  and the rule keeps flipping. Adaptive: faster deadline + more frequent
-//  switches with level.
+//  Task switching, played as an endless run. Match the target by the rule on
+//  screen — colour or shape — and the rule keeps flipping. Pick a mode, then
+//  answer trial after trial against a deadline that tightens as you score.
+//  Three hearts: a wrong tap or a timeout costs one. Out of hearts, a
+//  rewarded ad buys one last life — the hearts stay grey, and the next slip
+//  ends the run for good.
 //
 
 import SwiftUI
@@ -17,10 +20,34 @@ private let tileColors: [Color] = [
 ]
 
 struct TileShiftScreen: View {
-    var cfg: GameConfig
-    var onResult: (GameResult) -> Void
+    let difficulty: ChallengeDifficulty
+    let modeBest: Int
+    let allTimeBest: Int
+    var todayBest: Int = 0
+    var weekBest: Int = 0
+    /// (score, best streak, misses) → persist.
+    let onRunComplete: (Int, Int, Int) -> Void
+    let onQuit: () -> Void
 
-    private static let gameSeconds = 45.0
+    private static let maxLives = 3
+
+    private struct Tuning {
+        let startWindow: Double   // seconds to answer, at the start of a run
+        let minWindow: Double     // the deadline never tightens past this
+        let shrink: Double        // deadline lost per correct answer
+        let easeBack: Double      // breather given back after a miss
+        let pSwitch: Double       // chance the rule flips between trials
+    }
+
+    private static func tuning(for difficulty: ChallengeDifficulty) -> Tuning {
+        switch difficulty {
+        case .easy: Tuning(startWindow: 2.1, minWindow: 1.1, shrink: 0.02, easeBack: 0.2, pSwitch: 0.35)
+        case .medium: Tuning(startWindow: 1.8, minWindow: 0.9, shrink: 0.025, easeBack: 0.16, pSwitch: 0.5)
+        default: Tuning(startWindow: 1.5, minWindow: 0.75, shrink: 0.03, easeBack: 0.12, pSwitch: 0.65)
+        }
+    }
+
+    private var tuning: Tuning { Self.tuning(for: difficulty) }
 
     private struct Tile: Equatable { var shape: Int; var color: Int }
     private struct Round: Identifiable {
@@ -30,36 +57,6 @@ struct TileShiftScreen: View {
         let options: [Tile]
         let correct: Int
     }
-
-    @State private var round: Round
-    @State private var window: Double
-    @State private var windowFrac = 1.0
-    @State private var trialStart = Date()
-    @State private var timeLeft = gameSeconds
-    @State private var right = 0
-    @State private var wrong = 0
-    @State private var streak = 0
-    @State private var bestStreak = 0
-    @State private var score = 0
-    @State private var feedback: Bool?
-    @State private var finished = false
-    private let startedAt = Date()
-    private let level: Double
-
-    init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
-        self.cfg = cfg
-        self.onResult = onResult
-        self.level = cfg.difficulty.level
-        var rng = cfg.makeRandomGenerator()
-        _window = State(initialValue: max(1.0, 2.2 - cfg.difficulty.level * 0.1))
-        _round = State(initialValue: Self.make(byColor: Bool.random(using: &rng), using: &rng))
-        _rng = State(initialValue: rng)
-    }
-
-    private var multiplier: Int { min(5, 1 + streak / 3) }
-    private var world: GameWorld { GameID.tileShift.world }
-
-    @State private var rng: SeededRandomNumberGenerator
 
     private static func make<R: RandomNumberGenerator>(byColor: Bool, using rng: inout R) -> Round {
         let target = Tile(shape: .random(in: 0..<3, using: &rng),
@@ -82,28 +79,105 @@ struct TileShiftScreen: View {
         return Round(byColor: byColor, target: target, options: options, correct: correctFirst ? 0 : 1)
     }
 
+    init(difficulty: ChallengeDifficulty,
+         modeBest: Int,
+         allTimeBest: Int,
+         todayBest: Int = 0,
+         weekBest: Int = 0,
+         onRunComplete: @escaping (Int, Int, Int) -> Void,
+         onQuit: @escaping () -> Void) {
+        self.difficulty = difficulty
+        self.modeBest = modeBest
+        self.allTimeBest = allTimeBest
+        self.todayBest = todayBest
+        self.weekBest = weekBest
+        self.onRunComplete = onRunComplete
+        self.onQuit = onQuit
+        let t = Self.tuning(for: difficulty)
+        var rng = SystemRandomNumberGenerator()
+        _round = State(initialValue: Self.make(byColor: Bool.random(using: &rng), using: &rng))
+        _window = State(initialValue: t.startWindow)
+        _trialRemaining = State(initialValue: t.startWindow)
+    }
+
+    @State private var rng = SystemRandomNumberGenerator()
+    @State private var phase: Phase = .playing
+    @State private var pauseController = GamePauseController()
+
+    @State private var round: Round
+    @State private var window: Double
+    @State private var trialRemaining: Double
+    @State private var windowFrac = 1.0
+    @State private var feedback: Bool?
+
+    @State private var score = 0
+    @State private var streak = 0
+    @State private var bestStreak = 0
+    @State private var misses = 0
+    @State private var lives = maxLives
+
+    /// One rewarded continue per run: hearts stay empty afterwards, and the
+    /// next mistake ends the run with no second offer.
+    @State private var usedContinue = false
+    @State private var canContinue = false
+    @State private var adBusy = false
+    /// The run isn't recorded while a continue offer is on the table.
+    @State private var runRecorded = true
+
+    @State private var newAllTimeBest = false
+    /// Best across every run since this screen opened, so the bests rows stay
+    /// honest through PLAY AGAIN loops.
+    @State private var sessionBest = 0
+    /// Bumped on PLAY AGAIN so the run loop restarts fresh.
+    @State private var runID = 0
+
+    private enum Phase { case playing, over }
+
+    private var world: GameWorld { GameID.tileShift.world }
+
     var body: some View {
-        VStack(spacing: 12) {
-            if !cfg.isSurvival {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("\(Text("\(score)").foregroundStyle(world.accent)) pts")
-                        .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(world.ink).monospacedDigit()
-                    if multiplier > 1 {
-                        Text("×\(multiplier)")
-                            .font(.system(size: 12, weight: .heavy, design: .rounded))
-                            .foregroundStyle(world.accent)
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(world.accent.opacity(0.14), in: Capsule())
-                    }
-                    Spacer()
-                    Text("\(Int(ceil(timeLeft)))s")
-                        .font(.system(size: 17, weight: .heavy, design: .rounded))
-                        .foregroundStyle(world.muted).monospacedDigit()
-                }
-                ProgressTrack(fraction: timeLeft / Self.gameSeconds, animated: false,
-                              tint: world.accent, track: world.surface)
+        ZStack {
+            GameWorldBackdrop(game: .tileShift, patternOpacity: 0.35)
+            // The playing view stays mounted behind the game-over card so the
+            // final trial sits dimmed under the scrim.
+            playing
+            if phase == .over { runOver }
+        }
+        .overlay {
+            if phase == .playing, pauseController.isPaused {
+                GamePausedOverlay(game: .tileShift,
+                                  controller: pauseController,
+                                  onQuit: {
+                                      pauseController.reset()
+                                      onQuit()
+                                  })
             }
+        }
+        .onAppear { GameFeel.shared.warmUp() }
+        .onDisappear {
+            pauseController.reset()
+            GameFeel.shared.teardown()
+        }
+    }
+
+    // MARK: Playing
+
+    private var playing: some View {
+        VStack(spacing: 0) {
+            EndlessRunHUD(game: .tileShift,
+                          difficulty: difficulty,
+                          score: score,
+                          allTimeBest: allTimeBest,
+                          onQuit: onQuit,
+                          onPause: { pauseController.pause() })
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+
+            EndlessHeartsRow(game: .tileShift,
+                             lives: lives,
+                             maxLives: Self.maxLives,
+                             usedContinue: usedContinue)
+                .padding(.top, 14)
 
             Text(round.byColor ? "MATCH THE COLOUR" : "MATCH THE SHAPE")
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
@@ -111,9 +185,10 @@ struct TileShiftScreen: View {
                 .foregroundStyle(round.byColor ? world.accent : world.secondary)
                 .padding(.horizontal, 16).padding(.vertical, 9)
                 .background((round.byColor ? world.accent : world.secondary).opacity(0.14), in: Capsule())
-                .padding(.top, 6)
+                .padding(.top, 18)
 
             Spacer()
+
             tileView(round.target)
                 .frame(width: 120, height: 120)
                 .background(world.surface, in: RoundedRectangle(cornerRadius: 7))
@@ -124,6 +199,8 @@ struct TileShiftScreen: View {
                         .strokeBorder(feedback == true ? world.accent : feedback == false ? world.secondary : .clear, lineWidth: 2.5)
                         .padding(-10)
                 )
+
+            // per-trial deadline
             ZStack(alignment: .leading) {
                 Capsule().fill(world.surface)
                 GeometryReader { geo in
@@ -131,8 +208,11 @@ struct TileShiftScreen: View {
                         .frame(width: max(0, geo.size.width * windowFrac))
                 }
             }
-            .frame(width: 130, height: 4).padding(.top, 14)
+            .frame(width: 130, height: 4)
+            .padding(.top, 14)
+
             Spacer()
+
             HStack(spacing: 12) {
                 ForEach(0..<2, id: \.self) { i in
                     Button { answer(i) } label: {
@@ -143,11 +223,12 @@ struct TileShiftScreen: View {
                     .buttonStyle(.plain)
                 }
             }
+            .padding(.horizontal, EndlessMetrics.sidePadding)
             .padding(.top, 16)
+            .padding(.bottom, 12)
         }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.top, 24).padding(.bottom, 12)
-        .task { await run() }
+        .allowsHitTesting(phase == .playing && !pauseController.isPaused)
+        .task(id: runID) { await runLoop() }
     }
 
     private func tileView(_ t: Tile) -> some View {
@@ -156,73 +237,152 @@ struct TileShiftScreen: View {
             .foregroundStyle(tileColors[t.color])
     }
 
+    // MARK: Trial flow
+
     private func answer(_ i: Int) {
-        guard !finished else { return }
-        let ok = i == round.correct
-        if ok {
-            right += 1; streak += 1; bestStreak = max(bestStreak, streak)
-            score += 100 * multiplier
-            window = max(cfg.isSurvival ? 0.65 : 0.8, window - (cfg.isSurvival ? 0.05 : 0.03))
-            cfg.report(.hit, points: 100, combo: streak)
+        guard phase == .playing else { return }
+        if i == round.correct {
+            score += 1
+            streak += 1
+            bestStreak = max(bestStreak, streak)
+            window = max(tuning.minWindow, window - tuning.shrink)
+            feedback = true
+            GameFeel.shared.play(.correct(combo: streak))
+            if !newAllTimeBest, score > allTimeBest, allTimeBest > 0 {
+                newAllTimeBest = true
+                GameFeel.shared.play(.newBest)
+            }
+            clearFeedbackSoon()
+            next()
         } else {
-            wrong += 1; streak = 0
-            window = min(2.4, window + 0.2)
-            cfg.report(.miss)
+            mistake()
         }
-        feedback = ok
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { feedback = nil }
-        next()
     }
 
     private func timeout() {
-        guard !finished else { return }
-        wrong += 1; streak = 0
+        guard phase == .playing else { return }
+        mistake()
+    }
+
+    private func mistake() {
+        misses += 1
+        streak = 0
+        window = min(tuning.startWindow, window + tuning.easeBack)
         feedback = false
-        cfg.report(.timeout)
+        clearFeedbackSoon()
+        if lives > 0 { lives -= 1 }
+        if lives == 0 {
+            GameFeel.shared.play(.lifeLost(remaining: 0))
+            endRun()
+        } else {
+            GameFeel.shared.play(.lifeLost(remaining: lives))
+            next()
+        }
+    }
+
+    private func clearFeedbackSoon() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.16) { feedback = nil }
-        next()
     }
 
     private func next() {
-        let pSwitch = min(0.7, 0.3 + level * 0.04)
-        let nextByColor = Double.random(in: 0..<1, using: &rng) < pSwitch ? !round.byColor : round.byColor
+        let nextByColor = Double.random(in: 0..<1, using: &rng) < tuning.pSwitch
+            ? !round.byColor : round.byColor
         withAnimation(.easeOut(duration: 0.12)) {
             round = Self.make(byColor: nextByColor, using: &rng)
         }
-        trialStart = Date(); windowFrac = 1
+        trialRemaining = window
+        windowFrac = 1
     }
 
-    private func run() async {
-        let start = Date()
+    private func runLoop() async {
         while !Task.isCancelled {
             try? await Task.sleep(for: .milliseconds(30))
-            timeLeft = max(0, Self.gameSeconds - cfg.activeElapsed(since: start))
-            let elapsed = cfg.activeElapsed(since: trialStart)
-            windowFrac = max(0, 1 - elapsed / window)
-            if elapsed > window { timeout() }
-            if !cfg.isSurvival && timeLeft <= 0 {
-                guard !finished else { return }
-                finished = true
-                try? await Task.sleep(for: .milliseconds(350))
-                finish()
-                return
-            }
+            guard phase == .playing, !pauseController.isPaused else { continue }
+            trialRemaining -= 0.03
+            windowFrac = max(0, trialRemaining / window)
+            if trialRemaining <= 0 { timeout() }
         }
     }
 
-    private func finish() {
-        let total = right + wrong
-        let acc = total > 0 ? Double(right) / Double(total) : 0
-        var r = GameResult(game: .tileShift, score: score, accuracy: acc)
-        r.trials = total
-        r.startedAt = startedAt
-        r.durationMs = Int(Self.gameSeconds * 1000)
-        r.raw = [
-            "bestStreak": Double(bestStreak),
-            "correct": Double(right),
-            "wrong": Double(wrong),
-            "timeOnTaskMs": Self.gameSeconds * 1000
-        ]
-        onResult(r)
+    // MARK: Run lifecycle
+
+    private func endRun() {
+        pauseController.reset()
+        if score > 0, allTimeBest == 0 || score > allTimeBest {
+            newAllTimeBest = true
+        }
+        sessionBest = max(sessionBest, score)
+        // A continue offer defers recording — the run isn't over until the
+        // player passes on it. No offer → record right away.
+        canContinue = !usedContinue && AdManager.shared.rewardedReady
+        runRecorded = false
+        if !canContinue { finalizeRun() }
+        GameFeel.shared.play(.gameOver)
+        withAnimation(.easeOut(duration: 0.3)) { phase = .over }
+    }
+
+    private func finalizeRun() {
+        guard !runRecorded else { return }
+        runRecorded = true
+        onRunComplete(score, bestStreak, misses)
+    }
+
+    private var runOver: some View {
+        var continueAction: (() -> Void)?
+        if canContinue { continueAction = { continueRun() } }
+        return GameRunOverView(game: .tileShift,
+                               contextTitle: "\(difficulty.shortTitle) mode",
+                               badgeSymbol: difficulty.symbol,
+                               score: score,
+                               caption: "best streak \(bestStreak)",
+                               bests: RunBestLine.standard(today: max(todayBest, sessionBest),
+                                                           week: max(weekBest, sessionBest),
+                                                           allTime: max(allTimeBest, sessionBest)),
+                               celebrate: newAllTimeBest && !canContinue,
+                               onContinue: continueAction,
+                               continueBusy: adBusy,
+                               onHome: {
+                                   finalizeRun()
+                                   onQuit()
+                               },
+                               onPlayAgain: playAgain)
+    }
+
+    private func continueRun() {
+        guard !adBusy else { return }
+        adBusy = true
+        AdManager.shared.showRewarded { earned in
+            adBusy = false
+            guard earned else { return }   // closed early — offer stays on the table
+            usedContinue = true
+            canContinue = false
+            feedback = nil
+            window = min(tuning.startWindow, window + tuning.easeBack)
+            pauseController.reset()
+            next()
+            withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+            // Count the player back in — the trial clock stays frozen until
+            // the 3…2…1 finishes.
+            pauseController.pause()
+            pauseController.beginResumeCountdown()
+        }
+    }
+
+    private func playAgain() {
+        finalizeRun()
+        score = 0
+        streak = 0
+        bestStreak = 0
+        misses = 0
+        lives = Self.maxLives
+        usedContinue = false
+        canContinue = false
+        newAllTimeBest = false
+        feedback = nil
+        window = tuning.startWindow
+        pauseController.reset()
+        next()
+        runID += 1
+        withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }
 }

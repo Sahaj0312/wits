@@ -339,9 +339,9 @@ extension GameID {
             ]
         case .tileShift:
             [
-                "read the current rule.",
-                "tap the tile that matches by that rule.",
-                "adapt quickly when the rule changes."
+                "read the current rule, then tap the tile that matches by that rule.",
+                "the rule keeps flipping, and the deadline shrinks as you score.",
+                "you have three hearts. every miss costs one — lose them all and the run ends."
             ]
         case .lastSeen:
             [

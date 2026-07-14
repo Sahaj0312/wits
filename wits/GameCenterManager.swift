@@ -15,6 +15,7 @@
 //    wits.marathon.arrowStorm       Arrow Storm endless best score (all modes)
 //    wits.marathon.crowdControl     Crowd Control endless best score (all modes)
 //    wits.marathon.colorClash       Color Clash endless best score (all modes)
+//    wits.marathon.tileShift        Tile Shift endless best score (all modes)
 //    wits.weekly.<game-id>    recurring every Monday at 00:00 UTC for 7 days
 //  Achievement IDs:
 //    wits.ach.levels.50 / .150 / .300     lifetime level-clear milestones

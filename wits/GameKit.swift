@@ -31,13 +31,13 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
 
     /// Difficulty-track games (everything but the standalone survival modes).
     static var live: [GameID] {
-        [.echoGrid, .tileShift, .lastSeen,
+        [.echoGrid, .lastSeen,
          .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong, .crossword]
     }
     var isLive: Bool { Self.live.contains(self) }
 
     static var standalone: [GameID] {
-        [.arrowStorm, .crowdControl, .colorClash, .split, .blockFit, .fuse, .snake, .tower]
+        [.arrowStorm, .crowdControl, .colorClash, .tileShift, .split, .blockFit, .fuse, .snake, .tower]
     }
     var isStandalone: Bool { Self.standalone.contains(self) }
 
@@ -183,7 +183,7 @@ extension GameID {
         case .crowdControl: "keep your eyes on a few glowing dots as they scatter into an identical crowd, then pick them back out. every round the crowd grows and speeds up, and you have three hearts — every target you lose costs one."
         case .echoGrid: "watch a path of tiles light up, then tap them back in reverse order."
         case .colorClash: "tap the colour a word is printed in, not the word it spells. the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
-        case .tileShift: "follow the rule on screen — sometimes match by colour, sometimes by shape. it keeps flipping."
+        case .tileShift: "follow the rule on screen — sometimes match by colour, sometimes by shape. it keeps flipping, the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
         case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
         case .slidePuzzle: "the numbered tiles are scrambled around one empty square. slide them through the gap until they read in order — in as few moves as you can."
         case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit — in as few moves as you can."

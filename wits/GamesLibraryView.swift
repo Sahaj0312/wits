@@ -205,28 +205,9 @@ private struct GameLauncher: View {
                     },
                     onClose: { dismiss() }
                 )
-            } else if game == .arrowStorm {
-                ArrowStormModeSelectView(
-                    onPlay: { difficulty in
-                        runKind = .survival
-                        weeklyChallenge = nil
-                        playDifficulty = difficulty
-                        startRun()
-                    },
-                    onClose: { dismiss() }
-                )
-            } else if game == .crowdControl {
-                CrowdControlModeSelectView(
-                    onPlay: { difficulty in
-                        runKind = .survival
-                        weeklyChallenge = nil
-                        playDifficulty = difficulty
-                        startRun()
-                    },
-                    onClose: { dismiss() }
-                )
-            } else if game == .colorClash {
-                ColorClashModeSelectView(
+            } else if [.arrowStorm, .crowdControl, .colorClash, .tileShift].contains(game) {
+                EndlessModeSelectView(
+                    game: game,
                     onPlay: { difficulty in
                         runKind = .survival
                         weeklyChallenge = nil
@@ -415,6 +396,25 @@ private struct GameLauncher: View {
                                            score: score)
                         app.recordMarathon(game: .colorClash, depth: score, score: score)
                         app.recordRunBests(game: .colorClash, difficulty: playDifficulty, score: score)
+                    },
+                    onQuit: { withAnimation { phase = .selector } }
+                )
+            } else if game == .tileShift {
+                let runBests = app.levels.runBests(for: .tileShift, difficulty: playDifficulty)
+                TileShiftScreen(
+                    difficulty: playDifficulty,
+                    modeBest: app.levels.modeBest(for: .tileShift, difficulty: playDifficulty),
+                    allTimeBest: app.levels.marathonBest(for: .tileShift)?.score ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
+                    onRunComplete: { score, bestStreak, misses in
+                        let result = tileShiftResult(score: score, bestStreak: bestStreak, misses: misses)
+                        app.recordStandaloneGameResult(result)
+                        app.recordModeBest(game: .tileShift,
+                                           difficulty: playDifficulty,
+                                           score: score)
+                        app.recordMarathon(game: .tileShift, depth: score, score: score)
+                        app.recordRunBests(game: .tileShift, difficulty: playDifficulty, score: score)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
@@ -633,6 +633,22 @@ private struct GameLauncher: View {
     private func colorClashResult(score: Int, bestStreak: Int, misses: Int) -> GameResult {
         let trials = score + misses
         var result = GameResult(game: .colorClash,
+                                score: score,
+                                baseScore: score,
+                                accuracy: trials > 0 ? Double(score) / Double(trials) : 0,
+                                trials: max(1, trials))
+        result.raw = [
+            "score": Double(score),
+            "correct": Double(score),
+            "wrong": Double(misses),
+            "bestStreak": Double(bestStreak)
+        ]
+        return result
+    }
+
+    private func tileShiftResult(score: Int, bestStreak: Int, misses: Int) -> GameResult {
+        let trials = score + misses
+        var result = GameResult(game: .tileShift,
                                 score: score,
                                 baseScore: score,
                                 accuracy: trials > 0 ? Double(score) / Double(trials) : 0,
