@@ -99,23 +99,23 @@ extension GameID {
 
     var displayName: String {
         switch self {
-        case .arrowStorm: "arrow storm"
+        case .arrowStorm: "arrow ambush"
         case .crowdControl: "crowd control"
-        case .echoGrid: "echo grid"
+        case .echoGrid: "reverse recall"
         case .colorClash: "color clash"
-        case .tileShift: "tile shift"
-        case .lastSeen: "last seen"
-        case .slidePuzzle: "slide puzzle"
-        case .blockEscape: "block escape"
-        case .pegSolitaire: "peg solitaire"
-        case .waterSort: "water sort"
-        case .mahjong: "mahjong"
-        case .crossword: "crossword"
-        case .split: "split"
-        case .blockFit: "block fit"
-        case .fuse: "fuse"
-        case .snake: "snake"
-        case .tower: "tower"
+        case .tileShift: "shape shift"
+        case .lastSeen: "last look"
+        case .slidePuzzle: "number nudge"
+        case .blockEscape: "block breakout"
+        case .pegSolitaire: "peg patience"
+        case .waterSort: "water works"
+        case .mahjong: "mahjong madness"
+        case .crossword: "crossword craze"
+        case .split: "split second"
+        case .blockFit: "fit frenzy"
+        case .fuse: "fuse fever"
+        case .snake: "snake snack"
+        case .tower: "tower tap"
         }
     }
 

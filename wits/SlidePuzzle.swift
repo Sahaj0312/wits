@@ -98,7 +98,7 @@ struct SlidePuzzleScreen: View {
         }
         .task { await runTimer() }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Slide puzzle")
+        .accessibilityLabel("Number nudge")
     }
 
     private var background: some View {
