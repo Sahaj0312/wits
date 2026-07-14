@@ -197,6 +197,16 @@ struct WeeklyChallengeBest: Codable, Equatable {
     var detail: String
 }
 
+/// Rolling day/week bests for an endless run (the post-game card's
+/// "Today's best" and "Week's best" rows). Keys are device-local — the
+/// calendar the player actually lives in — matching the app's day convention.
+struct PeriodBests: Codable, Equatable {
+    var day: String
+    var dayBest: Int
+    var week: String
+    var weekBest: Int
+}
+
 @MainActor
 @Observable
 final class LevelProgressStore {
@@ -208,6 +218,9 @@ final class LevelProgressStore {
     /// Standalone games with speed modes (Snake) keep one best per mode;
     /// the all-time best across modes lives in `marathonBests`.
     private(set) var modeBests: [GameID: [ChallengeDifficulty: Int]] = [:]
+    /// Rolling today/this-week bests per game and mode (games without speed
+    /// modes store theirs under `.easy`).
+    private(set) var periodBests: [GameID: [ChallengeDifficulty: PeriodBests]] = [:]
 
     private static let storageKey = "wits.difficultyProgress.v2"
     private static let migrationKey = "wits.difficultyProgress.migrated.v2"
@@ -258,6 +271,15 @@ final class LevelProgressStore {
         modeBests[game]?[difficulty] ?? 0
     }
 
+    /// Today's and this week's best for a run, zero once the period rolls over.
+    func runBests(for game: GameID,
+                  difficulty: ChallengeDifficulty?,
+                  now: Date = Date()) -> (today: Int, week: Int) {
+        guard let bests = periodBests[game]?[difficulty ?? .easy] else { return (0, 0) }
+        return (bests.day == Self.dayKey(now) ? bests.dayBest : 0,
+                bests.week == Self.weekKey(now) ? bests.weekBest : 0)
+    }
+
     // MARK: Mutations
 
     func select(_ difficulty: ChallengeDifficulty, for game: GameID) {
@@ -306,6 +328,39 @@ final class LevelProgressStore {
             save()
         }
         return newBest
+    }
+
+    func recordRunBests(game: GameID,
+                        difficulty: ChallengeDifficulty?,
+                        score: Int,
+                        now: Date = Date()) {
+        let current = runBests(for: game, difficulty: difficulty, now: now)
+        var perGame = periodBests[game] ?? [:]
+        perGame[difficulty ?? .easy] = PeriodBests(day: Self.dayKey(now),
+                                                   dayBest: max(score, current.today),
+                                                   week: Self.weekKey(now),
+                                                   weekBest: max(score, current.week))
+        periodBests[game] = perGame
+        save()
+    }
+
+    /// Device-local calendar day, e.g. "2026-07-13".
+    private static func dayKey(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar.current
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    /// Device-local ISO week, e.g. "2026-W29".
+    private static func weekKey(_ date: Date) -> String {
+        var calendar = Calendar(identifier: .iso8601)
+        calendar.timeZone = TimeZone.current
+        let year = calendar.component(.yearForWeekOfYear, from: date)
+        let week = calendar.component(.weekOfYear, from: date)
+        return "\(year)-W\(week)"
     }
 
     @discardableResult
@@ -426,12 +481,19 @@ final class LevelProgressStore {
         var score: Int
     }
 
+    private struct StoredPeriodBest: Codable {
+        var game: GameID
+        var difficulty: ChallengeDifficulty
+        var bests: PeriodBests
+    }
+
     private struct Snapshot: Codable {
         var tracks: [StoredTrack]
         var selections: [StoredSelection]
         var marathon: [StoredMarathon]
         var weekly: [StoredWeekly]?
         var modes: [StoredModeBest]?
+        var periods: [StoredPeriodBest]?
     }
 
     private func load() {
@@ -457,10 +519,16 @@ final class LevelProgressStore {
             perGame[entry.difficulty] = entry.score
             modeBests[entry.game] = perGame
         }
+        for entry in snapshot.periods ?? [] {
+            var perGame = periodBests[entry.game] ?? [:]
+            perGame[entry.difficulty] = entry.bests
+            periodBests[entry.game] = perGame
+        }
     }
 
     private func save() {
-        var snapshot = Snapshot(tracks: [], selections: [], marathon: [], weekly: [], modes: [])
+        var snapshot = Snapshot(tracks: [], selections: [], marathon: [],
+                                weekly: [], modes: [], periods: [])
         for (game, values) in tracks {
             for (difficulty, progress) in values {
                 snapshot.tracks.append(StoredTrack(game: game,
@@ -482,6 +550,13 @@ final class LevelProgressStore {
                 snapshot.modes?.append(StoredModeBest(game: game,
                                                       difficulty: difficulty,
                                                       score: score))
+            }
+        }
+        for (game, values) in periodBests {
+            for (difficulty, bests) in values {
+                snapshot.periods?.append(StoredPeriodBest(game: game,
+                                                          difficulty: difficulty,
+                                                          bests: bests))
             }
         }
         if let data = try? JSONEncoder().encode(snapshot) {

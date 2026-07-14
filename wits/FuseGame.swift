@@ -247,6 +247,8 @@ struct FuseScreen: View {
     let best: Int
     let isWeekly: Bool
     let weeklyBestScore: Int
+    let todayBest: Int
+    let weekBest: Int
     /// (score, best tile, moves) → persist.
     let onRunComplete: (Int, Int, Int) -> Void
     let onQuit: () -> Void
@@ -255,6 +257,9 @@ struct FuseScreen: View {
     @State private var phase: Phase = .playing
     @State private var pauseController = GamePauseController()
     @State private var newBest = false
+    /// Best across every run since this screen opened, so the bests rows stay
+    /// honest through PLAY AGAIN loops.
+    @State private var sessionBest = 0
     /// True from a swipe landing until its settle applies; input is ignored so
     /// two-phase animations never interleave.
     @State private var resolving = false
@@ -268,12 +273,16 @@ struct FuseScreen: View {
          seed: UInt64? = nil,
          isWeekly: Bool = false,
          weeklyBestScore: Int = 0,
+         todayBest: Int = 0,
+         weekBest: Int = 0,
          onRunComplete: @escaping (Int, Int, Int) -> Void,
          onQuit: @escaping () -> Void) {
         self.best = best
         self.seed = seed
         self.isWeekly = isWeekly
         self.weeklyBestScore = weeklyBestScore
+        self.todayBest = todayBest
+        self.weekBest = weekBest
         self.onRunComplete = onRunComplete
         self.onQuit = onQuit
         _model = State(initialValue: FuseEngine(seed: seed))
@@ -282,10 +291,10 @@ struct FuseScreen: View {
     var body: some View {
         ZStack {
             GameWorldBackdrop(game: .fuse, patternOpacity: 0.4)
-            switch phase {
-            case .playing: playing
-            case .over: gameOver
-            }
+            // The playing view stays mounted behind the game-over card so the
+            // final board sits dimmed under the scrim.
+            playing
+            if phase == .over { runOver }
         }
         .overlay {
             if phase == .playing, !pauseController.isPaused {
@@ -334,7 +343,7 @@ struct FuseScreen: View {
 
             Spacer(minLength: 24)
         }
-        .allowsHitTesting(!pauseController.isPaused)
+        .allowsHitTesting(phase == .playing && !pauseController.isPaused)
     }
 
     private var header: some View {
@@ -504,100 +513,27 @@ struct FuseScreen: View {
     private func endRun() {
         onRunComplete(model.score, model.bestTile, model.moves)
         if referenceBest == 0 && model.score > 0 { newBest = true }
+        sessionBest = max(sessionBest, model.score)
         GameFeel.shared.play(.gameOver)
         withAnimation(.easeOut(duration: 0.3)) { phase = .over }
     }
 
-    private var gameOver: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 18)
-
-            Text(String(model.bestTile))
-                .font(.system(size: 30, weight: .black, design: world.titleDesign))
-                .foregroundStyle(FusePalette.ink(model.bestTile))
-                .lineLimit(1)
-                .minimumScaleFactor(0.3)
-                .padding(10)
-                .frame(width: 86, height: 86)
-                .background(FusePalette.fill(model.bestTile),
-                            in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .shadow(color: FusePalette.glow(model.bestTile), radius: 14)
-
-            Text(isWeekly ? "WEEKLY CHALLENGE" : "NO MOVES LEFT")
-                .font(.system(size: 11, weight: .black, design: world.bodyDesign))
-                .foregroundStyle(world.accent)
-                .padding(.top, 18)
-
-            Text(newBest ? "NEW BEST" : "RUN OVER")
-                .font(.system(size: 31, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.ink)
-                .padding(.top, 5)
-
-            Text(String(model.score))
-                .font(.system(size: 58, weight: .black, design: world.titleDesign))
-                .foregroundStyle(newBest ? world.accent : world.ink)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.4)
-                .padding(.top, 16)
-
-            HStack(spacing: 10) {
-                statPill("BEST", value: String(max(referenceBest, model.score)))
-                statPill("CELL", value: String(model.bestTile))
-                statPill("MOVES", value: String(model.moves))
-            }
-            .padding(.top, 18)
-
-            Spacer(minLength: 24)
-
-            Button(action: playAgain) {
-                HStack {
-                    Text("PLAY AGAIN")
-                    Spacer()
-                    Image(systemName: "arrow.clockwise")
-                }
-                .font(.system(size: 17, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.background)
-                .padding(.horizontal, 19)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(world.accent, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            }
-            .buttonStyle(PressScale())
-
-            Button(action: onQuit) {
-                Text("DONE")
-                    .font(.system(size: 11.5, weight: .black, design: world.bodyDesign))
-                    .foregroundStyle(world.muted)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 6)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 18)
-        .frame(maxWidth: 560)
-        .overlay {
-            if newBest { ConfettiBurst().ignoresSafeArea() }
-        }
-    }
-
-    private func statPill(_ title: String, value: String) -> some View {
-        VStack(spacing: 2) {
-            Text(title)
-                .font(.system(size: 9.5, weight: .black, design: world.bodyDesign))
-                .foregroundStyle(world.muted)
-            Text(value)
-                .font(.system(size: 16, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.ink)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .padding(.horizontal, 6)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 52)
-        .background(world.surface.opacity(0.75), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    private var runOver: some View {
+        GameRunOverView(game: .fuse,
+                        contextTitle: isWeekly ? "weekly challenge" : "endless run",
+                        badgeSymbol: GameID.fuse.symbol,
+                        score: model.score,
+                        caption: "best cell \(model.bestTile) · \(model.moves) moves",
+                        bests: isWeekly
+                            ? [RunBestLine(title: "This week's best",
+                                           value: max(weeklyBestScore, sessionBest),
+                                           tint: Color(hexAny: 0x6FD6C3))]
+                            : RunBestLine.standard(today: max(todayBest, sessionBest),
+                                                   week: max(weekBest, sessionBest),
+                                                   allTime: max(best, sessionBest)),
+                        celebrate: newBest,
+                        onHome: onQuit,
+                        onPlayAgain: playAgain)
     }
 
     private func playAgain() {

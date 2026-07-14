@@ -377,6 +377,8 @@ struct TowerScreen: View {
     let difficulty: ChallengeDifficulty
     let modeBest: Int
     let allTimeBest: Int
+    let todayBest: Int
+    let weekBest: Int
     /// (score, perfects, best streak) → persist.
     let onRunComplete: (Int, Int, Int) -> Void
     let onQuit: () -> Void
@@ -384,8 +386,10 @@ struct TowerScreen: View {
     @State private var model: TowerEngine
     @State private var phase: Phase = .playing
     @State private var pauseController = GamePauseController()
-    @State private var newModeBest = false
     @State private var newAllTimeBest = false
+    /// Best across every run since this screen opened, so the bests rows stay
+    /// honest through PLAY AGAIN loops.
+    @State private var sessionBest = 0
 
     private enum Phase { case playing, over }
 
@@ -394,11 +398,15 @@ struct TowerScreen: View {
     init(difficulty: ChallengeDifficulty,
          modeBest: Int,
          allTimeBest: Int,
+         todayBest: Int = 0,
+         weekBest: Int = 0,
          onRunComplete: @escaping (Int, Int, Int) -> Void,
          onQuit: @escaping () -> Void) {
         self.difficulty = difficulty
         self.modeBest = modeBest
         self.allTimeBest = allTimeBest
+        self.todayBest = todayBest
+        self.weekBest = weekBest
         self.onRunComplete = onRunComplete
         self.onQuit = onQuit
         _model = State(initialValue: TowerEngine(difficulty: difficulty))
@@ -407,10 +415,10 @@ struct TowerScreen: View {
     var body: some View {
         ZStack {
             GameWorldBackdrop(game: .tower, patternOpacity: 0.8)
-            switch phase {
-            case .playing: playing
-            case .over: gameOver
-            }
+            // The playing view stays mounted behind the game-over card so the
+            // pulled-back tower sits dimmed under the scrim.
+            playing
+            if phase == .over { runOver }
         }
         .overlay {
             if phase == .playing, pauseController.isPaused {
@@ -438,7 +446,7 @@ struct TowerScreen: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
         }
-        .allowsHitTesting(!pauseController.isPaused)
+        .allowsHitTesting(phase == .playing && !pauseController.isPaused)
     }
 
     private var hud: some View {
@@ -546,9 +554,6 @@ struct TowerScreen: View {
             endRun()
             return
         }
-        if !newModeBest, model.score > modeBest, modeBest > 0 {
-            newModeBest = true
-        }
         if !newAllTimeBest, model.score > allTimeBest, allTimeBest > 0 {
             newAllTimeBest = true
             GameFeel.shared.play(.newBest)
@@ -558,10 +563,10 @@ struct TowerScreen: View {
     // MARK: Game over
 
     private func endRun() {
-        if model.score > 0 {
-            if modeBest == 0 || model.score > modeBest { newModeBest = true }
-            if allTimeBest == 0 || model.score > allTimeBest { newAllTimeBest = true }
+        if model.score > 0, allTimeBest == 0 || model.score > allTimeBest {
+            newAllTimeBest = true
         }
+        sessionBest = max(sessionBest, model.score)
         onRunComplete(model.score, model.perfects, model.bestStreak)
         GameFeel.shared.play(.gameOver)
         // Let the camera pull back over the whole tower before the summary.
@@ -571,90 +576,22 @@ struct TowerScreen: View {
         }
     }
 
-    private var gameOver: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 18)
-
-            TowerBadge(size: 74, baseHue: model.baseHue)
-
-            Text("\(difficulty.shortTitle.uppercased()) MODE")
-                .font(.system(size: 11, weight: .black, design: world.bodyDesign))
-                .foregroundStyle(world.accent)
-                .padding(.top, 18)
-
-            Text(newAllTimeBest ? "ALL-TIME BEST" : (newModeBest ? "NEW MODE BEST" : "RUN OVER"))
-                .font(.system(size: 31, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.ink)
-                .padding(.top, 5)
-
-            Text(String(model.score))
-                .font(.system(size: 58, weight: .black, design: world.titleDesign))
-                .foregroundStyle(newModeBest || newAllTimeBest ? world.accent : world.ink)
-                .monospacedDigit()
-                .padding(.top, 16)
-
-            HStack(spacing: 10) {
-                statPill("MODE BEST", value: String(max(modeBest, model.score)))
-                statPill("ALL TIME", value: String(max(allTimeBest, model.score)))
-                statPill("PERFECTS", value: String(model.perfects))
-            }
-            .padding(.top, 18)
-
-            Spacer(minLength: 24)
-
-            Button(action: playAgain) {
-                HStack {
-                    Text("PLAY AGAIN")
-                    Spacer()
-                    Image(systemName: "arrow.clockwise")
-                }
-                .font(.system(size: 17, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.background)
-                .padding(.horizontal, 19)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(world.accent, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            }
-            .buttonStyle(PressScale())
-
-            Button(action: onQuit) {
-                Text("DONE")
-                    .font(.system(size: 11.5, weight: .black, design: world.bodyDesign))
-                    .foregroundStyle(world.muted)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 6)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 18)
-        .frame(maxWidth: 560)
-        .overlay {
-            if newAllTimeBest { ConfettiBurst().ignoresSafeArea() }
-        }
-    }
-
-    private func statPill(_ title: String, value: String) -> some View {
-        VStack(spacing: 2) {
-            Text(title)
-                .font(.system(size: 9.5, weight: .black, design: world.bodyDesign))
-                .foregroundStyle(world.muted)
-            Text(value)
-                .font(.system(size: 16, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.ink)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .padding(.horizontal, 6)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 52)
-        .background(world.surface.opacity(0.75), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    private var runOver: some View {
+        GameRunOverView(game: .tower,
+                        contextTitle: "\(difficulty.shortTitle) mode",
+                        badgeSymbol: difficulty.symbol,
+                        score: model.score,
+                        caption: "\(model.perfects) perfect · best streak \(model.bestStreak)",
+                        bests: RunBestLine.standard(today: max(todayBest, sessionBest),
+                                                    week: max(weekBest, sessionBest),
+                                                    allTime: max(allTimeBest, sessionBest)),
+                        celebrate: newAllTimeBest,
+                        onHome: onQuit,
+                        onPlayAgain: playAgain)
     }
 
     private func playAgain() {
         model = TowerEngine(difficulty: difficulty)
-        newModeBest = false
         newAllTimeBest = false
         pauseController.reset()
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
@@ -795,50 +732,3 @@ private enum TowerPainter {
     }
 }
 
-// MARK: - Pieces
-
-/// Static mini-tower used outside the Canvas (game-over screen).
-struct TowerBadge: View {
-    let size: CGFloat
-    var baseHue: Double = 0.94
-
-    var body: some View {
-        Canvas { context, canvasSize in
-            let s = Double(canvasSize.width) * 0.30
-            let cx = Double(canvasSize.width) / 2
-            let baseY = Double(canvasSize.height) * 0.88
-            let h = 0.34
-
-            func project(_ x: Double, _ y: Double, _ z: Double) -> CGPoint {
-                CGPoint(x: cx + (x - z) * 0.866 * s,
-                        y: baseY - y * s + (x + z) * 0.5 * s)
-            }
-
-            func quad(_ points: [CGPoint], _ color: Color) {
-                var path = Path()
-                path.move(to: points[0])
-                for point in points.dropFirst() { path.addLine(to: point) }
-                path.closeSubpath()
-                context.fill(path, with: .color(color))
-            }
-
-            for i in 0..<4 {
-                let w = 1.0 - Double(i) * 0.14
-                let yB = Double(i) * h, yT = Double(i + 1) * h
-                let x0 = -w / 2, x1 = w / 2
-                quad([project(x0, yT, x0), project(x1, yT, x0),
-                      project(x1, yT, x1), project(x0, yT, x1)],
-                     TowerShades.top(baseHue, i * 3))
-                quad([project(x1, yT, x0), project(x1, yT, x1),
-                      project(x1, yB, x1), project(x1, yB, x0)],
-                     TowerShades.right(baseHue, i * 3))
-                quad([project(x0, yT, x1), project(x1, yT, x1),
-                      project(x1, yB, x1), project(x0, yB, x1)],
-                     TowerShades.left(baseHue, i * 3))
-            }
-        }
-        .frame(width: size, height: size)
-        .shadow(color: Color(hue: baseHue, saturation: 0.5, brightness: 0.9).opacity(0.45),
-                radius: size * 0.14)
-    }
-}

@@ -276,6 +276,8 @@ struct SnakeScreen: View {
     let difficulty: ChallengeDifficulty
     let modeBest: Int
     let allTimeBest: Int
+    var todayBest: Int = 0
+    var weekBest: Int = 0
     /// (score, final length) → persist.
     let onRunComplete: (Int, Int) -> Void
     let onQuit: () -> Void
@@ -283,8 +285,12 @@ struct SnakeScreen: View {
     @State private var model = SnakeEngine()
     @State private var phase: Phase = .playing
     @State private var pauseController = GamePauseController()
-    @State private var newModeBest = false
     @State private var newAllTimeBest = false
+    /// Best across every run since this screen opened, so the bests rows stay
+    /// honest through PLAY AGAIN loops.
+    @State private var sessionBest = 0
+    /// Bumped on PLAY AGAIN so the run loop restarts for the fresh engine.
+    @State private var runID = 0
 
     private enum Phase { case playing, over }
 
@@ -293,10 +299,10 @@ struct SnakeScreen: View {
     var body: some View {
         ZStack {
             GameWorldBackdrop(game: .snake, patternOpacity: 0.35)
-            switch phase {
-            case .playing: playing
-            case .over: gameOver
-            }
+            // The playing view stays mounted behind the game-over card so the
+            // final board sits dimmed under the scrim.
+            playing
+            if phase == .over { runOver }
         }
         .overlay {
             if phase == .playing, pauseController.isPaused {
@@ -328,8 +334,8 @@ struct SnakeScreen: View {
                 .padding(.top, 14)
                 .padding(.bottom, 16)
         }
-        .allowsHitTesting(!pauseController.isPaused)
-        .task { await runLoop() }
+        .allowsHitTesting(phase == .playing && !pauseController.isPaused)
+        .task(id: runID) { await runLoop() }
     }
 
     private var hud: some View {
@@ -486,9 +492,6 @@ struct SnakeScreen: View {
     private func react(to outcome: SnakeEngine.StepOutcome) {
         guard outcome == .ate else { return }
         GameFeel.shared.play(.correct(combo: 1))
-        if !newModeBest, model.score > modeBest, modeBest > 0 {
-            newModeBest = true
-        }
         if !newAllTimeBest, model.score > allTimeBest, allTimeBest > 0 {
             newAllTimeBest = true
             GameFeel.shared.play(.newBest)
@@ -498,100 +501,33 @@ struct SnakeScreen: View {
     // MARK: Game over
 
     private func endRun() {
-        if model.score > 0 {
-            if modeBest == 0 || model.score > modeBest { newModeBest = true }
-            if allTimeBest == 0 || model.score > allTimeBest { newAllTimeBest = true }
+        if model.score > 0, allTimeBest == 0 || model.score > allTimeBest {
+            newAllTimeBest = true
         }
+        sessionBest = max(sessionBest, model.score)
         onRunComplete(model.score, model.body.count)
         GameFeel.shared.play(.gameOver)
         withAnimation(.easeOut(duration: 0.3)) { phase = .over }
     }
 
-    private var gameOver: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 18)
-
-            SnakeAppleBadge(size: 74)
-
-            Text("\(difficulty.shortTitle.uppercased()) MODE")
-                .font(.system(size: 11, weight: .black, design: world.bodyDesign))
-                .foregroundStyle(world.accent)
-                .padding(.top, 18)
-
-            Text(newAllTimeBest ? "ALL-TIME BEST" : (newModeBest ? "NEW MODE BEST" : "RUN OVER"))
-                .font(.system(size: 31, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.ink)
-                .padding(.top, 5)
-
-            Text(String(model.score))
-                .font(.system(size: 58, weight: .black, design: world.titleDesign))
-                .foregroundStyle(newModeBest || newAllTimeBest ? world.accent : world.ink)
-                .monospacedDigit()
-                .padding(.top, 16)
-
-            HStack(spacing: 10) {
-                statPill("MODE BEST", value: String(max(modeBest, model.score)))
-                statPill("ALL TIME", value: String(max(allTimeBest, model.score)))
-                statPill("LENGTH", value: String(model.body.count))
-            }
-            .padding(.top, 18)
-
-            Spacer(minLength: 24)
-
-            Button(action: playAgain) {
-                HStack {
-                    Text("PLAY AGAIN")
-                    Spacer()
-                    Image(systemName: "arrow.clockwise")
-                }
-                .font(.system(size: 17, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.background)
-                .padding(.horizontal, 19)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(world.accent, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            }
-            .buttonStyle(PressScale())
-
-            Button(action: onQuit) {
-                Text("DONE")
-                    .font(.system(size: 11.5, weight: .black, design: world.bodyDesign))
-                    .foregroundStyle(world.muted)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 6)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 18)
-        .frame(maxWidth: 560)
-        .overlay {
-            if newAllTimeBest { ConfettiBurst().ignoresSafeArea() }
-        }
-    }
-
-    private func statPill(_ title: String, value: String) -> some View {
-        VStack(spacing: 2) {
-            Text(title)
-                .font(.system(size: 9.5, weight: .black, design: world.bodyDesign))
-                .foregroundStyle(world.muted)
-            Text(value)
-                .font(.system(size: 16, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.ink)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.5)
-                .padding(.horizontal, 6)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 52)
-        .background(world.surface.opacity(0.75), in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    private var runOver: some View {
+        GameRunOverView(game: .snake,
+                        contextTitle: "\(difficulty.shortTitle) mode",
+                        badgeSymbol: difficulty.symbol,
+                        score: model.score,
+                        caption: "length \(model.body.count)",
+                        bests: RunBestLine.standard(today: max(todayBest, sessionBest),
+                                                    week: max(weekBest, sessionBest),
+                                                    allTime: max(allTimeBest, sessionBest)),
+                        celebrate: newAllTimeBest,
+                        onHome: onQuit,
+                        onPlayAgain: playAgain)
     }
 
     private func playAgain() {
         model = SnakeEngine()
-        newModeBest = false
         newAllTimeBest = false
+        runID += 1
         pauseController.reset()
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }
@@ -845,26 +781,6 @@ private enum SnakeBoardPainter {
 }
 
 // MARK: - Pieces
-
-/// Static apple used outside the Canvas (game-over screen).
-struct SnakeAppleBadge: View {
-    let size: CGFloat
-
-    var body: some View {
-        ZStack {
-            Circle()
-                .fill(SnakePalette.apple)
-                .overlay(Circle().strokeBorder(SnakePalette.appleRim, lineWidth: size * 0.07))
-            Ellipse()
-                .fill(SnakePalette.leaf)
-                .frame(width: size * 0.32, height: size * 0.16)
-                .rotationEffect(.degrees(-24))
-                .offset(x: size * 0.08, y: -size * 0.06)
-        }
-        .frame(width: size, height: size)
-        .shadow(color: SnakePalette.apple.opacity(0.45), radius: size * 0.14)
-    }
-}
 
 enum SnakePalette {
     static let body = Color(hexAny: 0x58C452)

@@ -266,11 +266,14 @@ private struct GameLauncher: View {
             if game == .blockFit {
                 let challenge = weeklyChallenge ?? .current(for: .blockFit)
                 let isWeekly = runKind == .weekly
+                let runBests = app.levels.runBests(for: .blockFit, difficulty: nil)
                 BlockFitScreen(
                     best: app.levels.marathonBest(for: .blockFit)?.score ?? 0,
                     seed: isWeekly ? challenge.seed : nil,
                     isWeekly: isWeekly,
                     weeklyBestScore: app.levels.weeklyBest(for: challenge)?.score ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
                     onRunComplete: { score, lines, pieces in
                         let result = blockFitResult(score: score, lines: lines, pieces: pieces)
                         if isWeekly {
@@ -278,6 +281,7 @@ private struct GameLauncher: View {
                         } else {
                             app.recordStandaloneGameResult(result)
                             app.recordMarathon(game: .blockFit, depth: score, score: score)
+                            app.recordRunBests(game: .blockFit, score: score)
                         }
                     },
                     onQuit: { withAnimation { phase = .selector } }
@@ -285,11 +289,14 @@ private struct GameLauncher: View {
             } else if game == .fuse {
                 let challenge = weeklyChallenge ?? .current(for: .fuse)
                 let isWeekly = runKind == .weekly
+                let runBests = app.levels.runBests(for: .fuse, difficulty: nil)
                 FuseScreen(
                     best: app.levels.marathonBest(for: .fuse)?.score ?? 0,
                     seed: isWeekly ? challenge.seed : nil,
                     isWeekly: isWeekly,
                     weeklyBestScore: app.levels.weeklyBest(for: challenge)?.score ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
                     onRunComplete: { score, bestTile, moves in
                         let result = fuseResult(score: score, bestTile: bestTile, moves: moves)
                         if isWeekly {
@@ -297,15 +304,19 @@ private struct GameLauncher: View {
                         } else {
                             app.recordStandaloneGameResult(result)
                             app.recordMarathon(game: .fuse, depth: score, score: score)
+                            app.recordRunBests(game: .fuse, score: score)
                         }
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
             } else if game == .snake {
+                let runBests = app.levels.runBests(for: .snake, difficulty: playDifficulty)
                 SnakeScreen(
                     difficulty: playDifficulty,
                     modeBest: app.levels.modeBest(for: .snake, difficulty: playDifficulty),
                     allTimeBest: app.levels.marathonBest(for: .snake)?.score ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
                     onRunComplete: { score, length in
                         let result = snakeResult(score: score, length: length)
                         app.recordStandaloneGameResult(result)
@@ -313,14 +324,18 @@ private struct GameLauncher: View {
                                            difficulty: playDifficulty,
                                            score: score)
                         app.recordMarathon(game: .snake, depth: score, score: score)
+                        app.recordRunBests(game: .snake, difficulty: playDifficulty, score: score)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
             } else if game == .tower {
+                let runBests = app.levels.runBests(for: .tower, difficulty: playDifficulty)
                 TowerScreen(
                     difficulty: playDifficulty,
                     modeBest: app.levels.modeBest(for: .tower, difficulty: playDifficulty),
                     allTimeBest: app.levels.marathonBest(for: .tower)?.score ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
                     onRunComplete: { score, perfects, bestStreak in
                         let result = towerResult(score: score, perfects: perfects, bestStreak: bestStreak)
                         app.recordStandaloneGameResult(result)
@@ -328,6 +343,7 @@ private struct GameLauncher: View {
                                            difficulty: playDifficulty,
                                            score: score)
                         app.recordMarathon(game: .tower, depth: score, score: score)
+                        app.recordRunBests(game: .tower, difficulty: playDifficulty, score: score)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )

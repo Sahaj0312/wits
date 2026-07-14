@@ -167,6 +167,11 @@ final class AppModel {
         levels.recordModeBest(game: game, difficulty: difficulty, score: score)
     }
 
+    /// Rolling today/this-week bests shown on the endless post-game card.
+    func recordRunBests(game: GameID, difficulty: ChallengeDifficulty? = nil, score: Int) {
+        levels.recordRunBests(game: game, difficulty: difficulty, score: score)
+    }
+
     private func recordStats(for result: GameResult) {
         let id = result.game
         var st = gameStats[id] ?? GameStats()

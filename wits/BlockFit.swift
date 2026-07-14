@@ -286,6 +286,8 @@ struct BlockFitScreen: View {
     let best: Int
     let isWeekly: Bool
     let weeklyBestScore: Int
+    let todayBest: Int
+    let weekBest: Int
     /// (score, lines cleared, pieces placed) → persist.
     let onRunComplete: (Int, Int, Int) -> Void
     let onQuit: () -> Void
@@ -297,6 +299,9 @@ struct BlockFitScreen: View {
     @State private var dragSlot: Int?
     @State private var dragLocation: CGPoint = .zero
     @State private var newBest = false
+    /// Best across every run since this screen opened, so the bests rows stay
+    /// honest through PLAY AGAIN loops.
+    @State private var sessionBest = 0
     private let seed: UInt64?
 
     private enum Phase { case playing, over }
@@ -310,12 +315,16 @@ struct BlockFitScreen: View {
          seed: UInt64? = nil,
          isWeekly: Bool = false,
          weeklyBestScore: Int = 0,
+         todayBest: Int = 0,
+         weekBest: Int = 0,
          onRunComplete: @escaping (Int, Int, Int) -> Void,
          onQuit: @escaping () -> Void) {
         self.best = best
         self.seed = seed
         self.isWeekly = isWeekly
         self.weeklyBestScore = weeklyBestScore
+        self.todayBest = todayBest
+        self.weekBest = weekBest
         self.onRunComplete = onRunComplete
         self.onQuit = onQuit
         _model = State(initialValue: BlockFitGame(seed: seed))
@@ -324,10 +333,10 @@ struct BlockFitScreen: View {
     var body: some View {
         ZStack {
             GameWorldBackdrop(game: .blockFit, patternOpacity: 0.45)
-            switch phase {
-            case .playing: playing
-            case .over: gameOver
-            }
+            // The playing view stays mounted behind the game-over card so the
+            // final board sits dimmed under the scrim.
+            playing
+            if phase == .over { runOver }
         }
         .overlay {
             if phase == .playing, !pauseController.isPaused {
@@ -385,7 +394,7 @@ struct BlockFitScreen: View {
                 draggedPieceView(piece)
             }
         }
-        .allowsHitTesting(!pauseController.isPaused)
+        .allowsHitTesting(phase == .playing && !pauseController.isPaused)
     }
 
     private var header: some View {
@@ -643,90 +652,27 @@ struct BlockFitScreen: View {
     private func endRun() {
         onRunComplete(model.score, model.linesCleared, model.piecesPlaced)
         if referenceBest == 0 && model.score > 0 { newBest = true }
+        sessionBest = max(sessionBest, model.score)
         GameFeel.shared.play(.gameOver)
         withAnimation(.easeOut(duration: 0.3)) { phase = .over }
     }
 
-    private var gameOver: some View {
-        VStack(spacing: 0) {
-            Spacer(minLength: 18)
-
-            Image(systemName: GameID.blockFit.symbol)
-                .font(.system(size: 35, weight: .black))
-                .foregroundStyle(world.accent)
-                .frame(width: 86, height: 86)
-                .background(world.surface, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-            Text(isWeekly ? "WEEKLY CHALLENGE" : "NO ROOM LEFT")
-                .font(.system(size: 11, weight: .black, design: world.bodyDesign))
-                .foregroundStyle(world.accent)
-                .padding(.top, 18)
-
-            Text(newBest ? "NEW BEST" : "RUN OVER")
-                .font(.system(size: 31, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.ink)
-                .padding(.top, 5)
-
-            Text("\(model.score)")
-                .font(.system(size: 58, weight: .black, design: world.titleDesign))
-                .foregroundStyle(newBest ? world.accent : world.ink)
-                .monospacedDigit()
-                .padding(.top, 16)
-
-            HStack(spacing: 10) {
-                statPill("BEST", value: "\(max(referenceBest, model.score))")
-                statPill("LINES", value: "\(model.linesCleared)")
-                statPill("COMBO", value: "×\(model.bestCombo)")
-            }
-            .padding(.top, 18)
-
-            Spacer(minLength: 24)
-
-            Button(action: playAgain) {
-                HStack {
-                    Text("PLAY AGAIN")
-                    Spacer()
-                    Image(systemName: "arrow.clockwise")
-                }
-                .font(.system(size: 17, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.background)
-                .padding(.horizontal, 19)
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(world.accent, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            }
-            .buttonStyle(PressScale())
-
-            Button(action: onQuit) {
-                Text("DONE")
-                    .font(.system(size: 11.5, weight: .black, design: world.bodyDesign))
-                    .foregroundStyle(world.muted)
-                    .padding(.vertical, 12)
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 6)
-        }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 18)
-        .frame(maxWidth: 560)
-        .overlay {
-            if newBest { ConfettiBurst().ignoresSafeArea() }
-        }
-    }
-
-    private func statPill(_ title: String, value: String) -> some View {
-        VStack(spacing: 2) {
-            Text(title)
-                .font(.system(size: 9.5, weight: .black, design: world.bodyDesign))
-                .foregroundStyle(world.muted)
-            Text(value)
-                .font(.system(size: 16, weight: .black, design: world.titleDesign))
-                .foregroundStyle(world.ink)
-                .monospacedDigit()
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 52)
-        .background(world.surface, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+    private var runOver: some View {
+        GameRunOverView(game: .blockFit,
+                        contextTitle: isWeekly ? "weekly challenge" : "endless run",
+                        badgeSymbol: GameID.blockFit.symbol,
+                        score: model.score,
+                        caption: "\(model.linesCleared) lines · combo ×\(model.bestCombo)",
+                        bests: isWeekly
+                            ? [RunBestLine(title: "This week's best",
+                                           value: max(weeklyBestScore, sessionBest),
+                                           tint: Color(hexAny: 0x6FD6C3))]
+                            : RunBestLine.standard(today: max(todayBest, sessionBest),
+                                                   week: max(weekBest, sessionBest),
+                                                   allTime: max(best, sessionBest)),
+                        celebrate: newBest,
+                        onHome: onQuit,
+                        onPlayAgain: playAgain)
     }
 
     private func playAgain() {
