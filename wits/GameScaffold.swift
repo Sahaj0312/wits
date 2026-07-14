@@ -345,9 +345,9 @@ extension GameID {
             ]
         case .lastSeen:
             [
-                "tap an object you have not chosen yet.",
-                "keep the earlier picks in mind.",
-                "never tap the same object twice."
+                "tap an object you have not chosen yet — every new one is a point.",
+                "the board reshuffles after each pick, and clearing a set grows it.",
+                "you have three hearts. tapping a repeat costs one — lose them all and the run ends."
             ]
         case .slidePuzzle:
             [

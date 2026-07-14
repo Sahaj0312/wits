@@ -31,13 +31,14 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
 
     /// Difficulty-track games (everything but the standalone survival modes).
     static var live: [GameID] {
-        [.echoGrid, .lastSeen,
+        [.echoGrid,
          .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong, .crossword]
     }
     var isLive: Bool { Self.live.contains(self) }
 
     static var standalone: [GameID] {
-        [.arrowStorm, .crowdControl, .colorClash, .tileShift, .split, .blockFit, .fuse, .snake, .tower]
+        [.arrowStorm, .crowdControl, .colorClash, .tileShift, .lastSeen,
+         .split, .blockFit, .fuse, .snake, .tower]
     }
     var isStandalone: Bool { Self.standalone.contains(self) }
 
@@ -184,7 +185,7 @@ extension GameID {
         case .echoGrid: "watch a path of tiles light up, then tap them back in reverse order."
         case .colorClash: "tap the colour a word is printed in, not the word it spells. the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
         case .tileShift: "follow the rule on screen — sometimes match by colour, sometimes by shape. it keeps flipping, the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
-        case .lastSeen: "tap each object once — never tap one you've already chosen as new ones appear."
+        case .lastSeen: "tap each object once — never tap one you've already chosen. the board reshuffles every pick and grows as you clear it, and you have three hearts — a repeat costs one."
         case .slidePuzzle: "the numbered tiles are scrambled around one empty square. slide them through the gap until they read in order — in as few moves as you can."
         case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit — in as few moves as you can."
         case .pegSolitaire: "every jump leaps one peg over a neighbour into an empty hole, and the jumped peg is removed. keep jumping until a single peg remains — on the marked hole at higher levels."

@@ -205,7 +205,7 @@ private struct GameLauncher: View {
                     },
                     onClose: { dismiss() }
                 )
-            } else if [.arrowStorm, .crowdControl, .colorClash, .tileShift].contains(game) {
+            } else if [.arrowStorm, .crowdControl, .colorClash, .tileShift, .lastSeen].contains(game) {
                 EndlessModeSelectView(
                     game: game,
                     onPlay: { difficulty in
@@ -415,6 +415,25 @@ private struct GameLauncher: View {
                                            score: score)
                         app.recordMarathon(game: .tileShift, depth: score, score: score)
                         app.recordRunBests(game: .tileShift, difficulty: playDifficulty, score: score)
+                    },
+                    onQuit: { withAnimation { phase = .selector } }
+                )
+            } else if game == .lastSeen {
+                let runBests = app.levels.runBests(for: .lastSeen, difficulty: playDifficulty)
+                LastSeenScreen(
+                    difficulty: playDifficulty,
+                    modeBest: app.levels.modeBest(for: .lastSeen, difficulty: playDifficulty),
+                    allTimeBest: app.levels.marathonBest(for: .lastSeen)?.score ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
+                    onRunComplete: { score, remembered, misses in
+                        let result = lastSeenResult(score: score, remembered: remembered, misses: misses)
+                        app.recordStandaloneGameResult(result)
+                        app.recordModeBest(game: .lastSeen,
+                                           difficulty: playDifficulty,
+                                           score: score)
+                        app.recordMarathon(game: .lastSeen, depth: score, score: score)
+                        app.recordRunBests(game: .lastSeen, difficulty: playDifficulty, score: score)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )
@@ -642,6 +661,22 @@ private struct GameLauncher: View {
             "correct": Double(score),
             "wrong": Double(misses),
             "bestStreak": Double(bestStreak)
+        ]
+        return result
+    }
+
+    private func lastSeenResult(score: Int, remembered: Int, misses: Int) -> GameResult {
+        let trials = score + misses
+        var result = GameResult(game: .lastSeen,
+                                score: score,
+                                baseScore: score,
+                                accuracy: trials > 0 ? Double(score) / Double(trials) : 0,
+                                trials: max(1, trials))
+        result.raw = [
+            "score": Double(score),
+            "correct": Double(score),
+            "wrong": Double(misses),
+            "remembered": Double(remembered)
         ]
         return result
     }
