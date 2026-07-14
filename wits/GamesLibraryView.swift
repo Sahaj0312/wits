@@ -24,14 +24,9 @@ struct GamesLibraryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .center, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("WITS")
-                            .font(.system(size: 13, weight: .black, design: .monospaced))
-                            .foregroundStyle(Color(hexAny: 0xFF4E77))
-                        Text("choose a game")
-                            .font(.system(size: 29, weight: .black, design: .default))
-                            .foregroundStyle(.white)
-                    }
+                    Text("choose a game")
+                        .font(.system(size: 29, weight: .black, design: .default))
+                        .foregroundStyle(.white)
                     Spacer()
                     StreakPill(count: app.streak.current)
                     shuffleButton
