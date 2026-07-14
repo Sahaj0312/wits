@@ -111,6 +111,14 @@ extension GameID {
                       accent: Color(hexAny: 0xF2C14E), secondary: Color(hexAny: 0x5BC08D),
                       difficultyColors: [0x5BC08D, 0xF2C14E, 0xF08A4B, 0xE05563].map { Color(hexAny: $0) },
                       titleDesign: .serif, bodyDesign: .rounded, uppercaseTitles: false)
+        case .crossword:
+            // The morning paper: newsprint cream, black ink, one blue pen.
+            GameWorld(background: Color(hexAny: 0xF5F0E2),
+                      surface: Color(hexAny: 0xFFFDF6), raised: Color(hexAny: 0xE9E1CB),
+                      ink: Color(hexAny: 0x1C1A15), muted: Color(hexAny: 0x6E6757),
+                      accent: Color(hexAny: 0x2B62E3), secondary: Color(hexAny: 0xD8442E),
+                      difficultyColors: [0x3F9C5A, 0x2B62E3, 0xE0812F, 0xD8442E].map { Color(hexAny: $0) },
+                      titleDesign: .serif, bodyDesign: .default, uppercaseTitles: false)
         case .split:
             GameWorld(background: Color(hexAny: 0x090713),
                       surface: Color(hexAny: 0x191329), raised: Color(hexAny: 0x251B3B),
@@ -295,6 +303,25 @@ private struct GameWorldPattern: View {
                                                           width: radius * 2, height: radius * 2)),
                                    with: .color(world.ink.opacity(0.10)), lineWidth: 2)
                 }
+            case .crossword:
+                // Faint newsprint rules and a few scattered ink blocks.
+                for y in stride(from: 26 as CGFloat, through: size.height, by: 30) {
+                    var line = Path()
+                    line.move(to: CGPoint(x: 14, y: y))
+                    line.addLine(to: CGPoint(x: size.width - 14, y: y))
+                    context.stroke(line, with: .color(world.ink.opacity(0.05)), lineWidth: 1)
+                }
+                for index in 0..<7 {
+                    let side: CGFloat = 22
+                    let x = CGFloat((index * 131) % 340) / 340 * (size.width - side)
+                    let y = CGFloat((index * 219) % 720) / 720 * size.height
+                    let rect = CGRect(x: x, y: y, width: side, height: side)
+                    if index.isMultiple(of: 3) {
+                        context.fill(Path(rect), with: .color(world.ink.opacity(0.10)))
+                    } else {
+                        context.stroke(Path(rect), with: .color(world.ink.opacity(0.12)), lineWidth: 1.5)
+                    }
+                }
             case .split:
                 context.fill(Path(CGRect(x: 0, y: 0, width: size.width / 2, height: size.height)),
                              with: .color(world.accent.opacity(0.06)))
@@ -416,6 +443,7 @@ struct GamePosterArt: View {
                 case .pegSolitaire: PegSolitairePoster(w: w, h: h)
                 case .waterSort: WaterSortPoster(w: w, h: h)
                 case .mahjong: MahjongPoster(w: w, h: h)
+                case .crossword: CrosswordPoster(w: w, h: h)
                 case .split: SplitPoster(w: w, h: h)
                 case .blockFit: BlockFitPoster(w: w, h: h)
                 case .fuse: FusePoster(w: w, h: h)
@@ -1114,6 +1142,50 @@ private struct SnakePoster: View {
             .shadow(color: Color(hexAny: 0xF05B4C).opacity(0.6), radius: 7)
             .position(x: 0.70 * w, y: 0.38 * h)
         }
+    }
+}
+
+// MARK: - Crossword — a mini grid mid-solve, one word inked in blue.
+
+private struct CrosswordPoster: View {
+    let w: CGFloat, h: CGFloat
+
+    // 5×5 mini: "" = empty, "#" = block, letters = solved.
+    private let cells: [[String]] = [
+        ["#", "#", "W", "I", "T"],
+        ["#", "M", "I", "N", "D"],
+        ["W", "O", "R", "D", ""],
+        ["", "P", "E", "", "#"],
+        ["", "S", "", "#", "#"]
+    ]
+
+    var body: some View {
+        let side = w * 0.15
+        let originX = w * 0.5 - side * 2.5
+        let originY = h * 0.5 - side * 2.5
+
+        ZStack {
+            ForEach(0..<25, id: \.self) { index in
+                let r = index / 5, c = index % 5
+                let value = cells[r][c]
+                ZStack {
+                    Rectangle()
+                        .fill(value == "#" ? Color(hexAny: 0x1C1A15)
+                              : (r == 2 ? Color(hexAny: 0x2B62E3).opacity(0.18) : Color(hexAny: 0xFFFDF6)))
+                    Rectangle()
+                        .strokeBorder(Color(hexAny: 0x1C1A15).opacity(0.5), lineWidth: 1)
+                    if value != "#", !value.isEmpty {
+                        Text(value)
+                            .font(.system(size: side * 0.58, weight: .heavy, design: .serif))
+                            .foregroundStyle(Color(hexAny: r == 2 ? 0x2B62E3 : 0x1C1A15))
+                    }
+                }
+                .frame(width: side, height: side)
+                .position(x: originX + (CGFloat(c) + 0.5) * side,
+                          y: originY + (CGFloat(r) + 0.5) * side)
+            }
+        }
+        .shadow(color: Color(hexAny: 0x1C1A15).opacity(0.12), radius: 8, y: 4)
     }
 }
 

@@ -64,7 +64,7 @@ extension GameID {
 
     var weeklyTrackLevel: Int {
         switch self {
-        case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong: 5
+        case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong, .crossword: 5
         case .split, .blockFit, .fuse, .snake, .tower: 1
         default: 8
         }

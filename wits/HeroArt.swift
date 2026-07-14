@@ -51,7 +51,7 @@ enum HeroPattern {
             arrows(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
         case .crowdControl, .split:
             crowd(&ctx, size, ink: ink, soft: inkSoft, glow: glow)
-        case .echoGrid:
+        case .echoGrid, .crossword:
             grid(&ctx, size, litPath: true, ink: ink, soft: inkSoft, glow: glow)
         case .colorClash:
             rings(&ctx, size, ink: ink, soft: inkSoft, glow: glow)

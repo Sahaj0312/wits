@@ -379,6 +379,12 @@ extension GameID {
                 "when its twin lands in the rack, the pair vanishes.",
                 "clear every tile before the rack fills with singles. undo rewinds a risky pick."
             ]
+        case .crossword:
+            [
+                "tap a square, then type — tap the square again to flip between across and down.",
+                "every answer crosses others, so each letter you land is a free hint elsewhere.",
+                "stuck? the bulb reveals the selected square, but clean solves grade higher."
+            ]
         case .split:
             [
                 "tap the left side to keep the flyer up.",
