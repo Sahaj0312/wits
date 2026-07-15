@@ -40,6 +40,9 @@ struct GamesLibraryView: View {
                     }
                 }
                 .padding(.top, 4)
+
+                communityRow
+                    .padding(.top, 4)
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.bottom, 24)
@@ -155,6 +158,115 @@ struct GamesLibraryView: View {
         let difficulty = app.levels.selectedDifficulty(for: g)
         let level = app.levels.currentLevel(for: g, difficulty: difficulty)
         return "\(difficulty.title) · level \(level)"
+    }
+
+    /// A small community footer after the game grid. It deliberately uses the
+    /// Wits visual language instead of pretending these are playable games.
+    private var communityRow: some View {
+        HStack(alignment: .top, spacing: 12) {
+            ShareLink(item: shareMessage) {
+                ZStack(alignment: .topLeading) {
+                    LinearGradient(colors: [Color(hexAny: 0x6657F5), Color(hexAny: 0x35C8B5)],
+                                   startPoint: .topLeading,
+                                   endPoint: .bottomTrailing)
+
+                    Circle()
+                        .fill(.white.opacity(0.13))
+                        .frame(width: 112, height: 112)
+                        .offset(x: 78, y: -32)
+
+                    VStack(alignment: .leading, spacing: 0) {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 25, weight: .black))
+                            .foregroundStyle(.white)
+                            .frame(width: 50, height: 50)
+                            .background(.black.opacity(0.17), in: Circle())
+
+                        Spacer(minLength: 12)
+
+                        Text("PASS IT ON")
+                            .font(.system(size: 22, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.78)
+
+                        Text("invite a friend to play")
+                            .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.82))
+                            .padding(.top, 5)
+
+                        HStack(spacing: 5) {
+                            Text("SHARE WITS")
+                            Image(systemName: "arrow.up.forward")
+                        }
+                        .font(.system(size: 11, weight: .black, design: .monospaced))
+                        .foregroundStyle(.white)
+                        .padding(.top, 13)
+                    }
+                    .padding(15)
+                }
+                .frame(maxWidth: .infinity)
+                .aspectRatio(0.88, contentMode: .fit)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(.white.opacity(0.18), lineWidth: 1))
+                .shadow(color: Color(hexAny: 0x6657F5).opacity(0.22), radius: 12, y: 6)
+            }
+            .buttonStyle(PressScale())
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel("Share Wits with a friend")
+
+            ZStack {
+                Color(hexAny: 0x17171C)
+
+                Circle()
+                    .strokeBorder(Color(hexAny: 0xF2C94C).opacity(0.17),
+                                  style: StrokeStyle(lineWidth: 2, dash: [5, 7]))
+                    .frame(width: 126, height: 126)
+                    .offset(x: 48, y: -45)
+
+                VStack(spacing: 0) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color(hexAny: 0x25252D))
+                            .frame(width: 58, height: 58)
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 25, weight: .black))
+                            .foregroundStyle(Color(hexAny: 0xF2C94C))
+                    }
+
+                    Spacer(minLength: 12)
+
+                    Text("MORE WITS")
+                        .font(.system(size: 21, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+
+                    Text("ON THE WAY")
+                        .font(.system(size: 11, weight: .black, design: .monospaced))
+                        .foregroundStyle(Color(hexAny: 0xF2C94C))
+                        .padding(.top, 5)
+
+                    Text("fresh games are in the works")
+                        .font(.system(size: 12.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.55))
+                        .multilineTextAlignment(.center)
+                        .padding(.top, 12)
+                }
+                .padding(15)
+            }
+            .frame(maxWidth: .infinity)
+            .aspectRatio(0.88, contentMode: .fit)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(.white.opacity(0.10), lineWidth: 1))
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("More Wits games are on the way")
+        }
+    }
+
+    private var shareMessage: String {
+        "I’ve been playing Wits — quick brain games for memory, logic, words, maths, and focus. Give it a try!"
     }
 
 }
