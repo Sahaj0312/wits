@@ -173,9 +173,13 @@ struct CrosswordScreen: View {
         } else {
             let isSelected = pos == selected
             ZStack(alignment: .topLeading) {
+                // Opaque paper first: the highlight tints are translucent and
+                // would otherwise composite over the grid's ink-colored base.
+                Rectangle()
+                    .fill(world.surface)
                 Rectangle()
                     .fill(isSelected ? world.accent.opacity(0.45)
-                          : (inWord ? world.accent.opacity(0.16) : world.surface))
+                          : (inWord ? world.accent.opacity(0.16) : .clear))
                 Rectangle()
                     .strokeBorder(world.ink.opacity(0.25), lineWidth: 0.5)
                 if puzzle.numbers[r][c] > 0 {
