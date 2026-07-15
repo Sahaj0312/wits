@@ -24,7 +24,7 @@ struct GamesLibraryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .center, spacing: 10) {
-                    Text("choose a game")
+                    Text("games")
                         .font(.system(size: 29, weight: .black, design: .default))
                         .foregroundStyle(.white)
                     Spacer()
