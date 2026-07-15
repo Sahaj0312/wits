@@ -19,7 +19,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     case arrowStorm, crowdControl, echoGrid
     case colorClash, tileShift, lastSeen
     case slidePuzzle, blockEscape, pegSolitaire
-    case waterSort, mahjong, crossword
+    case waterSort, numberNests, mahjong, crossword
     // Standalone survival modes.
     case split
     case blockFit
@@ -32,7 +32,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     /// Difficulty-track games (everything but the standalone survival modes).
     static var live: [GameID] {
         [.echoGrid,
-         .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong, .crossword]
+         .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .numberNests, .mahjong, .crossword]
     }
     var isLive: Bool { Self.live.contains(self) }
 
@@ -52,7 +52,7 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     /// their own top/bottom spacing.
     var ownsSafeAreaSurface: Bool {
         switch self {
-        case .echoGrid, .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong, .crossword: true
+        case .echoGrid, .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .numberNests, .mahjong, .crossword: true
         default: false
         }
     }
@@ -87,6 +87,7 @@ extension GameID {
         case .echoGrid, .lastSeen: .memory
         case .colorClash, .tileShift: .flexibility
         case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort: .reasoning
+        case .numberNests: .math
         case .mahjong: .focus
         case .crossword: .language
         case .split: .multitasking
@@ -109,6 +110,7 @@ extension GameID {
         case .blockEscape: "block breakout"
         case .pegSolitaire: "peg patience"
         case .waterSort: "water works"
+        case .numberNests: "number nests"
         case .mahjong: "mahjong madness"
         case .crossword: "crossword craze"
         case .split: "split second"
@@ -132,6 +134,7 @@ extension GameID {
         case .blockEscape: "free the big block."
         case .pegSolitaire: "jump pegs. leave just one."
         case .waterSort: "pour until every tube is one colour."
+        case .numberNests: "every number has one perfect place."
         case .mahjong: "bank the free tiles. don't fill the rack."
         case .crossword: "five by five. every letter counts twice."
         case .split: "fly and pick at once. one slip ends it."
@@ -149,6 +152,7 @@ extension GameID {
         case .echoGrid, .lastSeen: "memory"
         case .colorClash, .tileShift: "flexibility"
         case .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .blockFit, .fuse: "problem solving"
+        case .numberNests: "mathematics"
         case .crossword: "language"
         case .split, .snake, .tower: "attention"
         }
@@ -167,6 +171,7 @@ extension GameID {
         case .blockEscape: "forward planning"
         case .pegSolitaire: "strategic planning"
         case .waterSort: "sequencing"
+        case .numberNests: "arithmetic deduction"
         case .mahjong: "visual scanning"
         case .crossword: "word retrieval"
         case .split: "dual-tasking"
@@ -190,6 +195,7 @@ extension GameID {
         case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit — in as few moves as you can."
         case .pegSolitaire: "every jump leaps one peg over a neighbour into an empty hole, and the jumped peg is removed. keep jumping until a single peg remains — on the marked hole at higher levels."
         case .waterSort: "the tubes come scrambled. pour the top colour onto a matching colour or into an empty tube until every tube holds a single colour — in as few pours as you can."
+        case .numberNests: "fill the grid with 1 through its size without repeating a number in any row or column. inside each outlined nest, the numbers must combine to its target using the shown operation."
         case .mahjong: "tap free tiles to lift them into the rack — the moment a twin lands, the pair vanishes. the rack holds only a few, so every pick is a bet on which pairs you can actually reach before the space runs out."
         case .crossword: "fill the mini grid so every across and down answer matches its clue. tap a square to aim, tap it again to flip direction, and type — each letter you land helps the crossing word too."
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
@@ -213,6 +219,7 @@ extension GameID {
         case .blockEscape: "forward planning is simulating moves in your head — seeing how each slide opens or closes the big block's path several steps ahead."
         case .pegSolitaire: "strategic planning is ordering moves so nothing gets stranded — every jump has to leave the rest of the board still clearable."
         case .waterSort: "sequencing is ordering steps under constraints — every pour opens some moves and blocks others, so the whole plan matters before the first tube tips."
+        case .numberNests: "arithmetic deduction is using totals, products and exclusions together — every number placed narrows both its nest and the lines crossing it."
         case .mahjong: "visual scanning is searching a busy field quickly and precisely — weighing which tiles to bank when every rack slot you spend narrows what you can chase next."
         case .crossword: "word retrieval is pulling vocabulary from memory on demand — the crossings hand you letters, and your lexicon has to do the rest."
         case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
@@ -236,6 +243,7 @@ extension GameID {
         case .blockEscape: "square.split.2x2.fill"
         case .pegSolitaire: "circle.grid.cross.fill"
         case .waterSort: "testtube.2"
+        case .numberNests: "number.square.fill"
         case .mahjong: "square.stack.3d.up.fill"
         case .crossword: "textformat.abc"
         case .split: "rectangle.split.1x2.fill"
@@ -249,7 +257,7 @@ extension GameID {
     /// Starting difficulty level for a brand-new player (1…10).
     var seedLevel: Double {
         switch self {
-        case .crowdControl, .echoGrid, .lastSeen, .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .mahjong, .crossword: 1
+        case .crowdControl, .echoGrid, .lastSeen, .slidePuzzle, .blockEscape, .pegSolitaire, .waterSort, .numberNests, .mahjong, .crossword: 1
         default: 2
         }
     }
@@ -265,6 +273,7 @@ extension GameID {
         case .slidePuzzle: "efficiency"
         case .blockEscape: "efficiency"
         case .waterSort: "efficiency"
+        case .numberNests: "efficiency"
         case .mahjong: "efficiency"
         case .crossword: "efficiency"
         case .pegSolitaire: "clearPct"
@@ -287,6 +296,7 @@ extension GameID {
         case .slidePuzzle: "\(Int(v))% of par"
         case .blockEscape: "\(Int(v))% of par"
         case .waterSort: "\(Int(v))% of par"
+        case .numberNests: "\(Int(v))% clean"
         case .mahjong: "\(Int(v))% clean"
         case .crossword: "\(Int(v))% clean"
         case .pegSolitaire: "\(Int(v))% cleared"

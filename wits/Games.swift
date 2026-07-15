@@ -55,6 +55,13 @@ enum Mahjong: Game {
     }
 }
 
+enum NumberNests: Game {
+    static let id = GameID.numberNests
+    static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
+        AnyView(NumberNestsScreen(cfg: config, onResult: onComplete))
+    }
+}
+
 enum Crossword: Game {
     static let id = GameID.crossword
     static func makeView(config: GameConfig, onComplete: @escaping (GameResult) -> Void) -> AnyView {
@@ -71,6 +78,7 @@ func makeGameView(_ id: GameID, config: GameConfig, onComplete: @escaping (GameR
     case .blockEscape: BlockEscape.makeView(config: config, onComplete: onComplete)
     case .pegSolitaire: PegSolitaire.makeView(config: config, onComplete: onComplete)
     case .waterSort:   WaterSort.makeView(config: config, onComplete: onComplete)
+    case .numberNests: NumberNests.makeView(config: config, onComplete: onComplete)
     case .mahjong:     Mahjong.makeView(config: config, onComplete: onComplete)
     case .crossword:   Crossword.makeView(config: config, onComplete: onComplete)
     // Standalone survival modes are hosted directly by the launcher.

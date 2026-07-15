@@ -373,6 +373,12 @@ extension GameID {
                 "a pour lands only on a matching colour or an empty tube.",
                 "sort every colour into its own tube in as few pours as you can."
             ]
+        case .numberNests:
+            [
+                "fill every row and column with 1 through the grid size — no repeats.",
+                "numbers inside each outlined nest must combine to its target using the shown operation.",
+                "use NOTES to test possibilities; CHECK when the whole grid is full."
+            ]
         case .mahjong:
             [
                 "tap a free tile — one with an open side and nothing on top — to lift it into the rack.",

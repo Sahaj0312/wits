@@ -103,6 +103,14 @@ extension GameID {
                       accent: Color(hexAny: 0x5EE6D0), secondary: Color(hexAny: 0xFFB84D),
                       difficultyColors: [0x7DEBC9, 0x6FB1FF, 0xFFB84D, 0xFF6E8A].map { Color(hexAny: $0) },
                       titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: false)
+        case .numberNests:
+            // Chalkboard arithmetic: deep green slate, warm chalk and coral marks.
+            GameWorld(background: Color(hexAny: 0x102A2A),
+                      surface: Color(hexAny: 0x193C3A), raised: Color(hexAny: 0x24504C),
+                      ink: Color(hexAny: 0xFFF7E6), muted: Color(hexAny: 0x9BBDB4),
+                      accent: Color(hexAny: 0xF4C95D), secondary: Color(hexAny: 0xFF746C),
+                      difficultyColors: [0x7DDEB5, 0xF4C95D, 0xF39C55, 0xFF746C].map { Color(hexAny: $0) },
+                      titleDesign: .rounded, bodyDesign: .rounded, uppercaseTitles: false)
         case .mahjong:
             // Lacquer and ivory: deep red-brown table, gold and jade accents.
             GameWorld(background: Color(hexAny: 0x2E1013),
@@ -282,6 +290,28 @@ private struct GameWorldPattern: View {
                                                           width: radius * 2, height: radius * 2)),
                                    with: .color(world.ink.opacity(0.10)), lineWidth: 2)
                 }
+            case .numberNests:
+                // Arithmetic cages drifting across a chalkboard grid.
+                let step: CGFloat = 52
+                for x in stride(from: -12 as CGFloat, through: size.width, by: step) {
+                    for y in stride(from: -12 as CGFloat, through: size.height, by: step) {
+                        let rect = CGRect(x: x, y: y, width: step, height: step)
+                        context.stroke(Path(rect), with: .color(world.ink.opacity(0.045)), lineWidth: 1)
+                    }
+                }
+                let clues = ["6+", "3−", "8×", "2÷"]
+                for index in clues.indices {
+                    let x = CGFloat((index * 103) % 310) / 310 * max(1, size.width - 70)
+                    let y = CGFloat((index * 181) % 650) / 650 * max(1, size.height - 70)
+                    let rect = CGRect(x: x, y: y, width: 70, height: index.isMultiple(of: 2) ? 104 : 70)
+                    context.stroke(Path(roundedRect: rect, cornerRadius: 7),
+                                   with: .color((index.isMultiple(of: 2) ? world.accent : world.secondary).opacity(0.11)),
+                                   lineWidth: 3)
+                    context.draw(Text(clues[index])
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .foregroundStyle(world.ink.opacity(0.10)),
+                                 at: CGPoint(x: rect.minX + 15, y: rect.minY + 13), anchor: .center)
+                }
             case .mahjong:
                 // Sparse ivory tile backs resting on the lacquer, a few pips.
                 for index in 0..<6 {
@@ -442,6 +472,7 @@ struct GamePosterArt: View {
                 case .blockEscape: BlockEscapePoster(w: w, h: h)
                 case .pegSolitaire: PegSolitairePoster(w: w, h: h)
                 case .waterSort: WaterSortPoster(w: w, h: h)
+                case .numberNests: NumberNestsPoster(w: w, h: h)
                 case .mahjong: MahjongPoster(w: w, h: h)
                 case .crossword: CrosswordPoster(w: w, h: h)
                 case .split: SplitPoster(w: w, h: h)
@@ -824,6 +855,62 @@ private struct WaterSortPoster: View {
             shape.strokeBorder(.white.opacity(0.30), lineWidth: 2)
         }
         .frame(width: tubeW, height: tubeH)
+    }
+}
+
+// MARK: - Number Nests — arithmetic cages inside a Latin-square grid.
+
+private struct NumberNestsPoster: View {
+    let w: CGFloat, h: CGFloat
+
+    private let values = [[1, 3, 2], [2, 1, 3], [3, 2, 1]]
+    private let clues: [Int: String] = [0: "4+", 2: "2", 3: "6×", 7: "1−"]
+
+    var body: some View {
+        let side = w * 0.62
+        let cell = side / 3
+        let origin = CGPoint(x: (w - side) / 2, y: h * 0.43)
+
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 7)
+                .fill(Color(hexAny: 0x193C3A))
+                .frame(width: side, height: side)
+                .offset(x: origin.x, y: origin.y)
+
+            ForEach(0..<9, id: \.self) { index in
+                let r = index / 3, c = index % 3
+                ZStack(alignment: .topLeading) {
+                    Rectangle()
+                        .strokeBorder(.white.opacity(0.24), lineWidth: 1)
+                    if let clue = clues[index] {
+                        Text(clue)
+                            .font(.system(size: cell * 0.18, weight: .black, design: .rounded))
+                            .foregroundStyle(Color(hexAny: 0xF4C95D))
+                            .padding(3)
+                    }
+                    Text("\(values[r][c])")
+                        .font(.system(size: cell * 0.46, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(width: cell, height: cell)
+                        .offset(y: cell * 0.08)
+                }
+                .frame(width: cell, height: cell)
+                .offset(x: origin.x + CGFloat(c) * cell,
+                        y: origin.y + CGFloat(r) * cell)
+            }
+
+            // A few heavy, irregular boundaries make the nested regions read.
+            Path { path in
+                path.move(to: CGPoint(x: origin.x + cell * 2, y: origin.y))
+                path.addLine(to: CGPoint(x: origin.x + cell * 2, y: origin.y + cell))
+                path.addLine(to: CGPoint(x: origin.x + cell, y: origin.y + cell))
+                path.addLine(to: CGPoint(x: origin.x + cell, y: origin.y + cell * 2))
+                path.addLine(to: CGPoint(x: origin.x, y: origin.y + cell * 2))
+                path.move(to: CGPoint(x: origin.x + cell * 2, y: origin.y + cell))
+                path.addLine(to: CGPoint(x: origin.x + cell * 2, y: origin.y + cell * 3))
+            }
+            .stroke(.white.opacity(0.86), style: StrokeStyle(lineWidth: 3, lineCap: .square, lineJoin: .round))
+        }
     }
 }
 
