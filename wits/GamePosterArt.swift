@@ -864,18 +864,21 @@ private struct NumberNestsPoster: View {
     let w: CGFloat, h: CGFloat
 
     private let values = [[1, 3, 2], [2, 1, 3], [3, 2, 1]]
-    private let clues: [Int: String] = [0: "4+", 2: "2", 3: "6×", 7: "1−"]
+    private let clues: [Int: String] = [0: "4+", 2: "2", 3: "6×", 4: "5+", 7: "2"]
 
     var body: some View {
-        let side = w * 0.62
+        let isWide = w > h * 1.15
+        let side = isWide ? min(w * 0.46, h * 0.72) : min(w * 0.70, h * 0.52)
         let cell = side / 3
-        let origin = CGPoint(x: (w - side) / 2, y: h * 0.43)
+        let origin = CGPoint(x: (w - side) / 2,
+                             y: isWide ? h * 0.08 : h * 0.31)
 
         ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 7)
+            Rectangle()
                 .fill(Color(hexAny: 0x193C3A))
                 .frame(width: side, height: side)
                 .offset(x: origin.x, y: origin.y)
+                .shadow(color: .black.opacity(0.18), radius: 9, y: 6)
 
             ForEach(0..<9, id: \.self) { index in
                 let r = index / 3, c = index % 3
@@ -899,17 +902,29 @@ private struct NumberNestsPoster: View {
                         y: origin.y + CGFloat(r) * cell)
             }
 
-            // A few heavy, irregular boundaries make the nested regions read.
+            // Five valid arithmetic nests, including one L-shaped region.
             Path { path in
+                path.addRect(CGRect(origin: origin, size: CGSize(width: side, height: side)))
+
+                path.move(to: CGPoint(x: origin.x, y: origin.y + cell))
+                path.addLine(to: CGPoint(x: origin.x + side, y: origin.y + cell))
+
+                path.move(to: CGPoint(x: origin.x + cell, y: origin.y + cell * 2))
+                path.addLine(to: CGPoint(x: origin.x + cell * 2, y: origin.y + cell * 2))
+
+                path.move(to: CGPoint(x: origin.x + cell, y: origin.y + cell))
+                path.addLine(to: CGPoint(x: origin.x + cell, y: origin.y + side))
+
                 path.move(to: CGPoint(x: origin.x + cell * 2, y: origin.y))
                 path.addLine(to: CGPoint(x: origin.x + cell * 2, y: origin.y + cell))
-                path.addLine(to: CGPoint(x: origin.x + cell, y: origin.y + cell))
-                path.addLine(to: CGPoint(x: origin.x + cell, y: origin.y + cell * 2))
-                path.addLine(to: CGPoint(x: origin.x, y: origin.y + cell * 2))
-                path.move(to: CGPoint(x: origin.x + cell * 2, y: origin.y + cell))
-                path.addLine(to: CGPoint(x: origin.x + cell * 2, y: origin.y + cell * 3))
+
+                path.move(to: CGPoint(x: origin.x + cell * 2, y: origin.y + cell * 2))
+                path.addLine(to: CGPoint(x: origin.x + cell * 2, y: origin.y + side))
             }
-            .stroke(.white.opacity(0.86), style: StrokeStyle(lineWidth: 3, lineCap: .square, lineJoin: .round))
+            .stroke(.white.opacity(0.88),
+                    style: StrokeStyle(lineWidth: max(2, cell * 0.065),
+                                       lineCap: .square,
+                                       lineJoin: .round))
         }
     }
 }
