@@ -75,6 +75,24 @@ final class WaterSortTests: XCTestCase {
         XCTAssertNil(WaterSortEngine.solve(stuck, capacity: 4))
     }
 
+    func testSolverRejectsReversiblePourStalemate() {
+        // This mirrors a real six-colour dead position. Blue can move from
+        // tube 6 to tube 2, but the only resulting move is straight back.
+        let stuck: [WaterSortEngine.Tube] = [
+            [5, 5], [2, 6], [5, 3, 1, 1], [4, 2, 1, 1],
+            [5, 4, 2, 2], [3, 6, 6, 6], [4, 4], [3, 3]
+        ]
+        XCTAssertTrue(WaterSortEngine.canPour(stuck, from: 5, to: 1, capacity: 4),
+                      "the position has a legal-looking pour")
+        XCTAssertNil(WaterSortEngine.solve(stuck, capacity: 4),
+                     "a reversible pour loop is still a stalemate")
+
+        var loop = stuck
+        XCTAssertEqual(WaterSortEngine.pour(&loop, from: 5, to: 1, capacity: 4), 2)
+        XCTAssertEqual(WaterSortEngine.pour(&loop, from: 1, to: 5, capacity: 4), 2)
+        XCTAssertEqual(loop, stuck)
+    }
+
     // MARK: Generation
 
     // Small bands only: their searches finish fast in debug builds. Larger

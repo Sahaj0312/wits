@@ -46,6 +46,7 @@ struct WaterSortScreen: View {
     @State private var undos = 0
     @State private var restarts = 0
     @State private var deadEnd = false
+    @State private var positionRevision = 0
 
     private let startedAt = Date()
     private let level: Double
@@ -202,15 +203,14 @@ struct WaterSortScreen: View {
         }
     }
 
-    /// Shown when no player-legal pour remains: every top colour is blocked
-    /// and no tube is empty. Undo rewinds into the mistake; restart re-deals
-    /// the same board.
+    /// Shown when no route to a solution remains. Some dead positions still
+    /// allow a matching-colour pour, but only as a reversible loop.
     private var deadEndCard: some View {
         VStack(spacing: 14) {
-            Text("no pours left")
+            Text("this position is stuck")
                 .font(.system(size: 20, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
-            Text("every tube is blocked — rewind a pour or start this board over")
+            Text("the remaining pours only loop — rewind a pour or start this board over")
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.75))
                 .multilineTextAlignment(.center)
@@ -542,7 +542,7 @@ struct WaterSortScreen: View {
     // MARK: Interaction
 
     private func tap(_ index: Int) {
-        guard !finished, pour == nil, let current = tubes else { return }
+        guard !finished, !deadEnd, pour == nil, let current = tubes else { return }
 
         if let source = selected {
             if source == index {
@@ -572,6 +572,7 @@ struct WaterSortScreen: View {
         let moved = WaterSortEngine.pour(&current, from: source, to: dest, capacity: capacity)
         guard moved > 0 else { return }
         tubes = current
+        positionRevision &+= 1
         moves += 1
         hint = ""
         selected = nil
@@ -602,12 +603,38 @@ struct WaterSortScreen: View {
             GameFeel.shared.play(.correct(combo: 3))
         }
         checkCompletion()
-        if let tubes, !finished, !playerCanPour(tubes) {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                deadEnd = true
-            }
-            GameFeel.shared.play(.wrong)
+        guard let tubes, !finished else { return }
+        if !playerCanPour(tubes) {
+            presentDeadEnd()
+        } else if !tubes.contains(where: \.isEmpty) {
+            verifyReachability(of: tubes, revision: positionRevision)
         }
+    }
+
+    /// With no empty tube, a board can retain one legal pour that merely
+    /// shuttles a colour run back and forth forever. Confirm reachability off
+    /// the main thread so that loop counts as a stalemate too.
+    private func verifyReachability(of candidate: [WaterSortEngine.Tube], revision: Int) {
+        let cap = capacity
+        Task {
+            let isSolvable = await Task.detached(priority: .utility) {
+                WaterSortEngine.solve(candidate, capacity: cap) != nil
+            }.value
+            guard !Task.isCancelled, !isSolvable, !finished,
+                  revision == positionRevision,
+                  let current = tubes,
+                  WaterSortEngine.key(current) == WaterSortEngine.key(candidate) else { return }
+            presentDeadEnd()
+        }
+    }
+
+    private func presentDeadEnd() {
+        guard !deadEnd, !finished else { return }
+        selected = nil
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+            deadEnd = true
+        }
+        GameFeel.shared.play(.wrong)
     }
 
     /// A pour the player could actually make: complete tubes can't be picked
@@ -627,6 +654,7 @@ struct WaterSortScreen: View {
     /// hatch, not a free trial-and-error loop toward par.
     private func undo() {
         guard pour == nil, !finished, let last = history.popLast() else { return }
+        positionRevision &+= 1
         undos += 1
         selected = nil
         hint = ""
@@ -640,6 +668,7 @@ struct WaterSortScreen: View {
     /// exactly as if the level had just loaded.
     private func restart() {
         guard pour == nil, !finished, let initialTubes else { return }
+        positionRevision &+= 1
         restarts += 1
         history = []
         selected = nil
