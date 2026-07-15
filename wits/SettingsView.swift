@@ -15,6 +15,12 @@ struct SettingsView: View {
     @State private var restoreMessage: String?
     @State private var restoring = false
 
+    // The home screen's fixed dark chrome, not the adaptive wits palette —
+    // this sheet sits directly over the library and should read as one place.
+    private let pageBg = Color(hexAny: 0x09090B)
+    private let cardFill = Color(hexAny: 0x1B1B20)
+    private let hairline = Color.white.opacity(0.10)
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -83,20 +89,20 @@ struct SettingsView: View {
                 if let restoreMessage {
                     Text(restoreMessage)
                         .font(.witsBody(14))
-                        .foregroundStyle(Color.witsMuted)
+                        .foregroundStyle(.white.opacity(0.55))
                         .frame(maxWidth: .infinity)
                         .padding(.top, 16)
                 }
 
                 Text("wits · made for quick daily play")
                     .font(.witsBody(14))
-                    .foregroundStyle(Color.witsFaint)
+                    .foregroundStyle(.white.opacity(0.32))
                     .frame(maxWidth: .infinity)
                     .padding(.top, 28)
                     .padding(.bottom, 60)
             }
         }
-        .background(Color.witsBg.ignoresSafeArea())
+        .background(pageBg.ignoresSafeArea())
         .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
         .onAppear {
             syncGameFeelSettings()
@@ -111,22 +117,24 @@ struct SettingsView: View {
 
     private var pageHeader: some View {
         HStack(alignment: .center) {
-            VStack(alignment: .leading, spacing: 2) {
-                WitsBrandMark()
+            VStack(alignment: .leading, spacing: 6) {
                 Text("settings")
-                    .font(.witsDisplay(30))
-                    .foregroundStyle(Color.witsInk)
+                    .font(.system(size: 29, weight: .black, design: .default))
+                    .foregroundStyle(.white)
+                Rectangle()
+                    .fill(Color.witsAccent)
+                    .frame(width: 30, height: 4)
             }
             Spacer()
             Button {
                 dismiss()
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 14, weight: .heavy))
-                    .foregroundStyle(Color.witsMuted)
-                    .frame(width: 38, height: 38)
-                    .background(Color.witsCard, in: Circle())
-                    .overlay(Circle().strokeBorder(Color.witsLine, lineWidth: 1))
+                    .font(.system(size: 16, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 44, height: 44)
+                    .background(cardFill, in: Circle())
+                    .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 1))
             }
             .buttonStyle(PressScale())
             .accessibilityLabel("Close settings")
@@ -155,7 +163,7 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(title)
                 .font(.witsLabel(12.5))
-                .foregroundStyle(Color.witsFaint)
+                .foregroundStyle(.white.opacity(0.45))
                 .textCase(.uppercase)
                 .kerning(0.8)
                 .padding(.horizontal, WitsMetrics.screenPadding + 16)
@@ -165,7 +173,12 @@ struct SettingsView: View {
             VStack(spacing: 0) {
                 content()
             }
-            .cardSurface(radius: WitsMetrics.panelRadius)
+            .background(cardFill,
+                        in: RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: WitsMetrics.panelRadius, style: .continuous)
+                    .strokeBorder(hairline, lineWidth: 1)
+            )
             .padding(.horizontal, WitsMetrics.screenPadding)
         }
     }
@@ -177,7 +190,7 @@ struct SettingsView: View {
             .frame(width: 30, height: 30)
             .background(
                 dimmed
-                    ? AnyShapeStyle(Color.witsFaint)
+                    ? AnyShapeStyle(Color.white.opacity(0.22))
                     : AnyShapeStyle(LinearGradient(colors: [tint.opacity(0.85), tint],
                                                    startPoint: .top, endPoint: .bottom)),
                 in: RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -193,7 +206,7 @@ struct SettingsView: View {
 
             Text(title)
                 .font(.system(size: 16.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color.witsInk)
+                .foregroundStyle(.white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .layoutPriority(1)
@@ -220,7 +233,7 @@ struct SettingsView: View {
 
             Text(title)
                 .font(.system(size: 16.5, weight: .semibold, design: .rounded))
-                .foregroundStyle(isDimmed ? Color.witsFaint : Color.witsInk)
+                .foregroundStyle(isDimmed ? .white.opacity(0.35) : .white)
                 .lineLimit(1)
                 .minimumScaleFactor(0.76)
                 .layoutPriority(1)
@@ -230,7 +243,7 @@ struct SettingsView: View {
             if !value.isEmpty {
                 Text(value)
                     .font(.system(size: 14.5, weight: .semibold, design: .rounded))
-                    .foregroundStyle(isDimmed ? Color.witsFaint : Color.witsMuted)
+                    .foregroundStyle(.white.opacity(isDimmed ? 0.35 : 0.55))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .multilineTextAlignment(.trailing)
@@ -239,7 +252,7 @@ struct SettingsView: View {
             if showsChevron {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(Color.witsFaint)
+                    .foregroundStyle(.white.opacity(0.4))
             }
         }
         .padding(.horizontal, 16)
@@ -250,7 +263,7 @@ struct SettingsView: View {
 
     private var settingsDivider: some View {
         Rectangle()
-            .fill(Color.witsLine)
+            .fill(Color.white.opacity(0.08))
             .frame(height: 1)
             .padding(.leading, 60)
     }
