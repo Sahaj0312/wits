@@ -14,8 +14,8 @@ import Observation
 // MARK: - Identity
 
 enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
-    // Declaration order sets the library grid order; live vs standalone is
-    // decided by the static lists below, not by this grouping.
+    // Declaration order provides stable iteration; the library uses the
+    // intentionally mixed order below.
     case arrowStorm, crowdControl, echoGrid
     case colorClash, tileShift, lastSeen
     case slidePuzzle, blockEscape, pegSolitaire
@@ -28,6 +28,20 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
     case tower
 
     var id: String { rawValue }
+
+    /// Two-column library order. Each row mixes cognitive domains and the
+    /// columns avoid long runs of visually or mechanically similar games.
+    static let libraryOrder: [GameID] = [
+        .echoGrid, .waterSort,
+        .slidePuzzle, .arrowStorm,
+        .numberNests, .blockEscape,
+        .blockFit, .crowdControl,
+        .lastSeen, .pegSolitaire,
+        .fuse, .crossword,
+        .colorClash, .snake,
+        .mahjong, .split,
+        .tileShift, .tower
+    ]
 
     /// Difficulty-track games (everything but the standalone survival modes).
     static var live: [GameID] {

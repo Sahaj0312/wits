@@ -17,7 +17,7 @@ struct GamesLibraryView: View {
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
     private var games: [GameID] {
-        GameID.allCases.filter(\.isPlayable)
+        GameID.libraryOrder.filter(\.isPlayable)
     }
 
     var body: some View {
