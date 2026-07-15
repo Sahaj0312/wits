@@ -9,21 +9,34 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppModel.self) private var app
+    @AppStorage("wits.hasSeenWelcome") private var hasSeenWelcome = false
 
     var body: some View {
         if let g = ProcessInfo.processInfo.environment["WITS_GAME"], let id = GameID(rawValue: g) {
             DebugGameHarness(id: id)            // dev-only: SIMCTL_CHILD_WITS_GAME=<id>
         } else {
-            GamesLibraryView()
-                .task {
-                    GameCenterManager.shared.onAuthenticated = { [weak app] in
-                        guard let app else { return }
-                        GameCenterManager.shared.syncLocalBests(levels: app.levels, streak: app.streak)
+            // The library (and its ATT/Game Center prompts) only mounts once
+            // the welcome letter is dismissed, so no dialogs stack on it.
+            ZStack {
+                if hasSeenWelcome {
+                    GamesLibraryView()
+                        .task {
+                            GameCenterManager.shared.onAuthenticated = { [weak app] in
+                                guard let app else { return }
+                                GameCenterManager.shared.syncLocalBests(levels: app.levels, streak: app.streak)
+                            }
+                            GameCenterManager.shared.authenticate()
+                            AdManager.shared.adFreeProvider = { PurchasesManager.shared.isAdFree }
+                            await AdManager.shared.startIfNeeded()
+                        }
+                } else {
+                    WelcomeView {
+                        withAnimation(.easeInOut(duration: 0.35)) { hasSeenWelcome = true }
                     }
-                    GameCenterManager.shared.authenticate()
-                    AdManager.shared.adFreeProvider = { PurchasesManager.shared.isAdFree }
-                    await AdManager.shared.startIfNeeded()
+                    .transition(.opacity)
+                    .zIndex(1)
                 }
+            }
         }
     }
 }
