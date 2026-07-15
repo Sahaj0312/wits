@@ -140,6 +140,39 @@ final class BlockFitTests: XCTestCase {
         XCTAssertEqual(game.nextHand.count, 3, "a fresh preview is drawn after the deal")
     }
 
+    func testOpeningHandsAreGentle() {
+        let game = BlockFitGame(seed: 21)
+        let openingHands = [game.hand.compactMap { $0 }, game.nextHand]
+
+        for hand in openingHands {
+            XCTAssertEqual(hand.count, BlockFitGame.handSize)
+            XCTAssertGreaterThanOrEqual(hand.filter(BlockFitShapes.isCompact).count, 2,
+                                        "the first two hands should offer at least two flexible pieces")
+            XCTAssertFalse(hand.contains(where: BlockFitShapes.isBulky),
+                           "board-breakers should not cut the opening short")
+        }
+    }
+
+    func testEveryLaterHandHasACompactPieceAndAtMostOneBulkyPiece() {
+        let game = BlockFitGame(seed: 33)
+
+        for dealIndex in 0..<20 {
+            let hand = game.nextHand
+            XCTAssertTrue(hand.contains(where: BlockFitShapes.isCompact),
+                          "deal \(dealIndex) needs a flexible piece")
+            XCTAssertLessThanOrEqual(hand.filter(BlockFitShapes.isBulky).count, 1,
+                                     "deal \(dealIndex) should not stack board-breakers")
+
+            // Spend a disposable hand to advance the deterministic preview.
+            game.load(board: emptyBoard(), hand: [piece([(0, 0)], id: dealIndex * 3 + 1),
+                                                   piece([(0, 0)], id: dealIndex * 3 + 2),
+                                                   piece([(0, 0)], id: dealIndex * 3 + 3)])
+            for slot in 0..<BlockFitGame.handSize {
+                XCTAssertNotNil(game.place(handIndex: slot, atRow: 0, col: slot))
+            }
+        }
+    }
+
     // MARK: Sudden death
 
     func testDeadWhenNothingInHandFits() {

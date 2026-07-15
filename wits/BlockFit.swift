@@ -46,8 +46,9 @@ enum BlockFitPalette {
     }
 }
 
-/// The dealable shape catalog. Weights bias toward small and medium pieces so
-/// hands stay playable; the big squares and 5-lines are the board-breakers.
+/// The dealable shape catalog. Weights preserve variety inside each size band;
+/// `BlockFitGame` composes those bands into fair hands so a run cannot open on
+/// a wall of board-breakers.
 enum BlockFitShapes {
     struct Variant {
         let cells: [BlockCell]
@@ -100,7 +101,13 @@ enum BlockFitShapes {
         return shapes
     }()
 
-    static let totalWeight = all.reduce(0) { $0 + $1.weight }
+    /// Flexible pieces that still have useful homes on a crowded board.
+    static let compact = all.filter { $0.cells.count <= 3 }
+    /// The gentler pool excludes large-area board-breakers.
+    static let nonBulky = all.filter { $0.cells.count < 5 }
+
+    static func isCompact(_ piece: BlockPiece) -> Bool { piece.cells.count <= 3 }
+    static func isBulky(_ piece: BlockPiece) -> Bool { piece.cells.count >= 5 }
 }
 
 // MARK: - Engine
@@ -124,6 +131,7 @@ final class BlockFitGame {
 
     private var rng: SeededRandomNumberGenerator
     private var nextPieceID = 0
+    private var handsGenerated = 0
 
     struct Placement {
         let placedCells: [BlockCell]
@@ -250,18 +258,47 @@ final class BlockFitGame {
     /// ahead, so what the player sees as "next" is exactly what they'll get.
     private func deal() {
         if nextHand.isEmpty {
-            nextHand = (0..<Self.handSize).map { _ in draw() }
+            nextHand = drawHand()
         }
         for index in 0..<Self.handSize {
             hand[index] = nextHand[index]
         }
-        nextHand = (0..<Self.handSize).map { _ in draw() }
+        nextHand = drawHand()
     }
 
-    private func draw() -> BlockPiece {
-        var pick = Double.random(in: 0..<BlockFitShapes.totalWeight, using: &rng)
-        var variant = BlockFitShapes.all[0]
-        for candidate in BlockFitShapes.all {
+    /// Every hand includes a compact piece, which gives the player a way to
+    /// repair tight boards instead of losing to three awkward rolls. The first
+    /// two hands are extra gentle so a new run has time to develop; after that,
+    /// bulky pieces return but never appear more than once in the same hand.
+    /// The recipe depends only on the seeded RNG and hand count, preserving an
+    /// identical deal stream for weekly-challenge players.
+    private func drawHand() -> [BlockPiece] {
+        let openingHand = handsGenerated < 2
+        var pieces = [draw(from: BlockFitShapes.compact)]
+
+        if openingHand {
+            pieces.append(draw(from: BlockFitShapes.compact))
+            pieces.append(draw(from: BlockFitShapes.nonBulky))
+        } else {
+            pieces.append(draw(from: BlockFitShapes.all))
+            pieces.append(draw(from: BlockFitShapes.all))
+            let bulkySlots = pieces.indices.filter { BlockFitShapes.isBulky(pieces[$0]) }
+            for slot in bulkySlots.dropFirst() {
+                pieces[slot] = draw(from: BlockFitShapes.nonBulky)
+            }
+        }
+
+        pieces.shuffle(using: &rng)
+        handsGenerated += 1
+        return pieces
+    }
+
+    private func draw(from candidates: [BlockFitShapes.Variant]) -> BlockPiece {
+        precondition(!candidates.isEmpty)
+        let totalWeight = candidates.reduce(0) { $0 + $1.weight }
+        var pick = Double.random(in: 0..<totalWeight, using: &rng)
+        var variant = candidates[0]
+        for candidate in candidates {
             if pick < candidate.weight { variant = candidate; break }
             pick -= candidate.weight
         }
