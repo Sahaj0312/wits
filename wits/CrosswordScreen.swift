@@ -391,9 +391,22 @@ struct CrosswordScreen: View {
         if puzzle == nil {
             let target = mapLevel
             let seed = cfg.resolvedRandomSeed()
-            let generated = await Task.detached(priority: .userInitiated) {
-                CrosswordEngine.generate(mapLevel: target, seed: seed)
-            }.value
+            // Weekly competitors must always receive the exact same board,
+            // independent of device speed. The prevalidated seeded set is
+            // instant and deterministic; regular play gets a short window
+            // to create a fresh fill before using that same safety net.
+            let searchBudget: Duration = cfg.isWeekly ? .zero : .milliseconds(600)
+            let generationTask = Task.detached(priority: .userInitiated) {
+                CrosswordEngine.generate(mapLevel: target,
+                                         seed: seed,
+                                         searchBudget: searchBudget)
+            }
+            let generated = await withTaskCancellationHandler {
+                await generationTask.value
+            } onCancel: {
+                generationTask.cancel()
+            }
+            guard !Task.isCancelled else { return }
             puzzle = generated
             entries = Array(repeating: Array(repeating: "", count: generated.size),
                             count: generated.size)

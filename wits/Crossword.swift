@@ -5,10 +5,10 @@
 //  Mini-crossword engine. Every level is a fresh 5×5 grid: a block template
 //  (randomly mirrored for variety) sets the shape, and a seeded backtracking
 //  fill drops wits-original clue-bank words (CrosswordBank.swift) into the
-//  slots — most-constrained slot first — so puzzles never repeat and every
-//  fill is guaranteed valid. Difficulty comes from the shape (the "twist"
-//  template doubles the five-letter crossings) and from biasing the fill
-//  toward rarer vocabulary.
+//  slots — most-constrained slot first. Difficulty comes from the shape (the
+//  "twist" template doubles the five-letter crossings) and from biasing the
+//  fill toward rarer vocabulary. A small set of prevalidated fills guarantees
+//  startup if a randomized search reaches its short wall-clock budget.
 //
 //  Both shipped templates were profiled against the bank in a standalone -O
 //  harness: the staircase fills in ~800 nodes, the twist in ~4–9k, and both
@@ -90,6 +90,14 @@ nonisolated enum CrosswordEngine {
         let cells: [CrosswordCellPos]
     }
 
+    /// One letter shared by two slots. Keeping the offsets lets the solver
+    /// shrink only the affected candidate domain when it places a word.
+    private struct Crossing {
+        let otherSlot: Int
+        let ownOffset: Int
+        let otherOffset: Int
+    }
+
     private static func slots(in template: [String]) -> [Slot] {
         let size = template.count
         let rows = template.map(Array.init)
@@ -132,39 +140,68 @@ nonisolated enum CrosswordEngine {
 
     /// Fills the template's slots from the clue bank, most-constrained slot
     /// first, with a node budget so a doomed shuffle fails fast instead of
-    /// thrashing. Returns nil only when the budget runs dry.
+    /// thrashing. Returns nil when the node/time budget runs dry or the task
+    /// is cancelled.
     private static func fill<R: RandomNumberGenerator>(
         template: [String],
         tierCap: Int,
         tierBias: Int,
+        deadline: ContinuousClock.Instant,
         using rng: inout R
     ) -> [(slot: Slot, entry: CrosswordEntry)]? {
         let slots = slots(in: template)
-        let size = template.count
-        var grid = [UInt8](repeating: 0, count: size * size)
         var assigned = [Int](repeating: -1, count: slots.count)
         // Counts, not a set: a word also blocks its S-variants, and two
         // placed words may block the same string.
         var usedAnswers: [String: Int] = [:]
         var budget = 12_000
+        var stopped = false
 
-        // Per-slot candidate pools, shuffled once per attempt. The tier bias
+        // Per-length candidate pools, shuffled once per attempt. Slots of the
+        // same length can safely share an ordering; rebuilding and sorting
+        // the same 700-word pool for every slot was a large part of the load
+        // delay in unoptimized builds. The tier bias
         // is a WEAK noisy preference, never a strict ordering: front-loading
         // one tier funnels the whole search into that tier's subspace, and
         // the single-tier subspaces are too thin to fill from — a strict
         // sort here made easy levels hang for seconds in profiling.
-        let pools: [[CrosswordEntry]] = slots.map { slot in
-            var pool = (CrosswordBank.byLength[slot.cells.count] ?? [])
+        var poolsByLength: [Int: [CrosswordEntry]] = [:]
+        for length in Set(slots.map { $0.cells.count }) {
+            var pool = (CrosswordBank.byLength[length] ?? [])
                 .filter { $0.tier <= tierCap }
             pool.shuffle(using: &rng)
             if tierBias != 0 {
                 let keys = pool.map { Double($0.tier) * Double(-tierBias) + Double.random(in: 0..<3.2, using: &rng) }
                 pool = zip(pool, keys).sorted { $0.1 < $1.1 }.map(\.0)
             }
-            return pool
+            poolsByLength[length] = pool
         }
+        let pools = slots.map { poolsByLength[$0.cells.count] ?? [] }
         let poolLetters: [[[UInt8]]] = pools.map { $0.map { Array($0.answer.utf8) } }
-        let cellIndexes: [[Int]] = slots.map { $0.cells.map { $0.r * size + $0.c } }
+
+        // Build the tiny crossing graph once. The old solver rescanned every
+        // word in every unfilled slot at every search node; in an unoptimized
+        // app build that turned a nominal 12k-node cap into minutes of work.
+        // Domains below are filtered as crossings are fixed, so most later
+        // nodes inspect only a handful of candidates.
+        var uses: [CrosswordCellPos: [(slot: Int, offset: Int)]] = [:]
+        for slot in slots.indices {
+            for (offset, cell) in slots[slot].cells.enumerated() {
+                uses[cell, default: []].append((slot, offset))
+            }
+        }
+        var crossings = [[Crossing]](repeating: [], count: slots.count)
+        for occupants in uses.values where occupants.count == 2 {
+            let first = occupants[0]
+            let second = occupants[1]
+            crossings[first.slot].append(Crossing(otherSlot: second.slot,
+                                                  ownOffset: first.offset,
+                                                  otherOffset: second.offset))
+            crossings[second.slot].append(Crossing(otherSlot: first.slot,
+                                                   ownOffset: second.offset,
+                                                   otherOffset: first.offset))
+        }
+        var domains: [[Int]] = poolLetters.map { Array($0.indices) }
 
         /// A word, its plural, and its singular all count as one root.
         func variants(of answer: String) -> [String] {
@@ -173,15 +210,7 @@ nonisolated enum CrosswordEngine {
             return list
         }
 
-        func fits(_ slot: Int, _ index: Int) -> Bool {
-            // Letters first: a byte mismatch kills most candidates without
-            // paying for the used-answer string lookup.
-            let word = poolLetters[slot][index]
-            let cells = cellIndexes[slot]
-            for (offset, cell) in cells.enumerated() {
-                let fixed = grid[cell]
-                if fixed != 0 && fixed != word[offset] { return false }
-            }
+        func isUnused(_ slot: Int, _ index: Int) -> Bool {
             return usedAnswers[pools[slot][index].answer, default: 0] == 0
         }
 
@@ -189,7 +218,7 @@ nonisolated enum CrosswordEngine {
         /// know whether a slot beats the current best.
         func candidateCount(for slot: Int, limit: Int) -> Int {
             var count = 0
-            for index in poolLetters[slot].indices where fits(slot, index) {
+            for index in domains[slot] where isUnused(slot, index) {
                 count += 1
                 if count >= limit { return count }
             }
@@ -197,12 +226,21 @@ nonisolated enum CrosswordEngine {
         }
 
         func candidateIndexes(for slot: Int) -> [Int] {
-            poolLetters[slot].indices.filter { fits(slot, $0) }
+            domains[slot].filter { isUnused(slot, $0) }
         }
 
         func solve() -> Bool {
+            if stopped { return false }
             budget -= 1
             if budget <= 0 { return false }
+            // Checking periodically keeps the hot recursion cheap while
+            // enforcing a real wall-clock bound (and promptly honoring a
+            // cancelled screen task).
+            if budget.isMultiple(of: 64),
+               (Task.isCancelled || ContinuousClock.now >= deadline) {
+                stopped = true
+                return false
+            }
 
             // Most-constrained unassigned slot next.
             var bestSlot = -1
@@ -223,16 +261,36 @@ nonisolated enum CrosswordEngine {
                 let word = poolLetters[bestSlot][option]
                 assigned[bestSlot] = option
                 for blocked in variants(of: entry.answer) { usedAnswers[blocked, default: 0] += 1 }
-                var written: [Int] = []
-                for (offset, cell) in cellIndexes[bestSlot].enumerated() where grid[cell] == 0 {
-                    grid[cell] = word[offset]
-                    written.append(cell)
+
+                // Forward-check just the words that cross this one. Save the
+                // previous arrays so backtracking remains allocation-light
+                // and deterministic for a given seed.
+                var savedDomains: [(slot: Int, candidates: [Int])] = []
+                var viable = true
+                for crossing in crossings[bestSlot] where assigned[crossing.otherSlot] == -1 {
+                    let other = crossing.otherSlot
+                    let previous = domains[other]
+                    let required = word[crossing.ownOffset]
+                    let filtered = previous.filter {
+                        poolLetters[other][$0][crossing.otherOffset] == required
+                    }
+                    if filtered.count != previous.count {
+                        savedDomains.append((other, previous))
+                        domains[other] = filtered
+                    }
+                    if filtered.isEmpty {
+                        viable = false
+                        break
+                    }
                 }
-                if solve() { return true }
+
+                if viable && solve() { return true }
+                for saved in savedDomains.reversed() {
+                    domains[saved.slot] = saved.candidates
+                }
                 assigned[bestSlot] = -1
                 for blocked in variants(of: entry.answer) { usedAnswers[blocked]! -= 1 }
-                for cell in written { grid[cell] = 0 }
-                if budget <= 0 { return false }
+                if stopped || budget <= 0 { return false }
             }
             return false
         }
@@ -243,31 +301,119 @@ nonisolated enum CrosswordEngine {
 
     // MARK: Generation
 
-    static func generate(mapLevel: Int, seed: UInt64) -> CrosswordPuzzle {
+    static func generate(mapLevel: Int,
+                         seed: UInt64,
+                         searchBudget: Duration = .milliseconds(600)) -> CrosswordPuzzle {
         var rng = SeededRandomNumberGenerator(seed: seed)
-        return generate(mapLevel: mapLevel, using: &rng)
+        return generate(mapLevel: mapLevel,
+                        using: &rng,
+                        searchBudget: searchBudget,
+                        fallbackSelector: seed)
     }
 
-    static func generate<R: RandomNumberGenerator>(mapLevel: Int, using rng: inout R) -> CrosswordPuzzle {
-        let spec = spec(forMapLevel: mapLevel)
+    static func generate<R: RandomNumberGenerator>(
+        mapLevel: Int,
+        using rng: inout R,
+        searchBudget: Duration = .milliseconds(600)
+    ) -> CrosswordPuzzle {
+        generate(mapLevel: mapLevel,
+                 using: &rng,
+                 searchBudget: searchBudget,
+                 fallbackSelector: 0)
+    }
 
-        // A few shuffled attempts on the target shape, then the staircase,
-        // which filled on every profiled seed — a level must never fail to
-        // load.
-        for template in [spec.template, stairTemplate] {
+    private static func generate<R: RandomNumberGenerator>(
+        mapLevel: Int,
+        using rng: inout R,
+        searchBudget: Duration,
+        fallbackSelector: UInt64
+    ) -> CrosswordPuzzle {
+        let spec = spec(forMapLevel: mapLevel)
+        let deadline = ContinuousClock.now.advanced(by: searchBudget)
+
+        // Try the requested shape, then the easier staircase, but never keep
+        // the player behind a spinner past the shared wall-clock budget.
+        generation: for template in [spec.template, stairTemplate] {
             for _ in 0..<6 {
+                guard !Task.isCancelled, ContinuousClock.now < deadline else {
+                    break generation
+                }
                 let shaped = variant(of: template, using: &rng)
                 if let filled = fill(template: shaped,
                                      tierCap: spec.tierCap,
                                      tierBias: spec.tierBias,
+                                     deadline: deadline,
                                      using: &rng) {
                     return assemble(template: shaped, filled: filled, parSeconds: spec.parSeconds)
                 }
             }
         }
-        // Truly unreachable: an empty bank would be a build error, not a
-        // runtime state. Fail loudly in development.
-        fatalError("crossword generation exhausted every template")
+
+        // A time budget, cancellation, or an unusually hostile shuffle can
+        // all land here. These fills were generated from the same clue bank
+        // and are assembled without search, so startup always completes.
+        return fallbackPuzzle(for: spec, selector: fallbackSelector)
+    }
+
+    // MARK: Prevalidated fallback fills
+
+    private struct FallbackFill {
+        let template: [String]
+        /// Across in row order, then down in column order (the same order as
+        /// `slots(in:)`).
+        let answers: [String]
+    }
+
+    private static let stairFallbacks = [
+        FallbackFill(template: ["...##", "....#", ".....", "#....", "##..."],
+                     answers: ["DIM", "AREA", "DOLLS", "NOSE", "NOW", "DAD", "IRON", "MELON", "ALSO", "SEW"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["MUG", "TONE", "FRUIT", "EAST", "EYE", "FEE", "TRAY", "MOUSE", "UNIT", "GET"]),
+        FallbackFill(template: ["...##", "....#", ".....", "#....", "##..."],
+                     answers: ["ADD", "SOIL", "HOMES", "REAL", "SPY", "ASH", "DOOR", "DIMES", "LEAP", "SLY"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["CUP", "ROPE", "BACON", "ICON", "TEA", "BIT", "RACE", "COCOA", "UPON", "PEN"]),
+        FallbackFill(template: ["...##", "....#", ".....", "#....", "##..."],
+                     answers: ["ATE", "PODS", "PAGES", "DEEP", "SKY", "APP", "TOAD", "EDGES", "SEEK", "SPY"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["SIT", "TIDE", "DOZEN", "AREA", "YES", "DAY", "TORE", "SIZES", "IDEA", "TEN"])
+    ]
+
+    private static let twistFallbacks = [
+        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
+                     answers: ["MOB", "STOVE", "PANEL", "ALERT", "SLY", "SPAS", "TALL", "MONEY", "OVER", "BELT"]),
+        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
+                     answers: ["LOW", "SHAPE", "TUNES", "AGENT", "YES", "STAY", "HUGE", "LANES", "OPEN", "WEST"]),
+        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
+                     answers: ["MOB", "STOVE", "PANEL", "ALERT", "SKY", "SPAS", "TALK", "MONEY", "OVER", "BELT"]),
+        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
+                     answers: ["ROW", "STOVE", "TAPES", "ALERT", "YES", "STAY", "TALE", "ROPES", "OVER", "WEST"]),
+        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
+                     answers: ["COW", "STOVE", "NAMES", "ALERT", "PET", "SNAP", "TALE", "COMET", "OVER", "WEST"]),
+        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
+                     answers: ["LOT", "SHAPE", "TUNES", "AGENT", "YES", "STAY", "HUGE", "LANES", "OPEN", "TEST"])
+    ]
+
+    private static let entriesByAnswer: [String: CrosswordEntry] = {
+        Dictionary(uniqueKeysWithValues: CrosswordBank.byLength.values
+            .flatMap { $0 }
+            .map { ($0.answer, $0) })
+    }()
+
+    private static func fallbackPuzzle(for spec: CrosswordSpec, selector: UInt64) -> CrosswordPuzzle {
+        let choices = spec.template == twistTemplate ? twistFallbacks : stairFallbacks
+        let fallback = choices[Int(selector % UInt64(choices.count))]
+        let fallbackSlots = slots(in: fallback.template)
+        precondition(fallbackSlots.count == fallback.answers.count)
+        let filled = zip(fallbackSlots, fallback.answers).map { slot, answer in
+            guard let entry = entriesByAnswer[answer] else {
+                preconditionFailure("missing crossword fallback answer: \(answer)")
+            }
+            return (slot: slot, entry: entry)
+        }
+        return assemble(template: fallback.template,
+                        filled: filled,
+                        parSeconds: spec.parSeconds)
     }
 
     private static func assemble(template: [String],
