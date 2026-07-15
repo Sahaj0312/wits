@@ -10,7 +10,7 @@
 //
 
 import SwiftUI
-import RevenueCat
+import StoreKit
 
 // MARK: - When to show it
 
@@ -56,7 +56,7 @@ enum AdFreeOfferGate {
 
 struct AdFreeOfferView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var package: Package?
+    @State private var product: Product?
     @State private var loaded = false
     @State private var purchasing = false
     @State private var note: String?
@@ -116,7 +116,7 @@ struct AdFreeOfferView: View {
 
             Spacer()
 
-            Cta(title: ctaTitle, dimmed: purchasing || (loaded && package == nil)) { buy() }
+            Cta(title: ctaTitle, dimmed: purchasing || (loaded && product == nil)) { buy() }
             HStack {
                 QuietButton(title: "restore purchase") { restore() }
                 Spacer()
@@ -128,9 +128,9 @@ struct AdFreeOfferView: View {
         .padding(.vertical, 14)
         .background(Color.witsBg.ignoresSafeArea())
         .task {
-            package = await PurchasesManager.shared.adFreeLifetimePackage()
+            product = await PurchasesManager.shared.adFreeLifetimeProduct()
             loaded = true
-            if loaded, package == nil {
+            if loaded, product == nil {
                 note = "the one-time purchase isn't available right now."
             }
         }
@@ -138,7 +138,7 @@ struct AdFreeOfferView: View {
 
     private var ctaTitle: String {
         if purchasing { return "one moment…" }
-        if let price = package?.localizedPriceString { return "go ad-free · \(price)" }
+        if let price = product?.displayPrice { return "go ad-free · \(price)" }
         return "go ad-free"
     }
 
@@ -154,13 +154,13 @@ struct AdFreeOfferView: View {
     }
 
     private func buy() {
-        guard let package, !purchasing else { return }
+        guard let product, !purchasing else { return }
         purchasing = true
         note = nil
         Task {
             defer { purchasing = false }
             do {
-                if try await PurchasesManager.shared.purchase(package) {
+                if try await PurchasesManager.shared.purchase(product) {
                     dismiss()
                 }
                 // A false return with no error is a user cancel — stay quiet.

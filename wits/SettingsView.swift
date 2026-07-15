@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  wits
 //
-//  Settings sheet: feel toggles, Game Center, and the ad-free subscription.
+//  Settings sheet: feel toggles, Game Center, and the lifetime ad-free unlock.
 //
 
 import SwiftUI
@@ -57,7 +57,7 @@ struct SettingsView: View {
                     }
                 }
 
-                settingsSection("subscription") {
+                settingsSection("ad-free") {
                     if PurchasesManager.shared.isAdFree {
                         settingsValueRow(icon: "checkmark.seal.fill",
                                          tint: .witsAccent,

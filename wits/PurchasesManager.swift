@@ -2,76 +2,130 @@
 //  PurchasesManager.swift
 //  wits
 //
-//  RevenueCat wrapper for the single "ad_free" monthly subscription.
-//  The last-known entitlement is cached in UserDefaults so an offline cold
-//  start never flashes ads at a subscriber.
+//  StoreKit 2 wrapper for the one-time ad-free unlock. Apple owns product
+//  loading, purchase confirmation, verification, restoration, and refunds.
+//  A cached entitlement prevents ads flashing during an offline cold launch;
+//  StoreKit's signed current entitlements remain the source of truth.
 //
 
 import Foundation
 import Observation
-import RevenueCat
+import StoreKit
 
 @Observable
 @MainActor
 final class PurchasesManager {
     static let shared = PurchasesManager()
 
-    static let entitlementID = "ad_free"
-    /// RevenueCat public Apple API key (safe to ship in the binary).
-    private static let apiKey = "appl_REPLACE_WITH_REVENUECAT_KEY"
+    /// Must exactly match the non-consumable product ID in App Store Connect.
+    static let adFreeLifetimeProductID = "com.sahaj03.wits.lifetime"
+
     private static let cachedAdFreeKey = "wits.purchases.isAdFree"
 
     private(set) var isAdFree: Bool
+    private(set) var adFreeProduct: Product?
+    private(set) var productLoadFailureReason: String?
+    @ObservationIgnored private var transactionUpdates: Task<Void, Never>?
 
     private init() {
         isAdFree = UserDefaults.standard.bool(forKey: Self.cachedAdFreeKey)
     }
 
-    func configure() {
-        guard !Self.apiKey.contains("REPLACE") else { return }   // not wired to a RC project yet
-        Purchases.configure(withAPIKey: Self.apiKey)
-        Task {
-            for await info in Purchases.shared.customerInfoStream {
-                apply(info)
+    /// Starts StoreKit observation once at app launch and refreshes the local
+    /// product plus the signed entitlement state.
+    func start() {
+        guard transactionUpdates == nil else { return }
+
+        transactionUpdates = Task { [weak self] in
+            guard let self else { return }
+            for await update in StoreKit.Transaction.updates {
+                if case .verified(let transaction) = update,
+                   transaction.productID == Self.adFreeLifetimeProductID {
+                    await transaction.finish()
+                }
+                await refreshEntitlements()
             }
+        }
+
+        Task {
+            _ = await adFreeLifetimeProduct()
+            await refreshEntitlements()
         }
     }
 
-    var isConfigured: Bool { Purchases.isConfigured }
+    /// Loads Apple's non-consumable product and caches it for both paywalls.
+    func adFreeLifetimeProduct() async -> Product? {
+        if let adFreeProduct { return adFreeProduct }
 
-    func currentOffering() async -> Offering? {
-        guard isConfigured else { return nil }
-        return try? await Purchases.shared.offerings().current
+        productLoadFailureReason = nil
+
+        do {
+            let products = try await Product.products(for: [Self.adFreeLifetimeProductID])
+            let product = products.first { $0.id == Self.adFreeLifetimeProductID }
+            adFreeProduct = product
+
+            if product == nil {
+                let failure = "The App Store returned no product for ID \(Self.adFreeLifetimeProductID)."
+                productLoadFailureReason = failure
+#if DEBUG
+                print("[StoreKit] \(failure) bundle=\(Bundle.main.bundleIdentifier ?? "unknown")")
+#endif
+            }
+
+            return product
+        } catch {
+            productLoadFailureReason = error.localizedDescription
+#if DEBUG
+            print("[StoreKit] Product load failed: \(error.localizedDescription)")
+#endif
+            return nil
+        }
     }
 
-    /// The one-time "ad-free forever" package, when RevenueCat is configured
-    /// and the current offering carries a lifetime product.
-    func adFreeLifetimePackage() async -> Package? {
-        guard isConfigured else { return nil }
-        let offering = try? await Purchases.shared.offerings().current
-        return offering?.lifetime
-            ?? offering?.availablePackages.first { $0.packageType == .lifetime }
+    /// Starts Apple's purchase sheet. User cancellation and Ask to Buy pending
+    /// states return false without being presented as errors.
+    func purchase(_ product: Product) async throws -> Bool {
+        switch try await product.purchase() {
+        case .success(let verification):
+            let transaction = try verified(verification)
+            await transaction.finish()
+            await refreshEntitlements()
+            return isAdFree
+
+        case .userCancelled, .pending:
+            return false
+
+        @unknown default:
+            return false
+        }
     }
 
-    /// Purchase a package; returns true when the ad-free entitlement is now
-    /// active. A user cancel returns false without throwing.
-    func purchase(_ package: Package) async throws -> Bool {
-        let result = try await Purchases.shared.purchase(package: package)
-        if !result.userCancelled { apply(result.customerInfo) }
-        return isAdFree
-    }
-
-    /// Restore purchases; returns true when the ad-free entitlement came back.
+    /// Shows Apple's sign-in/sync flow, then checks signed entitlements again.
     func restore() async throws -> Bool {
-        guard isConfigured else { return false }
-        let info = try await Purchases.shared.restorePurchases()
-        apply(info)
+        try await AppStore.sync()
+        await refreshEntitlements()
         return isAdFree
     }
 
-    private func apply(_ info: CustomerInfo) {
-        let active = info.entitlements[Self.entitlementID]?.isActive == true
-        isAdFree = active
-        UserDefaults.standard.set(active, forKey: Self.cachedAdFreeKey)
+    func refreshEntitlements() async {
+        var ownsUnlock = false
+
+        for await entitlement in StoreKit.Transaction.currentEntitlements {
+            guard case .verified(let transaction) = entitlement else { continue }
+            guard transaction.productID == Self.adFreeLifetimeProductID else { continue }
+            ownsUnlock = transaction.revocationDate == nil
+        }
+
+        isAdFree = ownsUnlock
+        UserDefaults.standard.set(ownsUnlock, forKey: Self.cachedAdFreeKey)
+    }
+
+    private func verified<T>(_ result: VerificationResult<T>) throws -> T {
+        switch result {
+        case .verified(let value):
+            return value
+        case .unverified(_, let error):
+            throw error
+        }
     }
 }

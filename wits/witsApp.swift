@@ -82,7 +82,7 @@ struct witsApp: App {
         #if DEBUG
         ScoringDiagnostics.runDebugAssertions()
         #endif
-        PurchasesManager.shared.configure()
+        PurchasesManager.shared.start()
     }
 
     var body: some Scene {
