@@ -814,11 +814,12 @@ private struct WaterSortPoster: View {
     ]
 
     var body: some View {
-        let tubeW = w * 0.155
-        let tubeH = h * 0.46
+        let isWide = w > h * 1.15
+        let tubeW = isWide ? min(w * 0.105, h * 0.18) : w * 0.155
+        let tubeH = h * (isWide ? 0.70 : 0.46)
         let unit = tubeH / 4.6
-        let xs: [CGFloat] = [0.28, 0.50, 0.72]
-        let cy = h * 0.66
+        let xs: [CGFloat] = isWide ? [0.32, 0.50, 0.68] : [0.28, 0.50, 0.72]
+        let cy = h * (isWide ? 0.55 : 0.66)
 
         ZStack {
             ForEach(0..<fills.count, id: \.self) { i in
@@ -829,17 +830,18 @@ private struct WaterSortPoster: View {
             // the pour: a teal drop falling toward the middle tube
             Capsule()
                 .fill(Self.liquid[1])
-                .frame(width: w * 0.035, height: h * 0.085)
-                .position(x: w * 0.50, y: cy - tubeH * 0.68)
+                .frame(width: isWide ? tubeW * 0.28 : w * 0.035,
+                       height: h * (isWide ? 0.11 : 0.085))
+                .position(x: w * 0.50, y: cy - tubeH * 0.64)
                 .shadow(color: Self.liquid[1].opacity(0.7), radius: 5)
         }
     }
 
     private func tube(_ segments: [Int], tubeW: CGFloat, tubeH: CGFloat, unit: CGFloat) -> some View {
-        let shape = UnevenRoundedRectangle(topLeadingRadius: tubeW * 0.18,
+        let shape = UnevenRoundedRectangle(topLeadingRadius: tubeW * 0.10,
                                            bottomLeadingRadius: tubeW * 0.5,
                                            bottomTrailingRadius: tubeW * 0.5,
-                                           topTrailingRadius: tubeW * 0.18,
+                                           topTrailingRadius: tubeW * 0.10,
                                            style: .continuous)
         return ZStack(alignment: .bottom) {
             shape.fill(.white.opacity(0.08))
@@ -855,6 +857,13 @@ private struct WaterSortPoster: View {
             shape.strokeBorder(.white.opacity(0.30), lineWidth: 2)
         }
         .frame(width: tubeW, height: tubeH)
+        .overlay(alignment: .top) {
+            Capsule()
+                .fill(Color(hexAny: 0x201134))
+                .overlay(Capsule().strokeBorder(.white.opacity(0.38), lineWidth: 1.5))
+                .frame(width: tubeW * 1.12, height: max(5, tubeW * 0.14))
+                .offset(y: -2)
+        }
     }
 }
 
