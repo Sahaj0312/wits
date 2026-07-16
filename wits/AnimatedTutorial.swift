@@ -3,9 +3,8 @@
 //  wits
 //
 //  Paged "how to play" tutorial with looping animated demos, replacing the
-//  static text-step tutorial one game at a time. Each game registers an array
-//  of TutorialSlides (caption + a small self-animating demo view); games
-//  without slides keep falling back to FirstPlayTutorial at the call site.
+//  static text-step tutorial. Each game registers an array of TutorialSlides
+//  (caption + a small self-animating demo view).
 //
 
 import SwiftUI
@@ -23,11 +22,28 @@ struct TutorialSlide {
 }
 
 extension GameID {
-    /// Animated how-to-play slides, nil while a game hasn't been converted yet.
+    /// Animated how-to-play slides. Keep this switch exhaustive so adding a
+    /// game also requires adding its tutorial.
     var animatedTutorialSlides: [TutorialSlide]? {
         switch self {
+        case .arrowStorm: ArrowStormTutorial.slides
+        case .crowdControl: CrowdControlTutorial.slides
+        case .echoGrid: EchoGridTutorial.slides
+        case .colorClash: ColorClashTutorial.slides
+        case .tileShift: TileShiftTutorial.slides
+        case .lastSeen: LastSeenTutorial.slides
+        case .slidePuzzle: SlidePuzzleTutorial.slides
+        case .blockEscape: BlockEscapeTutorial.slides
+        case .pegSolitaire: PegSolitaireTutorial.slides
+        case .waterSort: WaterSortTutorial.slides
+        case .numberNests: NumberNestsTutorial.slides
+        case .mahjong: MahjongTutorial.slides
+        case .crossword: CrosswordTutorial.slides
+        case .split: SplitTutorial.slides
         case .blockFit: BlockFitTutorial.slides
-        default: nil
+        case .fuse: FuseTutorial.slides
+        case .snake: SnakeTutorial.slides
+        case .tower: TowerTutorial.slides
         }
     }
 }
@@ -244,6 +260,49 @@ enum DemoEase {
 
     static func lerp(_ a: CGPoint, _ b: CGPoint, _ u: Double) -> CGPoint {
         CGPoint(x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u))
+    }
+
+    /// A scripted tap for `handAlongTaps`: press `point` at `time`.
+    struct Tap {
+        let time: Double
+        let point: CGPoint
+    }
+
+    /// Drives the hand through a sequence of taps: fades in before the first,
+    /// glides between tap points, presses briefly at each, fades out after the
+    /// last. Returns the fingertip position, whether it's mid-press, and alpha.
+    static func handAlongTaps(_ taps: [Tap], t: Double) -> (tip: CGPoint, pressed: Bool, alpha: Double) {
+        guard let first = taps.first, let last = taps.last else {
+            return (.zero, false, 0)
+        }
+        let alpha = ramp(t, first.time - 0.7, first.time - 0.25)
+            * (1 - ramp(t, last.time + 0.45, last.time + 0.95))
+
+        var tip = first.point
+        for index in taps.indices.dropFirst() {
+            let previous = taps[index - 1]
+            let next = taps[index]
+            let u = ramp(t, previous.time + 0.35, next.time - 0.10)
+            tip = lerp(tip, next.point, u)
+        }
+        let pressed = taps.contains { t >= $0.time && t < $0.time + 0.18 }
+        return (tip, pressed, alpha)
+    }
+
+    /// Expanding ring feedback for a scripted tap.
+    static func drawTapRipple(_ context: GraphicsContext,
+                              at point: CGPoint,
+                              start: Double,
+                              t: Double,
+                              radius: CGFloat,
+                              color: Color) {
+        let u = ramp(t, start, start + 0.4)
+        guard u > 0, u < 1 else { return }
+        let r = radius * (0.35 + 0.65 * CGFloat(u))
+        let rect = CGRect(x: point.x - r, y: point.y - r, width: r * 2, height: r * 2)
+        context.stroke(Path(ellipseIn: rect),
+                       with: .color(color.opacity(0.8 * (1 - u))),
+                       lineWidth: 3)
     }
 
     /// Draws the pointer-hand cursor with its fingertip at `tip`.

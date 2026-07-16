@@ -419,6 +419,20 @@ private struct GameHelpSheet: View {
     private var world: GameWorld { game.world }
 
     var body: some View {
+        if let slides = game.animatedTutorialSlides {
+            AnimatedHowToPlay(game: game,
+                              slides: slides,
+                              doneTitle: "got it",
+                              onStart: { dismiss() },
+                              onBack: { dismiss() })
+                .presentationDragIndicator(.visible)
+                .presentationBackground(world.background)
+        } else {
+            staticSheet
+        }
+    }
+
+    private var staticSheet: some View {
         ZStack {
             GameWorldBackdrop(game: game, patternOpacity: 0.55)
             VStack(alignment: .leading, spacing: 18) {
