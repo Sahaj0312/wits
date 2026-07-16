@@ -5,15 +5,18 @@
 //  Mini-crossword engine. Every level is a fresh 5×5 grid: a block template
 //  (randomly mirrored for variety) sets the shape, and a seeded backtracking
 //  fill drops wits-original clue-bank words (CrosswordBank.swift) into the
-//  slots — most-constrained slot first. Difficulty comes from the shape (the
-//  "twist" template doubles the five-letter crossings) and from biasing the
-//  fill toward rarer vocabulary. A small set of prevalidated fills guarantees
-//  startup if a randomized search reaches its short wall-clock budget.
+//  slots — most-constrained slot first. Difficulty comes from tightening the
+//  time par and biasing the fill toward rarer vocabulary. A small set of
+//  prevalidated fills guarantees startup if a randomized search reaches its
+//  short wall-clock budget.
 //
-//  Both shipped templates were profiled against the bank in a standalone -O
-//  harness: the staircase fills in ~800 nodes, the twist in ~4–9k, and both
-//  succeeded on every tested seed. Fully open shapes (4+ five-slots on both
-//  axes) need a far larger dictionary and are deliberately not used.
+//  Every shipped template was audited with an exhaustive solution counter
+//  against the bank (2026-07): diamond admits ~73k distinct fills, lcross
+//  ~1.4k, and the staircase ~1.0k, so no shape can feel repetitive. Shapes
+//  with three or more interlocked five-letter slots collapse to a handful of
+//  fills at this bank size (the retired "twist" template had 8 total, which
+//  made every high level look identical) — rerun the counter before adding
+//  a shape.
 //
 //  Pure computation (no SwiftUI): the screen lives in CrosswordScreen.swift.
 //
@@ -58,27 +61,31 @@ nonisolated enum CrosswordEngine {
 
     // MARK: Level ladder
 
-    /// The two verified 5×5 shapes. The staircase carries two five-letter
-    /// answers; the twist carries four, so far more of the grid is
-    /// double-crossed.
+    /// The three audited 5×5 shapes. The diamond is a gentle six-word board;
+    /// the staircase and lcross each carry two crossing five-letter answers.
+    static let diamondTemplate = ["##.##", "#...#", ".....", "#...#", "##.##"]
     static let stairTemplate = ["##...", "#....", ".....", "....#", "...##"]
-    static let twistTemplate = ["##...", ".....", ".....", ".....", "...##"]
+    static let lcrossTemplate = ["...##", "...##", ".....", "##...", "##..."]
 
     /// Frozen exam spec per map level (1...40): shape, vocabulary reach, and
-    /// a time par sized to the grid's difficulty.
+    /// a time par sized to the grid's difficulty. Past the intro band the
+    /// shape alternates by level parity so consecutive exams read
+    /// differently; difficulty climbs through vocabulary and par instead of
+    /// grid openness (see the header on why open shapes are off the table).
     static func spec(forMapLevel level: Int) -> CrosswordSpec {
         let n = min(max(level, 1), 40)
+        let alternating = n.isMultiple(of: 2) ? stairTemplate : lcrossTemplate
         switch n {
         case ...5:
-            return CrosswordSpec(template: stairTemplate, tierCap: 2, tierBias: 0, parSeconds: 100)
+            return CrosswordSpec(template: diamondTemplate, tierCap: 2, tierBias: -1, parSeconds: 90)
         case ...12:
-            return CrosswordSpec(template: stairTemplate, tierCap: 2, tierBias: 0, parSeconds: 115)
+            return CrosswordSpec(template: alternating, tierCap: 2, tierBias: 0, parSeconds: 120)
         case ...19:
-            return CrosswordSpec(template: twistTemplate, tierCap: 2, tierBias: 0, parSeconds: 160)
+            return CrosswordSpec(template: alternating, tierCap: 2, tierBias: 0, parSeconds: 140)
         case ...28:
-            return CrosswordSpec(template: twistTemplate, tierCap: 2, tierBias: 0, parSeconds: 180)
+            return CrosswordSpec(template: alternating, tierCap: 3, tierBias: 0, parSeconds: 160)
         default:
-            return CrosswordSpec(template: twistTemplate, tierCap: 3, tierBias: 1, parSeconds: 210)
+            return CrosswordSpec(template: alternating, tierCap: 3, tierBias: 1, parSeconds: 180)
         }
     }
 
@@ -331,9 +338,9 @@ nonisolated enum CrosswordEngine {
         let spec = spec(forMapLevel: mapLevel)
         let deadline = ContinuousClock.now.advanced(by: searchBudget)
 
-        // Try the requested shape, then the easier staircase, but never keep
+        // Try the requested shape, then the roomy diamond, but never keep
         // the player behind a spinner past the shared wall-clock budget.
-        generation: for template in [spec.template, stairTemplate] {
+        generation: for template in [spec.template, diamondTemplate] {
             for _ in 0..<6 {
                 guard !Task.isCancelled, ContinuousClock.now < deadline else {
                     break generation
@@ -364,34 +371,61 @@ nonisolated enum CrosswordEngine {
         let answers: [String]
     }
 
-    private static let stairFallbacks = [
-        FallbackFill(template: ["...##", "....#", ".....", "#....", "##..."],
-                     answers: ["DIM", "AREA", "DOLLS", "NOSE", "NOW", "DAD", "IRON", "MELON", "ALSO", "SEW"]),
-        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
-                     answers: ["MUG", "TONE", "FRUIT", "EAST", "EYE", "FEE", "TRAY", "MOUSE", "UNIT", "GET"]),
-        FallbackFill(template: ["...##", "....#", ".....", "#....", "##..."],
-                     answers: ["ADD", "SOIL", "HOMES", "REAL", "SPY", "ASH", "DOOR", "DIMES", "LEAP", "SLY"]),
-        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
-                     answers: ["CUP", "ROPE", "BACON", "ICON", "TEA", "BIT", "RACE", "COCOA", "UPON", "PEN"]),
-        FallbackFill(template: ["...##", "....#", ".....", "#....", "##..."],
-                     answers: ["ATE", "PODS", "PAGES", "DEEP", "SKY", "APP", "TOAD", "EDGES", "SEEK", "SPY"]),
-        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
-                     answers: ["SIT", "TIDE", "DOZEN", "AREA", "YES", "DAY", "TORE", "SIZES", "IDEA", "TEN"])
+    private static let diamondFallbacks = [
+        FallbackFill(template: ["##.##", "#...#", ".....", "#...#", "##.##"],
+                     answers: ["LOG", "CANAL", "BUS", "LAB", "BONUS", "GAS"]),
+        FallbackFill(template: ["##.##", "#...#", ".....", "#...#", "##.##"],
+                     answers: ["WIG", "FINAL", "TOP", "WIT", "MINOR", "GAP"]),
+        FallbackFill(template: ["##.##", "#...#", ".....", "#...#", "##.##"],
+                     answers: ["CAT", "QUIET", "ERA", "CUE", "DAIRY", "TEA"]),
+        FallbackFill(template: ["##.##", "#...#", ".....", "#...#", "##.##"],
+                     answers: ["RAN", "RIVER", "BOW", "RIB", "FAVOR", "NEW"]),
+        FallbackFill(template: ["##.##", "#...#", ".....", "#...#", "##.##"],
+                     answers: ["FOG", "MINUS", "GEM", "FIG", "CONES", "GUM"]),
+        FallbackFill(template: ["##.##", "#...#", ".....", "#...#", "##.##"],
+                     answers: ["PEA", "MUDDY", "BAD", "PUB", "MEDAL", "ADD"]),
+        FallbackFill(template: ["##.##", "#...#", ".....", "#...#", "##.##"],
+                     answers: ["HIT", "HUMAN", "MIX", "HUM", "LIMIT", "TAX"]),
+        FallbackFill(template: ["##.##", "#...#", ".....", "#...#", "##.##"],
+                     answers: ["DAM", "COLOR", "TUB", "DOT", "VALUE", "MOB"])
     ]
 
-    private static let twistFallbacks = [
-        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
-                     answers: ["MOB", "STOVE", "PANEL", "ALERT", "SLY", "SPAS", "TALL", "MONEY", "OVER", "BELT"]),
-        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
-                     answers: ["LOW", "SHAPE", "TUNES", "AGENT", "YES", "STAY", "HUGE", "LANES", "OPEN", "WEST"]),
-        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
-                     answers: ["MOB", "STOVE", "PANEL", "ALERT", "SKY", "SPAS", "TALK", "MONEY", "OVER", "BELT"]),
-        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
-                     answers: ["ROW", "STOVE", "TAPES", "ALERT", "YES", "STAY", "TALE", "ROPES", "OVER", "WEST"]),
-        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
-                     answers: ["COW", "STOVE", "NAMES", "ALERT", "PET", "SNAP", "TALE", "COMET", "OVER", "WEST"]),
-        FallbackFill(template: ["##...", ".....", ".....", ".....", "...##"],
-                     answers: ["LOT", "SHAPE", "TUNES", "AGENT", "YES", "STAY", "HUGE", "LANES", "OPEN", "TEST"])
+    private static let stairFallbacks = [
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["HOT", "REAR", "DIARY", "APPS", "YES", "DAY", "RIPE", "HEAPS", "OARS", "TRY"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["LAB", "FACE", "ORBIT", "WEED", "EEL", "OWE", "FREE", "LABEL", "ACID", "BET"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["CAT", "HOPE", "SIREN", "ERAS", "EEL", "SEE", "HIRE", "CORAL", "APES", "TEN"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["FOG", "SAVE", "NOVEL", "ODOR", "WAR", "NOW", "SODA", "FAVOR", "OVER", "GEL"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["PEA", "SEAS", "COACH", "ARCH", "BEE", "CAB", "SORE", "PEACE", "EACH", "ASH"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["TOY", "HOPE", "BIKES", "EVEN", "TEN", "BET", "HIVE", "TOKEN", "OPEN", "YES"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["RAY", "BORE", "SEAMS", "EASY", "ART", "SEA", "BEAR", "ROAST", "ARMY", "YES"]),
+        FallbackFill(template: ["##...", "#....", ".....", "....#", "...##"],
+                     answers: ["HAY", "SORE", "POLES", "IDEA", "GAS", "PIG", "SODA", "HOLES", "AREA", "YES"])
+    ]
+
+    private static let lcrossFallbacks = [
+        FallbackFill(template: ["...##", "...##", ".....", "##...", "##..."],
+                     answers: ["LOG", "EAR", "GREET", "AGE", "TON", "LEG", "OAR", "GREAT", "EGO", "TEN"]),
+        FallbackFill(template: ["...##", "...##", ".....", "##...", "##..."],
+                     answers: ["LAB", "OIL", "TREES", "NAP", "DRY", "LOT", "AIR", "BLEND", "EAR", "SPY"]),
+        FallbackFill(template: ["...##", "...##", ".....", "##...", "##..."],
+                     answers: ["CAT", "AGO", "REACT", "DUE", "SPA", "CAR", "AGE", "TOADS", "CUP", "TEA"]),
+        FallbackFill(template: ["...##", "...##", ".....", "##...", "##..."],
+                     answers: ["PEA", "RAN", "ORGAN", "EGO", "ROW", "PRO", "EAR", "ANGER", "AGO", "NOW"]),
+        FallbackFill(template: ["...##", "...##", ".....", "##...", "##..."],
+                     answers: ["HIT", "ACE", "TENSE", "TEN", "SAD", "HAT", "ICE", "TENTS", "SEA", "END"]),
+        FallbackFill(template: ["...##", "...##", ".....", "##...", "##..."],
+                     answers: ["DAM", "AGO", "DENSE", "TEA", "HAT", "DAD", "AGE", "MONTH", "SEA", "EAT"]),
+        FallbackFill(template: ["...##", "...##", ".....", "##...", "##..."],
+                     answers: ["RAY", "EGO", "DOUBT", "TEA", "HEN", "RED", "AGO", "YOUTH", "BEE", "TAN"]),
+        FallbackFill(template: ["...##", "...##", ".....", "##...", "##..."],
+                     answers: ["OAK", "FIN", "FROST", "TIE", "SPA", "OFF", "AIR", "KNOTS", "SIP", "TEA"])
     ]
 
     private static let entriesByAnswer: [String: CrosswordEntry] = {
@@ -401,7 +435,12 @@ nonisolated enum CrosswordEngine {
     }()
 
     private static func fallbackPuzzle(for spec: CrosswordSpec, selector: UInt64) -> CrosswordPuzzle {
-        let choices = spec.template == twistTemplate ? twistFallbacks : stairFallbacks
+        let choices: [FallbackFill]
+        switch spec.template {
+        case diamondTemplate: choices = diamondFallbacks
+        case lcrossTemplate: choices = lcrossFallbacks
+        default: choices = stairFallbacks
+        }
         let fallback = choices[Int(selector % UInt64(choices.count))]
         let fallbackSlots = slots(in: fallback.template)
         precondition(fallbackSlots.count == fallback.answers.count)

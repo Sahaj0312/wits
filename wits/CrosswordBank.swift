@@ -1612,5 +1612,490 @@ WIRES|2|Electricians' lines
 WORDS|1|Dictionary entries
 YARDS|1|Lawns' locations
 YEARS|1|365-day stretches
+OUT|1|Opposite of in
+SEE|1|Spot with your eyes
+AIRY|2|Light and breezy
+ANEW|2|All over again
+ARCH|2|Curved doorway top
+ARMY|1|Soldiers as a group
+ATOM|1|Tiniest bit of matter
+AXIS|2|Line a wheel spins around
+BAIL|2|Scoop water from a boat
+BAIT|1|Worm on a hook
+BARE|1|Without any covering
+BARK|1|Guard dog's warning
+BASS|2|Deepest singing voice
+BEAK|1|Parrot's mouth
+BEAM|1|Ray of sunshine
+BENT|1|No longer straight
+BIAS|2|Leaning to one side
+BILL|1|Restaurant total
+BIND|2|Tie up tightly
+BITE|1|Use your teeth
+BLOW|1|Send air from your lips
+BOLT|1|Nut's hardware partner
+BOND|2|Strong connection
+BONY|2|Showing lots of skeleton
+BOOM|1|Thunder's sound
+BORE|2|Put everyone to sleep
+BUCK|2|Male deer
+BULK|2|How warehouse shoppers buy
+BULL|1|Rodeo charger
+BURN|1|What a dropped match might do
+BURY|1|Hide underground, as a bone
+BUSH|1|Trimmed garden shrub
+CALL|1|Ring on the phone
+CANE|2|Walking stick
+CASK|3|Barrel for aging wine
+CELL|1|Smallest unit of life
+CONE|1|Ice cream holder
+CRAB|1|Sideways beach walker
+CURB|2|Sidewalk's edge
+CURE|1|What a remedy does
+DAMP|1|A little bit wet
+DASH|1|Short sprint
+DEBT|2|Money still owed
+DECK|1|Backyard wooden platform
+DEED|2|Good ___, scout's daily goal
+DENY|2|Say it never happened
+DIET|1|Eating plan
+DISK|2|Flat circle shape
+DRAG|1|Pull along the ground
+DULL|1|Far from exciting
+DUTY|2|What you're obliged to do
+EASE|2|Total comfort
+ELSE|1|"Or ___!" (threat's end)
+EMIT|2|Give off, as light
+ENVY|2|Wishing you had theirs
+FAIL|1|Not pass the test
+FAIR|1|County event with rides
+FARE|2|Taxi payment
+FATE|2|What's meant to be
+FEEL|1|Sense by touch
+FELL|1|Took a tumble
+FILE|1|Folder's contents
+FILL|1|Top off the tank
+FIRM|2|Not squishy
+FLAX|3|Plant behind linen
+FLUX|3|Constant change
+FOIL|2|Kitchen wrap that crinkles
+FOND|2|Full of affection
+FOOL|1|Easily tricked person
+FORM|1|Paperwork to fill out
+FRET|2|Worry out loud
+FUND|2|Money set aside
+GAIN|2|Opposite of loss
+GILL|2|How a fish breathes
+HAIL|2|Ice falling in a storm
+HAUL|2|Carry with effort
+HEAP|2|Messy pile
+HEEL|1|Back of the foot
+HELP|1|Lend a hand
+HERB|1|Basil or thyme
+HERD|1|Group of cattle
+HIND|3|Rear, as legs
+HIRE|1|Add to the payroll
+HOLY|2|Sacred
+HOOD|1|Sweatshirt's head cover
+HOOP|1|Basketball's target
+IDLE|2|Doing nothing at all
+JOIN|1|Become a member
+KEEL|3|Boat's bottom spine
+KEEN|2|Extra sharp, as eyesight
+KNIT|2|Make a sweater by hand
+LACE|1|Shoe's tie
+LACK|2|Have none of
+LADY|1|Polite word for a woman
+LASH|2|Eye hair
+LEAD|1|Go first
+LIMB|2|Arm or leg
+LINK|1|One ring of a chain
+LOAD|1|Laundry batch
+LOOM|3|Weaver's machine
+LORD|2|Castle's noble
+LOSE|1|Misplace
+LOSS|2|Defeat on the scoreboard
+MALE|1|Boy or man
+MARK|1|Spot left behind
+MASS|2|How much matter something has
+MAST|2|Sail's tall pole
+MATE|2|Ship captain's second
+MEAN|1|Unkind
+MEET|1|Get introduced
+MILL|2|Where grain becomes flour
+MISS|1|Fail to hit
+MOCK|2|Make fun of
+MODE|2|Setting on a gadget
+MOLE|2|Backyard tunnel digger
+MUSE|3|Artist's inspiration
+MUTE|2|Silence the TV
+NAIL|1|Hammer's target
+NEAT|1|Tidy
+OATH|2|Solemn promise
+OILY|2|Like fried-food fingers
+PALE|1|Low on color
+PICK|1|Choose
+PITY|2|Feeling sorry for someone
+POLL|2|Opinion survey
+PORT|2|Where ships dock
+POST|1|Fence pole
+PREY|2|What the hawk hunts
+PUFF|1|Little burst of air
+PULP|2|Orange juice bits
+QUIT|1|Walk away from the job
+RACK|1|Where coats hang
+RAGE|2|Boiling anger
+RAIL|1|Train track's bar
+RANK|2|Sergeant or captain
+RASH|2|Itchy skin patch
+RATE|1|Give it stars
+REAR|2|Back end
+REED|3|Marsh grass
+REEL|2|Fishing rod's spinner
+RISK|1|Chance of trouble
+RUDE|1|Short on manners
+SACK|1|Potato bag
+SALE|1|Reason prices drop
+SEAM|2|Where two fabric pieces meet
+SHED|1|Backyard tool house
+SHOT|1|Basketball attempt
+SKIP|1|Hop down the sidewalk
+SLIP|1|Lose your footing
+SOAK|1|Sit in the tub
+SOLE|2|Shoe's bottom
+SORE|1|Aching after a workout
+SOUL|2|Music genre with heart
+SPUR|3|Cowboy boot's spike
+SWAY|2|Rock side to side
+TACK|2|Tiny pin for posters
+TEND|2|Look after, as a garden
+TERM|2|School calendar chunk
+TEXT|1|Message sent by thumb
+TICK|1|Clock's sound
+TILT|1|Lean to one side
+TOLL|2|Bridge crossing fee
+TUFT|3|Small clump of grass
+TYPE|1|Use a keyboard
+UNDO|1|Fix-a-mistake command
+URGE|2|Strong impulse
+VAIN|2|Mirror-loving
+VARY|2|Change from case to case
+VAST|2|Enormously wide
+VEIL|2|Bride's face cover
+VEIN|2|Blood's return route
+VENT|2|Where the AC blows
+VERB|1|Action word
+VICE|3|Bad habit
+VOID|3|Total emptiness
+WARD|3|Hospital section
+WARP|3|Bend out of shape
+WEAK|1|Short on strength
+WEED|1|Garden invader
+WHIP|2|Make cream fluffy
+WIFE|1|Married woman
+WILL|2|Legal paper naming heirs
+WINE|2|Grape pour
+YOKE|3|Oxen's shoulder bar
+ZINC|3|Sunscreen metal
+ABATE|3|Die down, as a storm
+ABIDE|3|Put up with
+ABODE|3|Fancy word for home
+ACUTE|2|Under ninety degrees, as angles
+ADMIT|2|Own up to it
+ADORN|3|Decorate
+AFTER|1|Following
+ALLOW|1|Give permission
+ALLOY|3|Blend of metals
+AMBER|2|Traffic light's middle color
+ANGER|1|Steam-out-the-ears feeling
+ANNOY|2|Get on someone's nerves
+APPLY|2|Send in a resume
+ARGUE|1|Have a war of words
+ARISE|2|Come up, as problems do
+ARMOR|2|Knight's metal suit
+ARRAY|3|Orderly lineup
+ASHES|2|Campfire's remains
+BASIN|3|Sink's bowl
+BEAST|2|Wild creature
+BELLY|1|Tummy
+BIRCH|3|Tree with papery bark
+BLIND|2|Window shade
+BLUNT|2|Needing a sharpening
+BOAST|2|Brag
+BOUND|3|Spring like a deer
+BRACE|3|Get ready for impact
+BRAID|2|Woven hairstyle
+BRAKE|1|Pedal that slows you down
+BRASS|2|Trumpet's metal
+BREED|2|Poodle or beagle
+BRISK|3|Refreshingly chilly
+BROAD|2|Wide from side to side
+BROOD|3|Hen's chicks
+CANAL|2|Venice waterway
+CEASE|3|Come to a stop
+CHEAT|1|Peek at a neighbor's test
+CHEER|1|Crowd's encouragement
+CHORD|2|Three notes at once
+CIVIL|3|Polite, just barely
+CLAMP|2|Workbench gripper
+CLASP|3|Necklace fastener
+CLERK|2|Front-desk worker
+CLOAK|2|Wizard's wrap
+CRACK|1|Line in old pavement
+CRANK|2|Handle you turn
+CREEP|2|Move like a cautious cat
+CREST|3|Top of the wave
+CRUDE|3|Rough and unrefined
+CRUST|1|Pizza's edge
+DECAY|2|Slow rot
+DENSE|2|Packed tight
+DOUBT|2|Feeling it might not be true
+DREAD|2|Fear of what's coming
+ELDER|2|The older one
+ELECT|2|Choose by ballot
+ENTRY|2|Way in
+EPOCH|3|Long stretch of history
+ESSAY|1|School writing assignment
+EXERT|3|Put out effort
+EXIST|2|Simply be
+EXPEL|3|Kick out of school
+FAITH|2|Firm belief
+FIFTH|1|Number five in line
+FLANK|3|Side, to a general
+FLASK|3|Chemistry class bottle
+FLUID|2|Anything that flows
+FLUKE|3|Lucky accident
+FLUSH|2|Poker hand of one suit
+FOLLY|3|Plain foolishness
+FORGE|3|Blacksmith's workplace
+FROTH|3|Cappuccino's foam
+GAUGE|3|Dashboard dial
+GIDDY|2|Dizzy with delight
+GLOOM|2|Heavy grayness
+GLORY|2|Winner's shine
+GLOSS|2|Lip shine
+GOOSE|1|Honking pond bird
+GRANT|2|Money for research
+GRASP|2|Get a firm hold
+GRATE|2|Shred cheese
+GRIND|2|Turn beans to powder
+HARDY|3|Tough enough for winter
+HARSH|2|Hard to hear, as criticism
+HASTE|3|Too much hurry
+HASTY|2|Done in a rush
+HATCH|1|Break out of the egg
+HEAVE|3|Lift with a grunt
+HEDGE|2|Living fence
+HINGE|2|What lets a door swing
+HONOR|2|Deep respect
+HOUND|2|Dog on a scent
+IDIOM|3|"Piece of cake," e.g.
+IVORY|2|Piano key white
+JOINT|2|Elbow or knee
+LABOR|2|Hard work
+LANCE|3|Jousting pole
+LATHE|3|Wood-spinning shop tool
+LEASE|2|Renter's contract
+LEGAL|2|Allowed by law
+LEVER|2|Bar that lifts with less effort
+LINEN|2|Crisp summer fabric
+LODGE|2|Ski trip lodging
+LOFTY|3|Sky-high, as goals
+MERIT|3|Earned worth
+MOIST|2|Like good cake
+MOUND|2|Pitcher's hill
+MUDDY|1|Like boots after rain
+NASAL|3|From the nose
+NAVAL|3|Of warships
+NOISY|1|Far from quiet
+NOTCH|2|Small carved nick
+NOTED|3|Famous in one's field
+OCCUR|2|Take place
+ORGAN|2|Instrument with church pipes
+OXIDE|3|Rust, chemically
+PASTE|1|Kindergarten glue
+PERCH|2|Where a parrot sits
+PETTY|3|Too small to matter
+PIVOT|3|Turn on one foot
+PLANK|2|Pirate ship's walkway
+PLEAD|3|Beg one's case
+PLUCK|2|Pull a guitar string
+PLUMB|3|Perfectly vertical
+PLUME|3|Showy feather
+PLUMP|2|Pleasantly round
+POUCH|2|Kangaroo's pocket
+POUND|2|Sixteen ounces
+PRIME|2|Number like seven
+PROSE|3|Writing that isn't poetry
+PROVE|2|Show beyond doubt
+PULSE|2|Beat at your wrist
+PUNCH|2|Fruity party drink
+PURSE|1|Handbag
+QUAIL|3|Small game bird
+QUILL|3|Old-fashioned pen
+RATIO|2|Three-to-one, e.g.
+REFER|2|Send to a specialist
+REIGN|2|Time on the throne
+RELAX|1|Take it easy
+RENEW|2|Extend, as a library book
+REPLY|1|Answer back
+RESIN|3|Sticky tree stuff
+RHYME|1|What "cat" and "hat" do
+RIDER|2|One in the saddle
+RIDGE|2|Mountain's spine
+RIGHT|1|Opposite of wrong
+RIGID|3|Refusing to bend
+RIGOR|3|Strictness
+RIVAL|2|The team to beat
+ROGUE|3|Charming troublemaker
+ROUGH|1|Like sandpaper
+ROUSE|3|Shake awake
+SAINT|2|Halo wearer
+SAVOR|3|Enjoy slowly
+SCARF|1|Winter neck wrap
+SCOLD|2|Give a talking-to
+SCOPE|3|How far something reaches
+SCORN|3|Open disrespect
+SCREW|2|Threaded fastener
+SEIZE|3|Grab suddenly
+SENSE|2|Sight or smell
+SERVE|1|Start a tennis point
+SHAVE|2|Use a razor
+SHEET|1|Bed cover
+SHIFT|2|Work hours block
+SHOCK|2|Static zap
+SHOWY|3|Flashy on purpose
+SHRUB|2|Knee-high greenery
+SKIRT|2|Garment that twirls
+SKULL|2|Head bone
+SLACK|3|Rope's looseness
+SLATE|3|Chalkboard rock
+SLOPE|2|Ski hill
+SMEAR|2|Wipe into a blur
+SMOKY|2|Like campfire air
+SNAIL|1|Shell-carrying slowpoke
+SOBER|3|Completely serious
+SPEAR|2|Pointed fishing pole
+SPIKE|2|Volleyball slam
+SPINE|2|Book's backbone
+SPIRE|3|Cathedral's point
+SPOIL|2|Go bad in the fridge
+SPOUT|2|Teapot's pour point
+STAFF|2|Everyone on payroll
+STAIN|1|Spill's leftover
+STAKE|2|Tent peg
+STALE|1|Like last week's bread
+STALK|2|Celery piece
+STALL|2|Farm animal's spot
+STEAL|2|Base runner's move
+STEEP|2|Hard to climb
+STERN|3|Strict-faced
+STIFF|2|Hard to bend
+STOCK|2|Soup base
+STONY|3|Cold-faced
+STOOL|1|Backless seat
+STOOP|2|Bend forward
+STOUT|3|Solidly built
+STRAP|1|Backpack band
+STUDY|1|Hit the books
+STUFF|1|Miscellaneous things
+STUMP|2|What's left after logging
+SWEAT|1|Workout drops
+SWELL|2|Puff up
+SWIFT|2|Fast as a falcon
+SWORD|2|Knight's blade
+TALLY|2|Running count
+TENOR|3|High male voice
+TENSE|2|Tight with nerves
+TENTH|1|Number ten in line
+THROW|1|Send through the air
+TINGE|3|Hint of color
+TONIC|3|Fizzy mixer
+TRACE|2|Barely-there amount
+TRACT|3|Stretch of land
+TREAD|2|Tire's grip pattern
+TRIBE|2|Close-knit group
+TROOP|2|Scouts' unit
+UNITY|2|All together as one
+USAGE|3|How a word gets used
+UTTER|3|Complete, as nonsense
+VALID|2|Still good, as a ticket
+VALVE|2|Pipe's shutoff
+VAPOR|2|Steam, e.g.
+VAULT|2|Bank's safe room
+VERSE|2|Poem section
+VIGOR|3|Get-up-and-go
+VITAL|2|Absolutely necessary
+VOCAL|2|Sung, not played
+VOWEL|1|A, E, I, O, or U
+WAGER|3|Friendly bet
+WAIST|1|Belt's spot
+WEARY|2|Bone-tired
+WEDGE|2|Doorstop shape
+WEIGH|1|Step on the scale
+WHIRL|2|Spin around
+WOODY|2|Like a forest's scent
+WORSE|1|Further from better
+WRECK|2|Total, as a car
+BEAKS|1|Bird mouths
+BEAMS|1|Rays of light
+BOLTS|1|Nuts' partners
+CANES|2|Walking sticks
+CELLS|1|Body's building blocks
+CONES|1|Ice cream holders
+CRABS|1|Beach pinchers
+CURBS|2|Street edges
+DECKS|1|Card packs
+DIETS|1|Eating plans
+DISKS|2|Flat circles
+FILES|1|Cabinet papers
+FORMS|1|Papers to fill out
+FUNDS|2|Money supplies
+HEAPS|2|Messy piles
+HEELS|1|Shoe backs
+HERBS|1|Recipe greens
+HERDS|1|Cattle groups
+HOODS|1|Jacket toppers
+HOOPS|1|Basketball rims
+LACES|1|Sneaker strings
+LIMBS|2|Arms and legs
+LINKS|1|Chain pieces
+LOADS|1|Laundry batches
+MARKS|1|Spots left behind
+MASTS|2|Sail poles
+MATES|2|Ship officers
+MILLS|2|Flour factories
+MODES|2|Gadget settings
+MOLES|2|Lawn tunnelers
+NAILS|1|Hammer targets
+OATHS|2|Solemn promises
+PICKS|1|Choices
+POLLS|2|Opinion surveys
+PORTS|2|Ship stops
+POSTS|1|Fence poles
+RACKS|1|Coat hangers
+RAILS|1|Track bars
+RANKS|2|Military levels
+RATES|1|Prices per unit
+REEDS|3|Marsh grasses
+REELS|2|Rod spinners
+RISKS|1|Chances taken
+SACKS|1|Potato bags
+SALES|1|Price drops
+SEAMS|2|Fabric joins
+SHEDS|1|Tool houses
+SLIPS|1|Small stumbles
+TERMS|2|Contract conditions
+TEXTS|1|Thumb-sent messages
+TICKS|1|Clock sounds
+TOLLS|2|Crossing fees
+TYPES|1|Kinds
+VEILS|2|Face covers
+VEINS|2|Blood routes
+VENTS|2|AC outlets
+VERBS|1|Action words
+WARDS|3|Hospital sections
+WEEDS|1|Garden invaders
+WHIPS|2|Cream fluffers
 """
 }

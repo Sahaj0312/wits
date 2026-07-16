@@ -394,16 +394,30 @@ struct CrosswordScreen: View {
     private func setUpAndRun() async {
         if puzzle == nil {
             let target = mapLevel
-            let seed = cfg.resolvedRandomSeed()
             // Weekly competitors must always receive the exact same board,
             // independent of device speed. The prevalidated seeded set is
             // instant and deterministic; regular play gets a short window
             // to create a fresh fill before using that same safety net.
-            let searchBudget: Duration = cfg.isWeekly ? .zero : .milliseconds(600)
-            let generationTask = Task.detached(priority: .userInitiated) {
-                CrosswordEngine.generate(mapLevel: target,
-                                         seed: seed,
-                                         searchBudget: searchBudget)
+            let isWeekly = cfg.isWeekly
+            let searchBudget: Duration = isWeekly ? .zero : .milliseconds(600)
+            let seeds = (0..<4).map { _ in cfg.resolvedRandomSeed() }
+            let generationTask = Task.detached(priority: .userInitiated) { () -> CrosswordPuzzle in
+                var pick = CrosswordEngine.generate(mapLevel: target,
+                                                    seed: seeds[0],
+                                                    searchBudget: searchBudget)
+                if !isWeekly {
+                    // Redraw a board the player has seen recently; the last
+                    // draw stands even if it repeats, so a stubborn streak
+                    // can never stall startup.
+                    for seed in seeds.dropFirst()
+                    where CrosswordRecentBoards.contains(pick) && !Task.isCancelled {
+                        pick = CrosswordEngine.generate(mapLevel: target,
+                                                        seed: seed,
+                                                        searchBudget: searchBudget)
+                    }
+                    CrosswordRecentBoards.record(pick)
+                }
+                return pick
             }
             let generated = await withTaskCancellationHandler {
                 await generationTask.value
@@ -499,6 +513,32 @@ struct CrosswordScreen: View {
     private static func clock(_ seconds: Double) -> String {
         let total = Int(seconds.rounded(.down))
         return String(format: "%02d:%02d", total / 60, total % 60)
+    }
+}
+
+/// Remembers the last few dozen boards served (as sorted-answer
+/// fingerprints, so a mirrored layout of the same words still counts as a
+/// repeat) and lets generation redraw instead of repeating one. Weekly
+/// boards bypass this entirely — they must be identical for every player.
+private enum CrosswordRecentBoards {
+    private static let key = "crossword.recentBoards"
+    private static let capacity = 30
+
+    private static func fingerprint(_ puzzle: CrosswordPuzzle) -> String {
+        puzzle.words.map(\.answer).sorted().joined(separator: ",")
+    }
+
+    static func contains(_ puzzle: CrosswordPuzzle) -> Bool {
+        UserDefaults.standard.stringArray(forKey: key)?.contains(fingerprint(puzzle)) ?? false
+    }
+
+    static func record(_ puzzle: CrosswordPuzzle) {
+        let mark = fingerprint(puzzle)
+        var list = UserDefaults.standard.stringArray(forKey: key) ?? []
+        list.removeAll { $0 == mark }
+        list.append(mark)
+        if list.count > capacity { list.removeFirst(list.count - capacity) }
+        UserDefaults.standard.set(list, forKey: key)
     }
 }
 

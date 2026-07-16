@@ -31,6 +31,32 @@ final class CrosswordTests: XCTestCase {
         }
     }
 
+    /// Open runs of two or more cells, matching the engine's slot scan.
+    private func slotCount(in isBlock: [[Bool]]) -> Int {
+        let size = isBlock.count
+        var count = 0
+        for isAcross in [true, false] {
+            for major in 0..<size {
+                var run = 0
+                for minor in 0...size {
+                    let open: Bool
+                    if minor < size {
+                        open = isAcross ? !isBlock[major][minor] : !isBlock[minor][major]
+                    } else {
+                        open = false
+                    }
+                    if open {
+                        run += 1
+                    } else {
+                        if run >= 2 { count += 1 }
+                        run = 0
+                    }
+                }
+            }
+        }
+        return count
+    }
+
     private func assertValid(_ puzzle: CrosswordPuzzle,
                              context: String,
                              file: StaticString = #filePath,
@@ -38,7 +64,9 @@ final class CrosswordTests: XCTestCase {
         XCTAssertEqual(puzzle.size, 5, context, file: file, line: line)
         XCTAssertEqual(puzzle.isBlock.count, puzzle.size, context, file: file, line: line)
         XCTAssertEqual(puzzle.solution.count, puzzle.size, context, file: file, line: line)
-        XCTAssertEqual(puzzle.words.count, 10, context, file: file, line: line)
+        XCTAssertEqual(puzzle.words.count, slotCount(in: puzzle.isBlock),
+                       context, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(puzzle.words.count, 6, context, file: file, line: line)
         XCTAssertEqual(Set(puzzle.words.map(\.id)).count, puzzle.words.count,
                        context, file: file, line: line)
 
