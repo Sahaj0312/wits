@@ -123,7 +123,7 @@ final class AdManager {
                 if AdFreeOfferGate.shouldOfferNow(isAdFree: self.adFreeProvider()) {
                     // The pitch lands directly behind the ad it follows — the
                     // moment the pain of the ad is most concrete.
-                    self.presentAdFreeOffer()
+                    self.presentPaywall()
                 }
             },
             onFail: { [weak self] in
@@ -155,10 +155,12 @@ final class AdManager {
     /// Presents the one-time-purchase upsell over whatever is on screen —
     /// UIKit presentation, like the ads themselves, so it works above the
     /// game's fullScreenCover where a root SwiftUI sheet cannot appear.
-    private func presentAdFreeOffer() {
+    private func presentPaywall() {
         guard let top = Self.topViewController() else { return }
         AdFreeOfferGate.recordOfferShown()
-        top.present(UIHostingController(rootView: AdFreeOfferView()), animated: true)
+        let controller = UIHostingController(rootView: PaywallView())
+        controller.modalPresentationStyle = .fullScreen
+        top.present(controller, animated: true)
     }
 
     private static func topViewController() -> UIViewController? {
