@@ -278,15 +278,17 @@ private struct GameLauncher: View {
     @State private var attempt = 0   // bump to force a fresh game instance
     @State private var pauseController = GamePauseController()
 
-    private enum Phase { case selector, tutorial, playing, levelResult }
+    private enum Phase { case selector, tutorial, reviewTutorial, playing, levelResult }
 
     var body: some View {
         content
-            .onChange(of: phase) { _, newPhase in
+            .onChange(of: phase) { oldPhase, newPhase in
                 // Endless runs have no dedicated result phase in this host —
                 // the selector is the first static screen after a run, so the
                 // interstitial slot (counted in each onRunComplete) is here.
-                guard newPhase == .selector else { return }
+                // Backing out of a tutorial isn't a run, so it never counts.
+                guard newPhase == .selector,
+                      oldPhase == .playing || oldPhase == .levelResult else { return }
                 AdManager.shared.maybeShowInterstitial()
             }
     }
@@ -301,7 +303,8 @@ private struct GameLauncher: View {
                         playDifficulty = difficulty
                         startRun()
                     },
-                    onClose: { dismiss() }
+                    onClose: { dismiss() },
+                    onHelp: showTutorialReview
                 )
             } else if game == .tower {
                 TowerModeSelectView(
@@ -309,7 +312,8 @@ private struct GameLauncher: View {
                         playDifficulty = difficulty
                         startRun()
                     },
-                    onClose: { dismiss() }
+                    onClose: { dismiss() },
+                    onHelp: showTutorialReview
                 )
             } else if [.arrowStorm, .crowdControl, .colorClash, .tileShift, .lastSeen].contains(game) {
                 EndlessModeSelectView(
@@ -318,7 +322,8 @@ private struct GameLauncher: View {
                         playDifficulty = difficulty
                         startRun()
                     },
-                    onClose: { dismiss() }
+                    onClose: { dismiss() },
+                    onHelp: showTutorialReview
                 )
             } else if game.isStandalone {
                 StandaloneModeSelectView(
@@ -326,7 +331,8 @@ private struct GameLauncher: View {
                     onSurvival: {
                         startRun()
                     },
-                    onClose: { dismiss() }
+                    onClose: { dismiss() },
+                    onHelp: showTutorialReview
                 )
             } else {
                 DifficultySelectView(
@@ -340,18 +346,38 @@ private struct GameLauncher: View {
                 )
             }
         case .tutorial:
-            FirstPlayTutorial(
-                game: game,
-                onStart: {
-                    GameTutorialStore.markSeen(game)
-                    pauseController.reset()
-                    withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
-                },
-                onBack: {
-                    pauseController.reset()
-                    withAnimation(.easeOut(duration: 0.2)) { phase = .selector }
-                }
-            )
+            if let slides = game.animatedTutorialSlides {
+                AnimatedHowToPlay(
+                    game: game,
+                    slides: slides,
+                    onStart: startFromTutorial,
+                    onBack: backFromTutorial
+                )
+            } else {
+                FirstPlayTutorial(
+                    game: game,
+                    onStart: startFromTutorial,
+                    onBack: backFromTutorial
+                )
+            }
+        case .reviewTutorial:
+            // Re-opened from the selector's "?" — finishing returns there.
+            if let slides = game.animatedTutorialSlides {
+                AnimatedHowToPlay(
+                    game: game,
+                    slides: slides,
+                    doneTitle: "got it",
+                    onStart: backFromTutorial,
+                    onBack: backFromTutorial
+                )
+            } else {
+                FirstPlayTutorial(
+                    game: game,
+                    ctaTitle: "GOT IT",
+                    onStart: backFromTutorial,
+                    onBack: backFromTutorial
+                )
+            }
         case .playing:
             if game == .blockFit {
                 let runBests = app.levels.runBests(for: .blockFit, difficulty: nil)
@@ -616,6 +642,21 @@ private struct GameLauncher: View {
         attempt += 1
         let needsTutorial = GameTutorialStore.shouldShow(for: game, hasPlayed: app.hasPlayed(game))
         withAnimation(.easeOut(duration: 0.2)) { phase = needsTutorial ? .tutorial : .playing }
+    }
+
+    private func startFromTutorial() {
+        GameTutorialStore.markSeen(game)
+        pauseController.reset()
+        withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+    }
+
+    private func backFromTutorial() {
+        pauseController.reset()
+        withAnimation(.easeOut(duration: 0.2)) { phase = .selector }
+    }
+
+    private func showTutorialReview() {
+        withAnimation(.easeOut(duration: 0.2)) { phase = .reviewTutorial }
     }
 
     private func handle(_ result: GameResult) {

@@ -179,6 +179,7 @@ struct StandaloneModeSelectView: View {
     let game: GameID
     var onSurvival: () -> Void
     var onClose: () -> Void
+    var onHelp: (() -> Void)? = nil
 
     @Environment(AppModel.self) private var app
 
@@ -196,7 +197,11 @@ struct StandaloneModeSelectView: View {
                             .font(.system(size: 10.5, weight: .black, design: world.bodyDesign))
                             .foregroundStyle(world.muted)
                         Spacer()
-                        Color.clear.frame(width: 44, height: 44)
+                        if let onHelp {
+                            iconButton("questionmark", label: "How to play", action: onHelp)
+                        } else {
+                            Color.clear.frame(width: 44, height: 44)
+                        }
                     }
                     .padding(.top, 10)
 

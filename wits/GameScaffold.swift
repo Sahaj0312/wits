@@ -184,6 +184,7 @@ enum GameTutorialStore {
 struct FirstPlayTutorial: View {
     let game: GameID
     var accessory: AnyView? = nil
+    var ctaTitle: String = "START GAME"
     var onStart: () -> Void
     var onBack: (() -> Void)? = nil
 
@@ -252,7 +253,7 @@ struct FirstPlayTutorial: View {
 
                     Button(action: onStart) {
                         HStack {
-                            Text("START GAME")
+                            Text(ctaTitle)
                             Spacer()
                             Image(systemName: "arrow.right")
                         }
