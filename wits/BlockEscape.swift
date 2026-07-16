@@ -4,24 +4,26 @@
 //
 //  Klotski-style sliding blocks. Mixed-size blocks jam a small tray; slide
 //  them along rows and columns to walk the big 2×2 block out the bottom exit.
-//  Every level is procedurally generated with an exact BFS par: the generator
-//  builds a random solved layout, explores its whole move graph, and serves a
-//  start position whose true minimum solve length matches the level's target
-//  — so boards never repeat and efficiency scoring is honest.
+//  Boards are selected from an offline-generated catalog of solvable starts.
+//  Runtime setup only reads a compact key and decodes it, so even the hardest
+//  trays appear immediately. Completing the escape is the pass condition.
 //
 
+import Foundation
+#if !BLOCK_ESCAPE_CATALOG_TOOL
 import SwiftUI
+#endif
 
 // MARK: - Engine
 
-nonisolated struct KlotskiBlock: Equatable, Hashable {
+nonisolated struct KlotskiBlock: Equatable, Hashable, Sendable {
     var x: Int
     var y: Int
     let w: Int
     let h: Int
 }
 
-nonisolated struct KlotskiBoard: Equatable {
+nonisolated struct KlotskiBoard: Equatable, Sendable {
     let width: Int
     let height: Int
     /// blocks[0] is always the 2×2 hero.
@@ -31,20 +33,55 @@ nonisolated struct KlotskiBoard: Equatable {
     var isSolved: Bool { blocks[0].x == exitX && blocks[0].y == height - 2 }
 }
 
-nonisolated struct KlotskiSpec: Equatable {
+nonisolated struct KlotskiSpec: Equatable, Sendable {
     let width: Int
     let height: Int
     let verticals: Int    // 1×2 upright blocks
     let horizontals: Int  // 2×1 flat blocks
     let singles: Int      // 1×1 blocks
-    let targetPar: Int
 }
 
-// Pure computation, generated off-main behind the tray spinner.
+nonisolated enum KlotskiDifficultyBand: Int, CaseIterable, Sendable {
+    case easy
+    case medium
+    case hard
+    case extraHard
+
+    var title: String {
+        switch self {
+        case .easy: "easy"
+        case .medium: "medium"
+        case .hard: "hard"
+        case .extraHard: "extra hard"
+        }
+    }
+
+    var spec: KlotskiSpec {
+        switch self {
+        case .easy:
+            KlotskiSpec(width: 4, height: 4, verticals: 1, horizontals: 1, singles: 2)
+        case .medium, .hard:
+            KlotskiSpec(width: 4, height: 5, verticals: 3, horizontals: 2, singles: 3)
+        case .extraHard:
+            KlotskiSpec(width: 4, height: 5, verticals: 4, horizontals: 1, singles: 4)
+        }
+    }
+
+    var catalogDepths: ClosedRange<Int> {
+        switch self {
+        case .easy: 4...10
+        case .medium: 12...27
+        case .hard: 28...48
+        case .extraHard: 35...77
+        }
+    }
+}
+
+// Pure computation. Runtime board selection does no graph search.
 nonisolated enum KlotskiEngine {
     /// States are canonical by cell shape-class (same-shaped blocks are
     /// interchangeable), packed 3 bits per cell into two UInt64s (≤ 30 cells).
-    struct Key: Hashable {
+    struct Key: Hashable, Sendable {
         var a: UInt64 = 0
         var b: UInt64 = 0
 
@@ -52,6 +89,11 @@ nonisolated enum KlotskiEngine {
             if cell < 21 { a |= value << (UInt64(cell) * 3) }
             else { b |= value << (UInt64(cell - 21) * 3) }
         }
+    }
+
+    struct CatalogEntry: Equatable, Sendable {
+        let key: Key
+        let depth: Int
     }
 
     private static func shapeClass(_ b: KlotskiBlock) -> UInt64 {
@@ -187,44 +229,163 @@ nonisolated enum KlotskiEngine {
         return nil
     }
 
-    // MARK: Level ladder
+    // MARK: Runtime catalog
 
-    /// Frozen exam spec per map level (1...40): tray, block mix, and the
-    /// minimum-move target the generator aims the start position at. Bands
-    /// step sideways-then-up like the other ladders — a new tray or a denser
-    /// mix resets the par ramp. Mixes are profiled: each keeps its full move
-    /// graph small enough to enumerate (≤ ~150k canonical states) while its
-    /// deepest positions comfortably cover the band's par targets. Bigger or
-    /// emptier trays blow up the state space without getting deeper, so the
-    /// ladder tops out at the classic 4×5, two-empty density (par ≤ ~77).
-    static func spec(forMapLevel level: Int) -> KlotskiSpec {
-        let n = min(max(level, 1), 40)
-        switch n {
-        case ...8:
-            return KlotskiSpec(width: 4, height: 4, verticals: 1, horizontals: 1, singles: 2,
-                               targetPar: 3 + n)                       // 4...11 (component max ~11)
-        case ...16:
-            return KlotskiSpec(width: 4, height: 4, verticals: 2, horizontals: 1, singles: 3,
-                               targetPar: 9 + (n - 8))                 // 10...17 (max ~18)
-        case ...26:
-            return KlotskiSpec(width: 4, height: 5, verticals: 3, horizontals: 2, singles: 3,
-                               targetPar: 15 + (n - 16) * 3)           // 18...45 (max ~78)
-        case ...34:
-            return KlotskiSpec(width: 4, height: 5, verticals: 4, horizontals: 1, singles: 4,
-                               targetPar: 40 + (n - 26) * 4)           // 44...72 (classic, max ~77)
-        default:
-            return KlotskiSpec(width: 4, height: 5, verticals: 4, horizontals: 1, singles: 4,
-                               targetPar: 72 + (n - 34))               // 73...78
+    static let boardsPerBand = 2_500
+
+    static func generate(band: KlotskiDifficultyBand,
+                         seed: UInt64,
+                         excluding: Set<Key> = []) -> (board: KlotskiBoard, key: Key) {
+        let entries = catalogEntries(for: band)
+        guard !entries.isEmpty else { return fallbackPuzzle() }
+
+        var rng = SeededRandomNumberGenerator(seed: seed)
+        let start = Int(rng.next() % UInt64(entries.count))
+        let selected = (0..<entries.count)
+            .lazy
+            .map { entries[(start + $0) % entries.count] }
+            .first { !excluding.contains($0.key) } ?? entries[start]
+        return (decode(selected.key, width: band.spec.width, height: band.spec.height), selected.key)
+    }
+
+    static func catalogEntries(for band: KlotskiDifficultyBand) -> [CatalogEntry] {
+        guard bundledCatalog.indices.contains(band.rawValue) else { return [] }
+        return bundledCatalog[band.rawValue]
+    }
+
+    static func catalogCount(for band: KlotskiDifficultyBand) -> Int {
+        catalogEntries(for: band).count
+    }
+
+    static func catalogDepthRange(for band: KlotskiDifficultyBand) -> ClosedRange<Int>? {
+        let depths = catalogEntries(for: band).map(\.depth)
+        guard let minimum = depths.min(), let maximum = depths.max() else { return nil }
+        return minimum...maximum
+    }
+
+    static func catalog(from data: Data) throws -> [[CatalogEntry]] {
+        var reader = CatalogReader(data: data)
+        guard try reader.readBytes(count: 8) == Array("WITSBE01".utf8) else {
+            throw CatalogError.invalidMagic
+        }
+
+        var catalog: [[CatalogEntry]] = []
+        for band in KlotskiDifficultyBand.allCases {
+            let count = Int(try reader.readUInt32())
+            guard count > 0, count <= 100_000 else { throw CatalogError.invalidCount }
+            var entries: [CatalogEntry] = []
+            entries.reserveCapacity(count)
+            var seen: Set<Key> = []
+            for _ in 0..<count {
+                let entry = CatalogEntry(
+                    key: Key(a: try reader.readUInt64(), b: try reader.readUInt64()),
+                    depth: Int(try reader.readByte())
+                )
+                guard band.catalogDepths.contains(entry.depth),
+                      seen.insert(entry.key).inserted,
+                      key(entry.key, matches: band.spec) else {
+                    throw CatalogError.invalidEntry
+                }
+                entries.append(entry)
+            }
+            catalog.append(entries)
+        }
+        guard reader.isAtEnd else { throw CatalogError.trailingData }
+        return catalog
+    }
+
+    private static let bundledCatalog: [[CatalogEntry]] = {
+        guard let url = Bundle.main.url(forResource: "BlockEscapeBoards", withExtension: "bin"),
+              let data = try? Data(contentsOf: url) else { return [] }
+        return (try? catalog(from: data)) ?? []
+    }()
+
+    private static func fallbackPuzzle() -> (board: KlotskiBoard, key: Key) {
+        let board = KlotskiBoard(width: 4, height: 4,
+                                 blocks: [KlotskiBlock(x: 1, y: 0, w: 2, h: 2),
+                                          KlotskiBlock(x: 0, y: 3, w: 1, h: 1),
+                                          KlotskiBlock(x: 3, y: 3, w: 1, h: 1)])
+        return (board, key(board))
+    }
+
+    private static func key(_ key: Key, matches spec: KlotskiSpec) -> Bool {
+        func shapeClass(at cell: Int) -> UInt64 {
+            cell < 21
+                ? (key.a >> (UInt64(cell) * 3)) & 7
+                : (key.b >> (UInt64(cell - 21) * 3)) & 7
+        }
+
+        var used = [Bool](repeating: false, count: spec.width * spec.height)
+        var counts = [Int](repeating: 0, count: 5)
+        for cell in used.indices where !used[cell] && shapeClass(at: cell) != 0 {
+            let value = shapeClass(at: cell)
+            guard value <= 4 else { return false }
+            let (width, height): (Int, Int)
+            switch value {
+            case 4: (width, height) = (2, 2)
+            case 3: (width, height) = (1, 2)
+            case 2: (width, height) = (2, 1)
+            default: (width, height) = (1, 1)
+            }
+            let x = cell % spec.width
+            let y = cell / spec.width
+            guard x + width <= spec.width, y + height <= spec.height else { return false }
+            for dy in 0..<height {
+                for dx in 0..<width {
+                    let index = (y + dy) * spec.width + x + dx
+                    guard !used[index], shapeClass(at: index) == value else { return false }
+                    used[index] = true
+                }
+            }
+            counts[Int(value)] += 1
+        }
+        return counts[4] == 1
+            && counts[3] == spec.verticals
+            && counts[2] == spec.horizontals
+            && counts[1] == spec.singles
+    }
+
+    private struct CatalogReader {
+        let bytes: [UInt8]
+        var offset = 0
+
+        init(data: Data) { bytes = Array(data) }
+        var isAtEnd: Bool { offset == bytes.count }
+
+        mutating func readBytes(count: Int) throws -> [UInt8] {
+            guard count >= 0, offset + count <= bytes.count else { throw CatalogError.truncated }
+            defer { offset += count }
+            return Array(bytes[offset..<(offset + count)])
+        }
+
+        mutating func readByte() throws -> UInt8 {
+            guard offset < bytes.count else { throw CatalogError.truncated }
+            defer { offset += 1 }
+            return bytes[offset]
+        }
+
+        mutating func readUInt32() throws -> UInt32 {
+            let value = try readBytes(count: 4)
+            return value.enumerated().reduce(0) { $0 | UInt32($1.element) << ($1.offset * 8) }
+        }
+
+        mutating func readUInt64() throws -> UInt64 {
+            let value = try readBytes(count: 8)
+            return value.enumerated().reduce(0) { $0 | UInt64($1.element) << ($1.offset * 8) }
         }
     }
 
-    /// A random legal layout with the hero already at the exit (solved), used
-    /// as the seed whose move graph the generator explores.
-    static func randomSolvedLayout(_ spec: KlotskiSpec) -> KlotskiBoard? {
-        var rng = SystemRandomNumberGenerator()
-        return randomSolvedLayout(spec, using: &rng)
+    enum CatalogError: Error {
+        case invalidMagic
+        case invalidCount
+        case invalidEntry
+        case trailingData
+        case truncated
     }
 
+#if BLOCK_ESCAPE_CATALOG_TOOL
+    /// A random legal layout with the hero already at the exit, used only to
+    /// build the bundled catalog during development.
     private static func randomSolvedLayout<R: RandomNumberGenerator>(_ spec: KlotskiSpec,
                                                                       using rng: inout R) -> KlotskiBoard? {
         outer: for _ in 0..<40 {
@@ -265,55 +426,6 @@ nonisolated enum KlotskiEngine {
         return nil
     }
 
-    /// Generate a puzzle for a map level. Two BFS passes over one random
-    /// component: enumerate every position reachable from a solved layout,
-    /// then walk distances back from every solved position in it and serve
-    /// the state whose exact par lands closest to the level's target.
-    static func generate(mapLevel: Int, attempts: Int = 6, cap: Int = 400_000) -> (board: KlotskiBoard, par: Int) {
-        var rng = SystemRandomNumberGenerator()
-        return generate(mapLevel: mapLevel, attempts: attempts, cap: cap, using: &rng)
-    }
-
-    static func generate(mapLevel: Int,
-                         seed: UInt64,
-                         attempts: Int = 6,
-                         cap: Int = 400_000) -> (board: KlotskiBoard, par: Int) {
-        var rng = SeededRandomNumberGenerator(seed: seed)
-        return generate(mapLevel: mapLevel, attempts: attempts, cap: cap, using: &rng)
-    }
-
-    private static func generate<R: RandomNumberGenerator>(mapLevel: Int,
-                                                            attempts: Int,
-                                                            cap: Int,
-                                                            using rng: inout R) -> (board: KlotskiBoard, par: Int) {
-        let spec = spec(forMapLevel: mapLevel)
-        var best: (KlotskiBoard, Int)?
-        for _ in 0..<attempts {
-            guard let seed = randomSolvedLayout(spec, using: &rng),
-                  let component = explore(from: seed, cap: cap) else { continue }
-            let distances = distancesFromGoals(component: component, width: spec.width, height: spec.height)
-            // A random layout can jam into a tiny locked pocket of the move
-            // graph — reject components too shallow to host a real puzzle.
-            let deepest = distances.values.max() ?? 0
-            guard deepest >= min(spec.targetPar, 4) else { continue }
-            guard let picked = pickStart(distances, target: spec.targetPar) else { continue }
-            let board = decode(picked.key, width: spec.width, height: spec.height)
-            if picked.par >= spec.targetPar { return (board, picked.par) }
-            if best == nil || abs(picked.par - spec.targetPar) < abs(best!.1 - spec.targetPar) {
-                best = (board, picked.par)
-            }
-        }
-        if let best { return best }
-        // Unreachable in practice; serve a minimal solvable tray so a run can
-        // never fail to start.
-        let fallback = KlotskiBoard(width: 4, height: 4,
-                                    blocks: [KlotskiBlock(x: 1, y: 0, w: 2, h: 2),
-                                             KlotskiBlock(x: 0, y: 3, w: 1, h: 1),
-                                             KlotskiBlock(x: 3, y: 3, w: 1, h: 1)])
-        let par = solve(fallback) ?? 2
-        return (fallback, par)
-    }
-
     /// Every state reachable from `seed` (moves are reversible, so this is the
     /// full component), or nil when it outgrows the cap.
     private static func explore(from seed: KlotskiBoard, cap: Int) -> (states: Set<Key>, goals: [KlotskiBoard])? {
@@ -323,10 +435,10 @@ nonisolated enum KlotskiEngine {
         while !frontier.isEmpty {
             var next: [KlotskiBoard] = []
             for state in frontier {
-                for n in neighbors(state) {
-                    guard visited.insert(key(n)).inserted else { continue }
-                    if n.isSolved { goals.append(n) }
-                    next.append(n)
+                for nextBoard in neighbors(state) {
+                    guard visited.insert(key(nextBoard)).inserted else { continue }
+                    if nextBoard.isSolved { goals.append(nextBoard) }
+                    next.append(nextBoard)
                 }
             }
             if visited.count > cap { return nil }
@@ -337,12 +449,11 @@ nonisolated enum KlotskiEngine {
 
     /// Multi-source BFS from every solved state: exact distance-to-solve for
     /// each state in the component.
-    private static func distancesFromGoals(component: (states: Set<Key>, goals: [KlotskiBoard]),
-                                           width: Int, height: Int) -> [Key: Int] {
-        var dist: [Key: Int] = [:]
+    private static func distancesFromGoals(component: (states: Set<Key>, goals: [KlotskiBoard])) -> [Key: Int] {
+        var distances: [Key: Int] = [:]
         var frontier: [KlotskiBoard] = []
         for goal in component.goals {
-            dist[key(goal)] = 0
+            distances[key(goal)] = 0
             frontier.append(goal)
         }
         var depth = 0
@@ -350,44 +461,90 @@ nonisolated enum KlotskiEngine {
             depth += 1
             var next: [KlotskiBoard] = []
             for state in frontier {
-                for n in neighbors(state) {
-                    let k = key(n)
-                    guard dist[k] == nil else { continue }
-                    dist[k] = depth
-                    next.append(n)
+                for nextBoard in neighbors(state) {
+                    let nextKey = key(nextBoard)
+                    guard distances[nextKey] == nil else { continue }
+                    distances[nextKey] = depth
+                    next.append(nextBoard)
                 }
             }
             frontier = next
         }
-        return dist
+        return distances
     }
 
-    private static func pickStart(_ distances: [Key: Int], target: Int) -> (key: Key, par: Int)? {
-        var best: (Key, Int)?
-        let ordered = distances.filter { $0.value >= 2 }.sorted {
-            if $0.value != $1.value {
-                let lhsGap = abs($0.value - target)
-                let rhsGap = abs($1.value - target)
-                if lhsGap != rhsGap { return lhsGap < rhsGap }
+    /// Offline-only catalog builder. Runtime builds never include this graph
+    /// enumeration path; they only decode keys from the generated asset.
+    static func catalogEntries(spec: KlotskiSpec,
+                               depths: ClosedRange<Int>,
+                               count: Int,
+                               seed: UInt64) -> [(key: Key, depth: Int)] {
+        var rng = SeededRandomNumberGenerator(seed: seed)
+        var candidates: [Key: Int] = [:]
+        var knownStates: Set<Key> = []
+
+        for _ in 0..<200 where candidates.count < count {
+            guard let solved = randomSolvedLayout(spec, using: &rng) else { continue }
+            let solvedKey = key(solved)
+            guard !knownStates.contains(solvedKey),
+                  let component = explore(from: solved, cap: 400_000) else { continue }
+            knownStates.formUnion(component.states)
+            let distances = distancesFromGoals(component: component)
+            for (key, depth) in distances where depths.contains(depth) {
+                candidates[key] = depth
             }
-            return $0.key.a == $1.key.a ? $0.key.b < $1.key.b : $0.key.a < $1.key.a
         }
-        for (k, d) in ordered {
-            if d == target { return (k, d) }
-            if best == nil || abs(d - target) < abs(best!.1 - target) { best = (k, d) }
-        }
-        return best
+
+        precondition(candidates.count >= count,
+                     "catalog recipe produced \(candidates.count), needs \(count)")
+        var entries = candidates.map { (key: $0.key, depth: $0.value) }
+        entries.shuffle(using: &rng)
+        return Array(entries.prefix(count))
     }
+#endif
 }
 
 // MARK: - Screen
+
+#if !BLOCK_ESCAPE_CATALOG_TOOL
+@MainActor
+private enum BlockEscapeRecentBoards {
+    private static let historyLimit = 40
+
+    static func excludedKeys(for band: KlotskiDifficultyBand) -> Set<KlotskiEngine.Key> {
+        Set(UserDefaults.standard.stringArray(forKey: storageKey(for: band))?.compactMap(parse) ?? [])
+    }
+
+    static func record(_ key: KlotskiEngine.Key, for band: KlotskiDifficultyBand) {
+        let encoded = encode(key)
+        var history = UserDefaults.standard.stringArray(forKey: storageKey(for: band)) ?? []
+        history.removeAll { $0 == encoded }
+        history.insert(encoded, at: 0)
+        UserDefaults.standard.set(Array(history.prefix(historyLimit)), forKey: storageKey(for: band))
+    }
+
+    private static func storageKey(for band: KlotskiDifficultyBand) -> String {
+        "wits.blockEscape.recent.\(band.rawValue)"
+    }
+
+    private static func encode(_ key: KlotskiEngine.Key) -> String {
+        "\(key.a):\(key.b)"
+    }
+
+    private static func parse(_ value: String) -> KlotskiEngine.Key? {
+        let parts = value.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              let a = UInt64(parts[0]),
+              let b = UInt64(parts[1]) else { return nil }
+        return KlotskiEngine.Key(a: a, b: b)
+    }
+}
 
 struct BlockEscapeScreen: View {
     var cfg: GameConfig
     var onResult: (GameResult) -> Void
 
     @State private var board: KlotskiBoard?
-    @State private var par = 0
     @State private var moves = 0
     @State private var elapsed = 0.0
     @State private var timerStartedAt = Date()
@@ -399,24 +556,31 @@ struct BlockEscapeScreen: View {
 
     private let startedAt = Date()
     private let level: Double
-    private let mapLevel: Int
+    private let band: KlotskiDifficultyBand
     private var world: GameWorld { GameID.blockEscape.world }
 
     init(cfg: GameConfig, onResult: @escaping (GameResult) -> Void) {
         self.cfg = cfg
         self.onResult = onResult
         self.level = cfg.difficulty.level
-        self.mapLevel = cfg.mapLevel ?? DifficultyScale.contentLevel(for: .blockEscape,
-                                                                     legacyDifficulty: cfg.difficulty.level)
+        self.band = Self.difficultyBand(for: cfg)
     }
 
-    /// Time budget prices in planning, not just execution — deep thought on a
-    /// hard tray shouldn't tank the grade.
-    private var parSeconds: Double { Double(par) * 5.0 + 30 }
-
-    /// Full move credit within ~20% of par: par is BFS-optimal, and matching a
-    /// computer within a fifth is mastery for a human.
-    private var graceMoves: Int { Int(ceil(Double(par) * 1.2)) + 1 }
+    private static func difficultyBand(for cfg: GameConfig) -> KlotskiDifficultyBand {
+        if let difficulty = cfg.difficultyTrack {
+            switch difficulty {
+            case .easy: return .easy
+            case .medium: return .medium
+            case .hard: return .hard
+            case .extraHard: return .extraHard
+            }
+        }
+        let level = cfg.difficulty.level
+        if level < 3.25 { return .easy }
+        if level < 5.5 { return .medium }
+        if level < 7.75 { return .hard }
+        return .extraHard
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -504,19 +668,13 @@ struct BlockEscapeScreen: View {
     }
 
     private func progressStrip(_ board: KlotskiBoard) -> some View {
-        VStack(spacing: 8) {
-            HStack {
-                Label("\(board.width)×\(board.height) tray", systemImage: "square.split.2x2.fill")
-                Spacer()
-                Text("par \(par)")
-            }
-            .font(.system(size: 13, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white.opacity(0.78))
-
-            ProgressView(value: min(1, Double(moves) / Double(max(1, graceMoves))))
-                .tint(moves <= graceMoves ? world.secondary : world.accent)
-                .background(.white.opacity(0.16), in: Capsule())
+        HStack {
+            Label("\(board.width)×\(board.height) tray", systemImage: "square.split.2x2.fill")
+            Spacer()
+            Text(band.title)
         }
+        .font(.system(size: 13, weight: .heavy, design: .rounded))
+        .foregroundStyle(.white.opacity(0.78))
     }
 
     // MARK: Tray
@@ -615,13 +773,14 @@ struct BlockEscapeScreen: View {
 
     private func setUpAndRun() async {
         if board == nil {
-            let target = mapLevel
+            let selectedBand = band
             let seed = cfg.resolvedRandomSeed()
+            let excluded = BlockEscapeRecentBoards.excludedKeys(for: selectedBand)
             let generated = await Task.detached(priority: .userInitiated) {
-                KlotskiEngine.generate(mapLevel: target, seed: seed)
+                KlotskiEngine.generate(band: selectedBand, seed: seed, excluding: excluded)
             }.value
             board = generated.board
-            par = generated.par
+            BlockEscapeRecentBoards.record(generated.key, for: selectedBand)
             timerStartedAt = Date()
         }
         while !Task.isCancelled {
@@ -643,29 +802,22 @@ struct BlockEscapeScreen: View {
 
     private func finish() {
         let seconds = max(1, elapsed)
-        let moveEfficiency = min(1, Double(graceMoves) / Double(max(1, moves)))
-        let timeEfficiency = min(1, parSeconds / seconds)
-        // Escaping at all earns the floor, and move quality dominates the rest,
-        // so a slow, deliberate near-optimal solve still grades to a clean pass.
-        // Time keeps a small weight to reward decisiveness at the margins.
-        let accuracy = max(0, min(1, 0.30 + moveEfficiency * 0.60 + timeEfficiency * 0.10))
-        let score = max(0, Int((Double(par) * 24 + moveEfficiency * 1300 + timeEfficiency * 500).rounded()))
+        // Moves remain a local best stat, but progression is pass/fail: this
+        // result only exists after the hero reaches the exit.
+        let score = max(0, 10_000 - moves * 100 - Int(seconds.rounded()))
 
-        var result = GameResult(game: .blockEscape, score: score, accuracy: accuracy)
+        var result = GameResult(game: .blockEscape, score: score, accuracy: 1)
         result.trials = moves
         result.startedAt = startedAt
         result.durationMs = Int(seconds * 1000)
         result.raw = [
-            "efficiency": (moveEfficiency * 100).rounded(),
             "moves": Double(moves),
-            "parMoves": Double(par),
-            "graceMoves": Double(graceMoves),
-            "parSeconds": parSeconds.rounded(),
             "seconds": seconds.rounded(),
             "trayWidth": Double(board?.width ?? 0),
             "trayHeight": Double(board?.height ?? 0),
             "blocks": Double(board?.blocks.count ?? 0),
-            "blockLevel": level
+            "blockLevel": level,
+            "completed": 1
         ]
         onResult(result)
     }
@@ -684,3 +836,4 @@ struct BlockEscapeScreen: View {
         return String(format: "%02d:%02d", total / 60, total % 60)
     }
 }
+#endif

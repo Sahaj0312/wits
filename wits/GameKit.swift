@@ -285,7 +285,7 @@ extension GameID {
         case .echoGrid: "maxSpan"
         case .lastSeen: "remembered"
         case .slidePuzzle: "efficiency"
-        case .blockEscape: "efficiency"
+        case .blockEscape: "moves"
         case .waterSort: "efficiency"
         case .numberNests: "efficiency"
         case .mahjong: "efficiency"
@@ -300,7 +300,9 @@ extension GameID {
         }
     }
 
-    var statLowerIsBetter: Bool { false }
+    var statLowerIsBetter: Bool {
+        self == .blockEscape
+    }
 
     func statLabel(_ v: Double) -> String {
         switch self {
@@ -308,7 +310,7 @@ extension GameID {
         case .crowdControl: "\(Int(v)) perfect"
         case .lastSeen: "\(Int(v)) recalled"
         case .slidePuzzle: "\(Int(v))% of par"
-        case .blockEscape: "\(Int(v))% of par"
+        case .blockEscape: "\(Int(v)) moves"
         case .waterSort: "\(Int(v))% of par"
         case .numberNests: "\(Int(v))% clean"
         case .mahjong: "\(Int(v))% clean"

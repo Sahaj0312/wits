@@ -66,6 +66,17 @@ final class ScoringTests: XCTestCase {
         XCTAssertFalse(ScoringPolicies.policy(for: .lastSeen) is AccuracyPolicy)
     }
 
+    func testBlockEscapeCompletionIsAlwaysAPass() {
+        let prior = DifficultyState(level: 6, mastery: 6, confidence: 1)
+        var result = GameResult(game: .blockEscape, score: 0, accuracy: 1, trials: 250, durationMs: 900_000)
+        result.raw = ["completed": 1, "moves": 250, "seconds": 900, "blockLevel": 6]
+
+        let run = BlockEscapePolicy().score(result, prior: prior)
+
+        XCTAssertEqual(run.performance, 1)
+        XCTAssertTrue(LevelGrader.passed(quality: run.performance))
+    }
+
     func testEqualMasteryMapsConsistentlyAcrossLaunchPriors() {
         let arrow = ScoringCalibrator.calibratedAbility(game: .arrowStorm, mastery: 7)
         let pegs = ScoringCalibrator.calibratedAbility(game: .pegSolitaire, mastery: 7)

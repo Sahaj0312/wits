@@ -21,10 +21,10 @@ final class RandomnessTests: XCTestCase {
     }
 
     func testSeededPuzzleGeneratorsRepeatExactly() {
-        let blockA = KlotskiEngine.generate(mapLevel: 1, seed: 5150)
-        let blockB = KlotskiEngine.generate(mapLevel: 1, seed: 5150)
+        let blockA = KlotskiEngine.generate(band: .easy, seed: 5150)
+        let blockB = KlotskiEngine.generate(band: .easy, seed: 5150)
         XCTAssertEqual(blockA.board, blockB.board)
-        XCTAssertEqual(blockA.par, blockB.par)
+        XCTAssertEqual(blockA.key, blockB.key)
 
         let pegA = PegSolitaireEngine.generate(mapLevel: 1, seed: 8181)
         let pegB = PegSolitaireEngine.generate(mapLevel: 1, seed: 8181)
