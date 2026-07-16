@@ -3,7 +3,7 @@
 //  wits
 //
 //  Animated how-to-play demos for Mahjong on a tiny two-layer stack with the
-//  five-slot rack below: a blocked tile refuses the tap, a free tile flies
+//  four-slot rack below: a blocked tile refuses the tap, a free tile flies
 //  into the rack, twins pop gold and vanish, and a rack full of singles turns
 //  the border red until undo rewinds the risky pick. Tiles are drawn like the
 //  real game — ivory faces on jade sides, buried tiles falling into shade.
@@ -19,7 +19,7 @@ enum MahjongTutorial {
         TutorialSlide(caption: "when its twin lands in the rack, the pair vanishes") {
             MahjongDemo(page: .match)
         },
-        TutorialSlide(caption: "five singles fill the rack and end the run — undo rewinds a risky pick") {
+        TutorialSlide(caption: "four singles fill the rack and end the run — undo rewinds a risky pick") {
             MahjongDemo(page: .danger)
         },
     ]
@@ -116,7 +116,7 @@ private struct MahjongDemo: View {
             slotH = slotW * 1.24
             let pad = size.width * 0.035
             let gap = size.width * 0.02
-            let panelW = slotW * 5 + gap * 4 + pad * 2
+            let panelW = slotW * 4 + gap * 3 + pad * 2
             let panelH = slotH + slotW * 0.10 + pad * 2
             rackPanel = CGRect(x: (size.width - panelW) / 2,
                                y: size.height * 0.86 - panelH / 2,
@@ -137,7 +137,7 @@ private struct MahjongDemo: View {
 
         func slotCenter(_ index: Int) -> CGPoint {
             let gap = size.width * 0.02
-            return CGPoint(x: size.width / 2 + (CGFloat(index) - 2) * (slotW + gap),
+            return CGPoint(x: size.width / 2 + (CGFloat(index) - 1.5) * (slotW + gap),
                            y: rackPanel.midY - slotW * 0.05)
         }
 
@@ -241,14 +241,14 @@ private struct MahjongDemo: View {
                          style: .continuous)
         context.fill(panel, with: .color(Self.rackWood.opacity(0.9)))
         if warning {
-            // Same red breathing border the real rack shows one slot from full.
+            // Same red breathing border the real rack shows when it fills.
             let pulse = 0.55 + 0.45 * sin(t * 5)
             context.stroke(panel, with: .color(Self.danger.opacity(0.8 * pulse)), lineWidth: 2)
         } else {
             context.stroke(panel, with: .color(world.accent.opacity(0.25)), lineWidth: 1)
         }
 
-        for slot in 0..<5 {
+        for slot in 0..<4 {
             let center = geo.slotCenter(slot)
             let rect = CGRect(x: center.x - geo.slotW / 2, y: center.y - geo.slotH / 2,
                               width: geo.slotW, height: geo.slotH)

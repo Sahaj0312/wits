@@ -183,7 +183,7 @@ struct AnimatedHowToPlay: View {
             }
 
             Button(action: advance) {
-                Text(game.worldTitle(isLast ? doneTitle : "ok"))
+                Text((isLast ? doneTitle : "ok").uppercased())
                     .font(.system(size: 17, weight: .black, design: world.titleDesign))
                     .foregroundStyle(world.background)
                     .frame(maxWidth: .infinity)
