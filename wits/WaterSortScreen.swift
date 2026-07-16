@@ -185,7 +185,7 @@ struct WaterSortScreen: View {
             Button {
                 restart()
             } label: {
-                Image(systemName: "arrow.counterclockwise")
+                Image(systemName: "backward.end.fill")
                     .font(.system(size: 16, weight: .heavy))
                     .foregroundStyle(.white.opacity(moves == 0 ? 0.35 : 1))
                     .frame(width: 42, height: 42)
@@ -236,7 +236,7 @@ struct WaterSortScreen: View {
                 Button {
                     restart()
                 } label: {
-                    Label("restart", systemImage: "arrow.counterclockwise")
+                    Label("restart", systemImage: "backward.end.fill")
                         .font(.system(size: 15, weight: .heavy, design: .rounded))
                         .foregroundStyle(.black.opacity(0.85))
                         .padding(.horizontal, 18)
