@@ -4,7 +4,7 @@
 //
 //  The shared post-run card for the endless games: the frozen game stays
 //  visible behind a soft scrim while one cohesive result surface carries the
-//  score, run context, and bests. Home and PLAY AGAIN sit safely above the
+//  score and bests. Home and PLAY AGAIN sit safely above the
 //  bottom-edge resting zone.
 //  Everything is themed by the game's color world; the three bests retain a
 //  fixed gold / pink / mint medal language across every game.
@@ -39,10 +39,6 @@ struct RunBestLine: Identifiable {
 
 struct GameRunOverView: View {
     let game: GameID
-    /// Panel header, e.g. "MEDIUM MODE" or "ENDLESS RUN".
-    let contextTitle: String
-    /// SF Symbol in the badge straddling the panel's top edge.
-    let badgeSymbol: String
     let score: Int
     /// Optional one-liner under the score for game-specific stats.
     var caption: String? = nil
@@ -135,13 +131,9 @@ struct GameRunOverView: View {
                 .padding(.horizontal, compact ? 16 : 22)
                 .padding(.top, compact ? 14 : 20)
 
-            contextRow(compact: compact)
-                .padding(.horizontal, compact ? 16 : 22)
-                .padding(.top, compact ? 12 : 16)
-
             bestsGrid(compact: compact)
                 .padding(.horizontal, compact ? 12 : 16)
-                .padding(.top, compact ? 10 : 14)
+                .padding(.top, compact ? 12 : 16)
                 .padding(.bottom, compact ? 14 : 18)
         }
         .frame(maxWidth: .infinity)
@@ -189,54 +181,6 @@ struct GameRunOverView: View {
             .frame(height: compact ? 25 : 29)
             .background(world.background.opacity(0.42), in: Capsule())
             .overlay(Capsule().strokeBorder(world.ink.opacity(0.10), lineWidth: 1))
-    }
-
-    private func contextRow(compact: Bool) -> some View {
-        HStack(spacing: compact ? 10 : 13) {
-            badge(compact: compact)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("RUN TYPE")
-                    .font(.system(size: 9.5, weight: .black, design: world.bodyDesign))
-                    .foregroundStyle(world.muted)
-                    .tracking(0.8)
-                Text(contextTitle.uppercased())
-                    .font(.system(size: compact ? 16 : 19,
-                                  weight: .black,
-                                  design: world.titleDesign))
-                    .foregroundStyle(Color(hexAny: 0xF2C14E))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
-            }
-
-            Spacer(minLength: 0)
-
-            Image(systemName: "chevron.right")
-                .font(.system(size: 11, weight: .black))
-                .foregroundStyle(world.muted.opacity(0.55))
-        }
-        .padding(.horizontal, compact ? 12 : 15)
-        .frame(height: compact ? 54 : 62)
-        .frame(maxWidth: .infinity)
-        .background(world.background.opacity(0.36),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(world.ink.opacity(0.09), lineWidth: 1)
-        )
-    }
-
-    private func badge(compact: Bool) -> some View {
-        ZStack {
-            Circle()
-                .fill(world.background)
-                .overlay(Circle().strokeBorder(Color(hexAny: 0xF2C14E).opacity(0.75),
-                                               lineWidth: 2))
-            Image(systemName: badgeSymbol)
-                .font(.system(size: compact ? 17 : 20, weight: .black))
-                .foregroundStyle(Color(hexAny: 0xF2C14E))
-        }
-        .frame(width: compact ? 38 : 44, height: compact ? 38 : 44)
     }
 
     private func bestsGrid(compact: Bool) -> some View {

@@ -725,8 +725,6 @@ struct BlockFitScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .blockFit,
-                        contextTitle: "endless run",
-                        badgeSymbol: GameID.blockFit.symbol,
                         score: model.score,
                         caption: "\(model.linesCleared) lines · combo ×\(model.bestCombo)",
                         bests: RunBestLine.standard(today: max(todayBest, sessionBest),

@@ -543,8 +543,6 @@ struct FuseScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .fuse,
-                        contextTitle: "endless run",
-                        badgeSymbol: GameID.fuse.symbol,
                         score: model.score,
                         caption: "best cell \(model.bestTile) · \(model.moves) moves",
                         bests: RunBestLine.standard(today: max(todayBest, sessionBest),

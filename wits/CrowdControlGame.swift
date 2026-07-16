@@ -460,8 +460,6 @@ struct CrowdControlScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .crowdControl,
-                               contextTitle: "\(difficulty.shortTitle) mode",
-                               badgeSymbol: difficulty.symbol,
                                score: score,
                                caption: "\(perfectRounds) perfect rounds",
                                bests: RunBestLine.standard(today: max(todayBest, sessionBest),

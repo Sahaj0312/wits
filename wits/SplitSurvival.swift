@@ -343,6 +343,8 @@ final class SplitGame {
 struct SplitSurvivalScreen: View {
     let best: Int
     let bestDepthFraction: Double
+    let todayBest: Int
+    let weekBest: Int
     /// (level reached, depth into the next level 0…1, emoji trials) → persist.
     let onRunComplete: (Int, Double, Int) -> Void
     let onQuit: () -> Void
@@ -369,10 +371,14 @@ struct SplitSurvivalScreen: View {
 
     init(best: Int,
          bestDepthFraction: Double = 0,
+         todayBest: Int = 0,
+         weekBest: Int = 0,
          onRunComplete: @escaping (Int, Double, Int) -> Void,
          onQuit: @escaping () -> Void) {
         self.best = best
         self.bestDepthFraction = bestDepthFraction
+        self.todayBest = todayBest
+        self.weekBest = weekBest
         self.onRunComplete = onRunComplete
         self.onQuit = onQuit
         _model = State(initialValue: SplitGame())
@@ -514,46 +520,16 @@ struct SplitSurvivalScreen: View {
     // MARK: Game over
 
     private var gameOver: some View {
-        VStack(spacing: 0) {
-            Spacer()
-            VStack(spacing: 12) {
-                Image(systemName: GameID.split.symbol)
-                    .font(.system(size: 34, weight: .heavy))
-                    .foregroundStyle(Color.witsAccent)
-                Text(endReason)
-                    .font(.witsBody(15, weight: .semibold))
-                    .foregroundStyle(Color.witsMuted)
-                    .multilineTextAlignment(.center)
-                if newBest {
-                    Text("NEW BEST")
-                        .font(.system(size: 12, weight: .heavy, design: .rounded)).kerning(1)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10).padding(.vertical, 4)
-                        .background(Color.witsWarm, in: Capsule())
-                        .padding(.top, 2)
-                }
-                Text("level \(endLevel)")
-                    .font(.system(size: 56, weight: .heavy, design: .rounded))
-                    .foregroundStyle(Color.witsInk)
-                    .monospacedDigit()
-                HStack(spacing: 10) {
-                    SplitStatPill(title: "best", value: splitBestLabel)
-                    SplitStatPill(title: "picks", value: "\(model.trials)")
-                }
-            }
-            .padding(28)
-            .frame(maxWidth: .infinity)
-            .cardSurface()
-            .rise()
-            Spacer()
-            Cta(title: "play again", action: playAgain)
-                .rise(0.1)
-            QuietButton(title: "done", action: finishAndQuit)
-                .padding(.top, 6)
-        }
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .padding(.vertical, 16)
-        .disabled(adBusy)
+        GameRunOverView(game: .split,
+                        score: endLevel,
+                        caption: "\(model.trials) picks · \(endReason)",
+                        bests: RunBestLine.standard(today: max(todayBest, endLevel),
+                                                    week: max(weekBest, endLevel),
+                                                    allTime: max(best, endLevel)),
+                        celebrate: newBest,
+                        onHome: finishAndQuit,
+                        onPlayAgain: playAgain)
+            .disabled(adBusy)
     }
 
     // MARK: Run lifecycle
@@ -589,10 +565,6 @@ struct SplitSurvivalScreen: View {
         guard !runRecorded else { return }
         runRecorded = true
         onRunComplete(model.level, model.depthIntoLevel, model.trials)
-    }
-
-    private var splitBestLabel: String {
-        SplitProgress.label(value: max(comparisonBestValue, currentProgressValue))
     }
 
     private var currentProgressValue: Int {

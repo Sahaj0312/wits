@@ -345,8 +345,6 @@ struct ColorClashScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .colorClash,
-                               contextTitle: "\(difficulty.shortTitle) mode",
-                               badgeSymbol: difficulty.symbol,
                                score: score,
                                caption: "best streak \(bestStreak)",
                                bests: RunBestLine.standard(today: max(todayBest, sessionBest),

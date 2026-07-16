@@ -566,9 +566,12 @@ private struct GameLauncher: View {
                 )
             } else if game == .split {
                 let survivalBest = app.levels.marathonBest(for: .split)
+                let runBests = app.levels.runBests(for: .split, difficulty: nil)
                 SplitSurvivalScreen(
                     best: survivalBest?.depth ?? splitBestLevel,
                     bestDepthFraction: survivalBest?.depthFraction ?? 0,
+                    todayBest: runBests.today,
+                    weekBest: runBests.week,
                     onRunComplete: { level, depth, trials in
                         let result = splitResult(level: level, depth: depth, trials: trials)
                         app.recordStandaloneGameResult(result)
@@ -576,6 +579,7 @@ private struct GameLauncher: View {
                                            depth: level,
                                            depthFraction: depth,
                                            score: splitScore(level: level))
+                        app.recordRunBests(game: .split, score: level)
                     },
                     onQuit: { withAnimation { phase = .selector } }
                 )

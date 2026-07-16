@@ -338,8 +338,6 @@ struct TileShiftScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .tileShift,
-                               contextTitle: "\(difficulty.shortTitle) mode",
-                               badgeSymbol: difficulty.symbol,
                                score: score,
                                caption: "best streak \(bestStreak)",
                                bests: RunBestLine.standard(today: max(todayBest, sessionBest),

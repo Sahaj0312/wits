@@ -502,8 +502,6 @@ struct SnakeScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .snake,
-                        contextTitle: "\(difficulty.shortTitle) mode",
-                        badgeSymbol: difficulty.symbol,
                         score: model.score,
                         caption: "length \(model.body.count)",
                         bests: RunBestLine.standard(today: max(todayBest, sessionBest),

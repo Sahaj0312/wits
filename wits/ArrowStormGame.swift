@@ -348,8 +348,6 @@ struct ArrowStormScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .arrowStorm,
-                        contextTitle: "\(difficulty.shortTitle) mode",
-                        badgeSymbol: difficulty.symbol,
                         score: score,
                         caption: "best streak \(bestStreak)",
                         bests: RunBestLine.standard(today: max(todayBest, sessionBest),

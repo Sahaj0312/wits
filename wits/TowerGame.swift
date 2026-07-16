@@ -560,8 +560,6 @@ struct TowerScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .tower,
-                        contextTitle: "\(difficulty.shortTitle) mode",
-                        badgeSymbol: difficulty.symbol,
                         score: model.score,
                         caption: "\(model.perfects) perfect · best streak \(model.bestStreak)",
                         bests: RunBestLine.standard(today: max(todayBest, sessionBest),

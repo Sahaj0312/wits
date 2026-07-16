@@ -247,8 +247,6 @@ struct LastSeenScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .lastSeen,
-                               contextTitle: "\(difficulty.shortTitle) mode",
-                               badgeSymbol: difficulty.symbol,
                                score: score,
                                caption: "best set \(bestRemembered)",
                                bests: RunBestLine.standard(today: max(todayBest, sessionBest),
