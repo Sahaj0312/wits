@@ -672,9 +672,14 @@ struct BlockFitScreen: View {
         withAnimation(.easeOut(duration: 0.18)) {
             placement = model.place(handIndex: slot, atRow: origin.r, col: origin.c)
         }
-        guard let placement else { return }
+        guard let placement else {
+            GameFeel.shared.uiTick(0.35)
+            return
+        }
 
-        GameFeel.shared.play(.correct(combo: placement.lines > 0 ? placement.comboAfter : 0))
+        if placement.lines > 0 {
+            GameFeel.shared.play(.correct(combo: placement.comboAfter))
+        }
         if placement.lines >= 2 {
             GameFeel.shared.play(.comboMilestone(placement.lines))
         }

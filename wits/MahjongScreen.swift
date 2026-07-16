@@ -419,7 +419,7 @@ struct MahjongScreen: View {
             withAnimation(.linear(duration: 0.34)) {
                 shakes[tile.id, default: 0] += 1
             }
-            GameFeel.shared.play(.wrong)
+            GameFeel.shared.uiTick(0.35)
             return
         }
 

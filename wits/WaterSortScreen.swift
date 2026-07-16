@@ -588,7 +588,6 @@ struct WaterSortScreen: View {
         let active = ActivePour(source: source, dest: dest, color: color,
                                 units: moved, side: side, start: Date())
         pour = active
-        GameFeel.shared.play(.correct(combo: 1))
         Task {
             try? await Task.sleep(for: .seconds(active.total))
             finishPour()

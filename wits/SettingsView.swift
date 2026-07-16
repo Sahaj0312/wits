@@ -271,8 +271,5 @@ struct SettingsView: View {
     private func syncGameFeelSettings() {
         GameFeel.shared.soundEnabled = soundEffectsEnabled
         GameFeel.shared.hapticsEnabled = hapticsEnabled
-        if !soundEffectsEnabled {
-            GameFeel.shared.teardown()
-        }
     }
 }
