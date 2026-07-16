@@ -8,8 +8,7 @@
 //  small spatial-planning decision and runs die suddenly, which is the hook.
 //
 //  The engine is pure logic and deterministic under a seed: the piece stream
-//  never depends on where pieces are placed, so a weekly seed gives every
-//  player the same deal order.
+//  never depends on where pieces are placed.
 //
 
 import SwiftUI
@@ -270,8 +269,7 @@ final class BlockFitGame {
     /// repair tight boards instead of losing to three awkward rolls. The first
     /// two hands are extra gentle so a new run has time to develop; after that,
     /// bulky pieces return but never appear more than once in the same hand.
-    /// The recipe depends only on the seeded RNG and hand count, preserving an
-    /// identical deal stream for weekly-challenge players.
+    /// The recipe depends only on the seeded RNG and hand count.
     private func drawHand() -> [BlockPiece] {
         let openingHand = handsGenerated < 2
         var pieces = [draw(from: BlockFitShapes.compact)]
@@ -321,8 +319,6 @@ final class BlockFitGame {
 
 struct BlockFitScreen: View {
     let best: Int
-    let isWeekly: Bool
-    let weeklyBestScore: Int
     let todayBest: Int
     let weekBest: Int
     /// (score, lines cleared, pieces placed) → persist.
@@ -339,7 +335,6 @@ struct BlockFitScreen: View {
     /// Best across every run since this screen opened, so the bests rows stay
     /// honest through PLAY AGAIN loops.
     @State private var sessionBest = 0
-    private let seed: UInt64?
 
     private enum Phase { case playing, over }
     private static let space = "blockfit.play"
@@ -349,22 +344,16 @@ struct BlockFitScreen: View {
     private var world: GameWorld { GameID.blockFit.world }
 
     init(best: Int,
-         seed: UInt64? = nil,
-         isWeekly: Bool = false,
-         weeklyBestScore: Int = 0,
          todayBest: Int = 0,
          weekBest: Int = 0,
          onRunComplete: @escaping (Int, Int, Int) -> Void,
          onQuit: @escaping () -> Void) {
         self.best = best
-        self.seed = seed
-        self.isWeekly = isWeekly
-        self.weeklyBestScore = weeklyBestScore
         self.todayBest = todayBest
         self.weekBest = weekBest
         self.onRunComplete = onRunComplete
         self.onQuit = onQuit
-        _model = State(initialValue: BlockFitGame(seed: seed))
+        _model = State(initialValue: BlockFitGame())
     }
 
     var body: some View {
@@ -377,15 +366,11 @@ struct BlockFitScreen: View {
         }
         .overlay {
             if phase == .playing, !pauseController.isPaused {
-                if isWeekly {
-                    GameExitButtonLayer(game: .blockFit) { onQuit() }
-                } else {
-                    GamePauseButtonLayer(game: .blockFit) { pauseController.pause() }
-                }
+                GamePauseButtonLayer(game: .blockFit) { pauseController.pause() }
             }
         }
         .overlay {
-            if !isWeekly, phase == .playing, pauseController.isPaused {
+            if phase == .playing, pauseController.isPaused {
                 GamePausedOverlay(game: .blockFit,
                                   controller: pauseController,
                                   onQuit: {
@@ -474,7 +459,7 @@ struct BlockFitScreen: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.combo >= 2)
     }
 
-    private var referenceBest: Int { isWeekly ? weeklyBestScore : best }
+    private var referenceBest: Int { best }
 
     // MARK: Board
 
@@ -702,15 +687,11 @@ struct BlockFitScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .blockFit,
-                        contextTitle: isWeekly ? "weekly challenge" : "endless run",
+                        contextTitle: "endless run",
                         badgeSymbol: GameID.blockFit.symbol,
                         score: model.score,
                         caption: "\(model.linesCleared) lines · combo ×\(model.bestCombo)",
-                        bests: isWeekly
-                            ? [RunBestLine(title: "This week's best",
-                                           value: max(weeklyBestScore, sessionBest),
-                                           tint: Color(hexAny: 0x6FD6C3))]
-                            : RunBestLine.standard(today: max(todayBest, sessionBest),
+                        bests: RunBestLine.standard(today: max(todayBest, sessionBest),
                                                    week: max(weekBest, sessionBest),
                                                    allTime: max(best, sessionBest)),
                         celebrate: newBest,
@@ -719,8 +700,7 @@ struct BlockFitScreen: View {
     }
 
     private func playAgain() {
-        // A weekly rerun keeps its seed: same board, same deal, fair ladder.
-        model = BlockFitGame(seed: seed)
+        model = BlockFitGame()
         newBest = false
         pauseController.reset()
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }

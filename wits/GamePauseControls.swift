@@ -40,27 +40,6 @@ struct GamePauseButtonLayer: View {
     }
 }
 
-struct GameExitButtonLayer: View {
-    var game: GameID
-    var action: () -> Void
-
-    var body: some View {
-        GeometryReader { _ in
-            Button(action: action) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 16, weight: .heavy))
-                    .foregroundStyle(game.world.ink)
-                    .frame(width: 44, height: 44)
-                    .background(game.world.surface.opacity(0.9), in: Circle())
-            }
-            .buttonStyle(.plain)
-            .contentShape(Circle())
-            .accessibilityLabel("quit weekly challenge")
-            .position(x: 36, y: 26)
-        }
-    }
-}
-
 struct GamePausedOverlay: View {
     var game: GameID
     var controller: GamePauseController

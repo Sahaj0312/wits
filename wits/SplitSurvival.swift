@@ -343,8 +343,6 @@ final class SplitGame {
 struct SplitSurvivalScreen: View {
     let best: Int
     let bestDepthFraction: Double
-    let isWeekly: Bool
-    let weeklyBestScore: Int
     /// (level reached, depth into the next level 0…1, emoji trials) → persist.
     let onRunComplete: (Int, Double, Int) -> Void
     let onQuit: () -> Void
@@ -371,18 +369,13 @@ struct SplitSurvivalScreen: View {
 
     init(best: Int,
          bestDepthFraction: Double = 0,
-         seed: UInt64? = nil,
-         isWeekly: Bool = false,
-         weeklyBestScore: Int = 0,
          onRunComplete: @escaping (Int, Double, Int) -> Void,
          onQuit: @escaping () -> Void) {
         self.best = best
         self.bestDepthFraction = bestDepthFraction
-        self.isWeekly = isWeekly
-        self.weeklyBestScore = weeklyBestScore
         self.onRunComplete = onRunComplete
         self.onQuit = onQuit
-        _model = State(initialValue: SplitGame(seed: seed))
+        _model = State(initialValue: SplitGame())
         _phase = State(initialValue: .playing)
     }
 
@@ -396,17 +389,13 @@ struct SplitSurvivalScreen: View {
         }
         .overlay {
             if phase == .playing, !pauseController.isPaused {
-                if isWeekly {
-                    GameExitButtonLayer(game: .split) { onQuit() }
-                } else {
-                    GamePauseButtonLayer(game: .split) {
-                        pauseController.pause()
-                    }
+                GamePauseButtonLayer(game: .split) {
+                    pauseController.pause()
                 }
             }
         }
         .overlay {
-            if !isWeekly, phase == .playing, pauseController.isPaused {
+            if phase == .playing, pauseController.isPaused {
                 GamePausedOverlay(game: .split,
                                   controller: pauseController,
                                   onQuit: {
@@ -534,7 +523,7 @@ struct SplitSurvivalScreen: View {
                         .background(Color.witsWarm, in: Capsule())
                         .padding(.top, 2)
                 }
-                Text(isWeekly ? weeklyScore.headline : "level \(endLevel)")
+                Text("level \(endLevel)")
                     .font(.system(size: 56, weight: .heavy, design: .rounded))
                     .foregroundStyle(Color.witsInk)
                     .monospacedDigit()
@@ -584,11 +573,11 @@ struct SplitSurvivalScreen: View {
         pauseController.reset()
         endLevel = model.level
         endReason = model.deathReason
-        newBest = weeklyScore.rankValue > comparisonBestScore
+        newBest = currentProgressValue > comparisonBestValue
         GameFeel.shared.play(newBest ? .newBest : .gameOver)
         // A continue offer defers recording — the run isn't over until the
         // player passes on it. No offer → record right away, as before.
-        canContinue = !isWeekly && !usedContinue && AdManager.shared.rewardedReady
+        canContinue = !usedContinue && AdManager.shared.rewardedReady
         if canContinue {
             runRecorded = false
         } else {
@@ -604,18 +593,17 @@ struct SplitSurvivalScreen: View {
         onRunComplete(model.level, model.depthIntoLevel, model.trials)
     }
 
-    private var weeklyScore: WeeklyChallengeScore {
-        WeeklyChallengeScorer.split(level: endLevel, depth: model.depthIntoLevel)
-    }
-
     private var splitBestLabel: String {
-        WeeklyChallengeScorer.splitLabel(rankValue: max(comparisonBestScore, weeklyScore.rankValue))
+        SplitProgress.label(value: max(comparisonBestValue, currentProgressValue))
     }
 
-    private var comparisonBestScore: Int {
-        if isWeekly { return weeklyBestScore }
+    private var currentProgressValue: Int {
+        SplitProgress.value(level: endLevel, depth: model.depthIntoLevel)
+    }
+
+    private var comparisonBestValue: Int {
         guard best > 0 else { return 0 }
-        return WeeklyChallengeScorer.split(level: best, depth: bestDepthFraction).rankValue
+        return SplitProgress.value(level: best, depth: bestDepthFraction)
     }
 
     private func playAgain() {

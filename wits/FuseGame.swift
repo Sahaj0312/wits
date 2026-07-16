@@ -8,8 +8,7 @@
 //  dies suddenly.
 //
 //  The engine is pure logic and deterministic under a seed: spawn cells and
-//  values come off one seeded stream, so a weekly seed gives every player the
-//  same game tree for the same swipes.
+//  values come off one seeded stream.
 //
 
 import SwiftUI
@@ -245,8 +244,6 @@ enum FusePalette {
 
 struct FuseScreen: View {
     let best: Int
-    let isWeekly: Bool
-    let weeklyBestScore: Int
     let todayBest: Int
     let weekBest: Int
     /// (score, best tile, moves) → persist.
@@ -263,29 +260,22 @@ struct FuseScreen: View {
     /// True from a swipe landing until its settle applies; input is ignored so
     /// two-phase animations never interleave.
     @State private var resolving = false
-    private let seed: UInt64?
 
     private enum Phase { case playing, over }
 
     private var world: GameWorld { GameID.fuse.world }
 
     init(best: Int,
-         seed: UInt64? = nil,
-         isWeekly: Bool = false,
-         weeklyBestScore: Int = 0,
          todayBest: Int = 0,
          weekBest: Int = 0,
          onRunComplete: @escaping (Int, Int, Int) -> Void,
          onQuit: @escaping () -> Void) {
         self.best = best
-        self.seed = seed
-        self.isWeekly = isWeekly
-        self.weeklyBestScore = weeklyBestScore
         self.todayBest = todayBest
         self.weekBest = weekBest
         self.onRunComplete = onRunComplete
         self.onQuit = onQuit
-        _model = State(initialValue: FuseEngine(seed: seed))
+        _model = State(initialValue: FuseEngine())
     }
 
     var body: some View {
@@ -298,15 +288,11 @@ struct FuseScreen: View {
         }
         .overlay {
             if phase == .playing, !pauseController.isPaused {
-                if isWeekly {
-                    GameExitButtonLayer(game: .fuse) { onQuit() }
-                } else {
-                    GamePauseButtonLayer(game: .fuse) { pauseController.pause() }
-                }
+                GamePauseButtonLayer(game: .fuse) { pauseController.pause() }
             }
         }
         .overlay {
-            if !isWeekly, phase == .playing, pauseController.isPaused {
+            if phase == .playing, pauseController.isPaused {
                 GamePausedOverlay(game: .fuse,
                                   controller: pauseController,
                                   onQuit: {
@@ -391,7 +377,7 @@ struct FuseScreen: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.bestTile)
     }
 
-    private var referenceBest: Int { isWeekly ? weeklyBestScore : best }
+    private var referenceBest: Int { best }
 
     // MARK: Board
 
@@ -520,15 +506,11 @@ struct FuseScreen: View {
 
     private var runOver: some View {
         GameRunOverView(game: .fuse,
-                        contextTitle: isWeekly ? "weekly challenge" : "endless run",
+                        contextTitle: "endless run",
                         badgeSymbol: GameID.fuse.symbol,
                         score: model.score,
                         caption: "best cell \(model.bestTile) · \(model.moves) moves",
-                        bests: isWeekly
-                            ? [RunBestLine(title: "This week's best",
-                                           value: max(weeklyBestScore, sessionBest),
-                                           tint: Color(hexAny: 0x6FD6C3))]
-                            : RunBestLine.standard(today: max(todayBest, sessionBest),
+                        bests: RunBestLine.standard(today: max(todayBest, sessionBest),
                                                    week: max(weekBest, sessionBest),
                                                    allTime: max(best, sessionBest)),
                         celebrate: newBest,
@@ -537,8 +519,7 @@ struct FuseScreen: View {
     }
 
     private func playAgain() {
-        // A weekly rerun keeps its seed: same spawn stream, fair ladder.
-        model = FuseEngine(seed: seed)
+        model = FuseEngine()
         newBest = false
         resolving = false
         pauseController.reset()

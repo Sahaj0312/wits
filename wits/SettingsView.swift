@@ -2,7 +2,7 @@
 //  SettingsView.swift
 //  wits
 //
-//  Settings sheet: feel toggles, Game Center, and the lifetime ad-free unlock.
+//  Settings sheet: feel toggles and the lifetime ad-free unlock.
 //
 
 import SwiftUI
@@ -36,25 +36,6 @@ struct SettingsView: View {
                                       tint: .witsWarm,
                                       title: "haptics",
                                       isOn: $hapticsEnabled)
-                }
-
-                if GameCenterManager.isEnabled {
-                    settingsSection("game center") {
-                        Button {
-                            if GameCenterManager.shared.isAuthenticated {
-                                GameCenterManager.shared.presentDashboard()
-                            } else {
-                                GameCenterManager.shared.authenticate()
-                            }
-                        } label: {
-                            settingsValueRow(icon: "trophy.fill",
-                                             tint: .witsGold,
-                                             title: "leaderboards & achievements",
-                                             value: GameCenterManager.shared.isAuthenticated ? "" : "sign in",
-                                             showsChevron: true)
-                        }
-                        .buttonStyle(.plain)
-                    }
                 }
 
                 settingsSection("ad-free") {

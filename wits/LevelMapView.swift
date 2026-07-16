@@ -11,7 +11,6 @@ import SwiftUI
 struct DifficultySelectView: View {
     let game: GameID
     var onPlay: (ChallengeDifficulty, Int) -> Void
-    var onWeekly: (WeeklyChallenge) -> Void
     var onClose: () -> Void
 
     @Environment(AppModel.self) private var app
@@ -33,10 +32,6 @@ struct DifficultySelectView: View {
                     difficultyControl
                     playButton
                         .padding(.top, 28)
-                    if GameCenterManager.isEnabled {
-                        weeklyButton
-                            .padding(.top, 11)
-                    }
                 }
                 .padding(.bottom, 30)
                 .padding(.horizontal, 22)
@@ -154,43 +149,6 @@ struct DifficultySelectView: View {
         .shadow(color: difficultyColor.opacity(0.25), radius: 12, y: 6)
     }
 
-    private var weeklyButton: some View {
-        let challenge = WeeklyChallenge.current(for: game)
-        let best = app.levels.weeklyBest(for: challenge)
-        return Button { onWeekly(challenge) } label: {
-            HStack(spacing: 13) {
-                Image(systemName: "calendar.badge.clock")
-                    .font(.system(size: 22, weight: .black))
-                    .foregroundStyle(world.accent)
-                    .frame(width: 42, height: 42)
-                    .background(world.accent.opacity(0.13), in: Circle())
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("WEEKLY CHALLENGE")
-                        .font(.system(size: 14, weight: .black, design: world.titleDesign))
-                    Text(best.map { "best · \($0.headline)" } ?? challenge.shortWeekLabel.uppercased())
-                        .font(.system(size: 11.5, weight: .bold, design: world.bodyDesign))
-                        .foregroundStyle(world.muted)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 15, weight: .black))
-                    .foregroundStyle(world.muted)
-            }
-            .foregroundStyle(world.ink)
-            .padding(.horizontal, 15)
-            .frame(maxWidth: .infinity)
-            .frame(height: 64)
-            .background(world.surface,
-                        in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(world.accent.opacity(0.45), lineWidth: 1)
-            )
-        }
-        .buttonStyle(PressScale())
-    }
-
     private var titleSize: CGFloat {
         switch game {
         case .crowdControl, .pegSolitaire: 34
@@ -215,18 +173,16 @@ struct DifficultySelectView: View {
     }
 }
 
-/// Mode selector for the standalone survival games (Split, Block Fit):
-/// one endless mode plus the weekly challenge, no difficulty tracks.
+/// Mode selector for standalone survival games, which have no difficulty
+/// tracks.
 struct StandaloneModeSelectView: View {
     let game: GameID
     var onSurvival: () -> Void
-    var onWeekly: (WeeklyChallenge) -> Void
     var onClose: () -> Void
 
     @Environment(AppModel.self) private var app
 
     private var world: GameWorld { game.world }
-    private var challenge: WeeklyChallenge { .current(for: game) }
 
     var body: some View {
         ZStack {
@@ -263,16 +219,6 @@ struct StandaloneModeSelectView: View {
                                color: world.accent,
                                action: onSurvival)
                         .padding(.top, 30)
-
-                    if GameCenterManager.isEnabled {
-                        modeButton(title: "WEEKLY CHALLENGE",
-                                   subtitle: weeklySubtitle,
-                                   symbol: "calendar.badge.clock",
-                                   color: world.secondary) {
-                            onWeekly(challenge)
-                        }
-                        .padding(.top, 11)
-                    }
                 }
                 .padding(.bottom, 30)
                 .padding(.horizontal, 22)
@@ -285,13 +231,8 @@ struct StandaloneModeSelectView: View {
     private var survivalSubtitle: String {
         guard let best = app.levels.marathonBest(for: game) else { return "all-time run" }
         return game == .split
-            ? "all-time best · \(WeeklyChallengeScorer.splitLabel(rankValue: best.leaderboardScore))"
+            ? "all-time best · \(SplitProgress.label(level: best.depth, depth: best.depthFraction ?? 0))"
             : "all-time best · \(best.score) points"
-    }
-
-    private var weeklySubtitle: String {
-        app.levels.weeklyBest(for: challenge).map { "best · \($0.headline)" }
-            ?? challenge.shortWeekLabel.uppercased()
     }
 
     private func modeButton(title: String,

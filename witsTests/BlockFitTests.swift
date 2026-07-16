@@ -104,7 +104,8 @@ final class BlockFitTests: XCTestCase {
 
     func testDealStreamIndependentOfPlacementChoices() {
         // Same seed, different placement positions: the refill after the hand
-        // empties must be identical — the weekly ladder depends on it.
+        // empties must be identical — placement choices cannot alter the
+        // deal stream.
         let a = BlockFitGame(seed: 7)
         let b = BlockFitGame(seed: 7)
         let ones: [BlockPiece?] = [piece([(0, 0)], id: 1),

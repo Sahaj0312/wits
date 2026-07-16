@@ -15,6 +15,7 @@ final class LevelSystemTests: XCTestCase {
     override func setUp() {
         super.setUp()
         for key in [
+            "wits.appstate.v1",
             "wits.difficultyProgress.v2",
             "wits.difficultyProgress.migrated.v2",
             "wits.levelProgress.v1",
@@ -180,6 +181,32 @@ final class LevelSystemTests: XCTestCase {
         XCTAssertTrue(store.recordMarathon(game: .split, depth: 8, score: 3_500))
         XCTAssertTrue(store.recordMarathon(game: .split, depth: 9, score: 100))
         XCTAssertEqual(store.marathonBest(for: .split)?.depth, 9)
+    }
+
+    func testSplitDepthBreaksEqualLevelTies() {
+        let store = LevelProgressStore()
+        XCTAssertTrue(store.recordMarathon(game: .split, depth: 8, depthFraction: 0.2, score: 1_000))
+        XCTAssertTrue(store.recordMarathon(game: .split, depth: 8, depthFraction: 0.7, score: 900))
+        XCTAssertFalse(store.recordMarathon(game: .split, depth: 8, depthFraction: 0.5, score: 9_000))
+        XCTAssertEqual(store.marathonBest(for: .split)?.depthFraction, 0.7)
+    }
+
+    func testCampaignMasteryIsIndependentByDifficulty() {
+        let app = AppModel()
+        let hardBefore = app.difficultyState(for: .lastSeen, difficulty: .hard)
+        var result = GameResult(game: .lastSeen, score: 900, accuracy: 1, trials: 20)
+        result.raw = [
+            "correct": 20,
+            "wrong": 0,
+            "remembered": 8,
+            "trackLevel": 1,
+            "difficultyTrack": Double(ChallengeDifficulty.easy.ordinal)
+        ]
+
+        app.recordGameResult(result)
+
+        XCTAssertGreaterThan(app.difficultyState(for: .lastSeen, difficulty: .easy).sessionsPlayed, 0)
+        XCTAssertEqual(app.difficultyState(for: .lastSeen, difficulty: .hard), hardBefore)
     }
 
     func testMarathonPointsScaleWithDepth() {

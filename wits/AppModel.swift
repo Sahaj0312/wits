@@ -3,8 +3,8 @@
 //  wits
 //
 //  Root state for the app: the daily streak, per-game difficulty bookkeeping,
-//  lifetime game stats, and independent difficulty-track progress. Everything persists
-//  locally (UserDefaults); Game Center carries leaderboards and achievements.
+//  lifetime game stats, and independent difficulty-track progress. Everything
+//  persists locally in UserDefaults.
 //
 
 import SwiftUI
@@ -56,8 +56,8 @@ final class AppModel {
 
     // MARK: Game events
 
-    /// Called as each game finishes: score the run, advance the game's mastery
-    /// bookkeeping and selected difficulty track, then refresh achievements.
+    /// Called as each game finishes: score the run and advance the game's
+    /// mastery bookkeeping and selected difficulty track.
     @discardableResult
     func recordGameResult(_ result: GameResult) -> GameResult {
         let id = result.game
@@ -100,37 +100,7 @@ final class AppModel {
 
         streak = StreakEngine.recordActivity(streak, today: Date())
         saveCache()
-        GameCenterManager.shared.recordProgress(levels: levels, streak: streak)
         return r
-    }
-
-    /// Weekly competition is deliberately outside campaign progression. It
-    /// records the run and streak, keeps only this week's best, and submits the
-    /// comparable fixed-seed score without changing levels or mastery.
-    @discardableResult
-    func recordWeeklyChallengeResult(_ result: GameResult,
-                                     challenge: WeeklyChallenge) -> WeeklyRunOutcome {
-        precondition(result.game == challenge.game)
-        let scoredResult: GameResult
-        if result.game.isStandalone {
-            scoredResult = result
-        } else {
-            let fixed = DifficultyScale.initialState(for: challenge.game,
-                                                     difficulty: challenge.difficulty,
-                                                     trackLevel: challenge.trackLevel)
-            scoredResult = ScoringEngine.score(result, previous: fixed).result
-        }
-        let score = WeeklyChallengeScorer.score(scoredResult)
-        let improved = levels.recordWeekly(challenge: challenge, score: score)
-
-        recordStats(for: scoredResult)
-        streak = StreakEngine.recordActivity(streak, today: Date())
-        saveCache()
-        if improved {
-            GameCenterManager.shared.submitWeeklyBest(challenge: challenge, levels: levels)
-        }
-        GameCenterManager.shared.recordProgress(levels: levels, streak: streak)
-        return WeeklyRunOutcome(result: scoredResult, score: score, improved: improved)
     }
 
     /// Standalone modes (Split) are saved for lifetime stats and the streak,
@@ -142,22 +112,16 @@ final class AppModel {
         recordStats(for: r)
         streak = StreakEngine.recordActivity(streak, today: Date())
         saveCache()
-        GameCenterManager.shared.recordProgress(levels: levels, streak: streak)
         return r
     }
 
-    /// Record a finished marathon run; on a new best, submit it to Game Center.
-    /// Returns true when the run set a new best.
+    /// Record a finished marathon run. Returns true when the run set a new best.
     @discardableResult
     func recordMarathon(game: GameID, depth: Int, depthFraction: Double = 0, score: Int) -> Bool {
-        let improved = levels.recordMarathon(game: game,
-                                             depth: depth,
-                                             depthFraction: depthFraction,
-                                             score: score)
-        if improved {
-            GameCenterManager.shared.submitMarathonBest(game: game, levels: levels)
-        }
-        return improved
+        levels.recordMarathon(game: game,
+                              depth: depth,
+                              depthFraction: depthFraction,
+                              score: score)
     }
 
     /// Per-mode best for standalone games with speed modes (Snake). The

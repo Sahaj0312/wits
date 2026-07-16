@@ -184,17 +184,22 @@ struct MarathonBest: Codable, Equatable {
     var depth: Int
     var score: Int
     var depthFraction: Double?
-
-    var leaderboardScore: Int {
-        WeeklyChallengeScorer.split(level: depth, depth: depthFraction ?? 0).rankValue
-    }
 }
 
-struct WeeklyChallengeBest: Codable, Equatable {
-    var weekID: String
-    var score: Int
-    var headline: String
-    var detail: String
+enum SplitProgress {
+    static func value(level: Int, depth: Double) -> Int {
+        let safeLevel = max(1, level)
+        let fraction = min(0.999, max(0, depth))
+        return safeLevel * 1_000 + Int((fraction * 999).rounded())
+    }
+
+    static func label(level: Int, depth: Double) -> String {
+        label(value: value(level: level, depth: depth))
+    }
+
+    static func label(value: Int) -> String {
+        String(format: "%.3f", Double(max(0, value)) / 1_000)
+    }
 }
 
 /// Rolling day/week bests for an endless run (the post-game card's
@@ -214,7 +219,6 @@ final class LevelProgressStore {
     private(set) var selections: [GameID: ChallengeDifficulty] = [:]
     /// Retained for Split, the app's standalone endless mode.
     private(set) var marathonBests: [GameID: MarathonBest] = [:]
-    private(set) var weeklyBests: [GameID: WeeklyChallengeBest] = [:]
     /// Standalone games with speed modes (Snake) keep one best per mode;
     /// the all-time best across modes lives in `marathonBests`.
     private(set) var modeBests: [GameID: [ChallengeDifficulty: Int]] = [:]
@@ -260,11 +264,6 @@ final class LevelProgressStore {
 
     func marathonBest(for game: GameID) -> MarathonBest? {
         marathonBests[game]
-    }
-
-    func weeklyBest(for challenge: WeeklyChallenge) -> WeeklyChallengeBest? {
-        guard let best = weeklyBests[challenge.game], best.weekID == challenge.weekID else { return nil }
-        return best
     }
 
     func modeBest(for game: GameID, difficulty: ChallengeDifficulty) -> Int {
@@ -373,18 +372,6 @@ final class LevelProgressStore {
         return true
     }
 
-    @discardableResult
-    func recordWeekly(challenge: WeeklyChallenge, score: WeeklyChallengeScore) -> Bool {
-        let current = weeklyBest(for: challenge)
-        guard current == nil || score.rankValue > (current?.score ?? 0) else { return false }
-        weeklyBests[challenge.game] = WeeklyChallengeBest(weekID: challenge.weekID,
-                                                          score: score.rankValue,
-                                                          headline: score.headline,
-                                                          detail: score.detail)
-        save()
-        return true
-    }
-
     // MARK: Migration
 
     /// Imports the old finite star map once. Old levels are projected onto the
@@ -470,11 +457,6 @@ final class LevelProgressStore {
         var best: MarathonBest
     }
 
-    private struct StoredWeekly: Codable {
-        var game: GameID
-        var best: WeeklyChallengeBest
-    }
-
     private struct StoredModeBest: Codable {
         var game: GameID
         var difficulty: ChallengeDifficulty
@@ -491,7 +473,6 @@ final class LevelProgressStore {
         var tracks: [StoredTrack]
         var selections: [StoredSelection]
         var marathon: [StoredMarathon]
-        var weekly: [StoredWeekly]?
         var modes: [StoredModeBest]?
         var periods: [StoredPeriodBest]?
     }
@@ -511,9 +492,6 @@ final class LevelProgressStore {
         for entry in snapshot.marathon {
             marathonBests[entry.game] = entry.best
         }
-        for entry in snapshot.weekly ?? [] {
-            weeklyBests[entry.game] = entry.best
-        }
         for entry in snapshot.modes ?? [] {
             var perGame = modeBests[entry.game] ?? [:]
             perGame[entry.difficulty] = entry.score
@@ -528,7 +506,7 @@ final class LevelProgressStore {
 
     private func save() {
         var snapshot = Snapshot(tracks: [], selections: [], marathon: [],
-                                weekly: [], modes: [], periods: [])
+                                modes: [], periods: [])
         for (game, values) in tracks {
             for (difficulty, progress) in values {
                 snapshot.tracks.append(StoredTrack(game: game,
@@ -541,9 +519,6 @@ final class LevelProgressStore {
         }
         for (game, best) in marathonBests {
             snapshot.marathon.append(StoredMarathon(game: game, best: best))
-        }
-        for (game, best) in weeklyBests {
-            snapshot.weekly?.append(StoredWeekly(game: game, best: best))
         }
         for (game, values) in modeBests {
             for (difficulty, score) in values {

@@ -4,7 +4,7 @@
 //
 //  First-launch welcome: a slow marquee of game posters drifting across the
 //  top, a short serif letter about why wits exists, and one quiet button in.
-//  Shown once, before the library (and so before any ATT/Game Center prompts
+//  Shown once, before the library (and so before any ATT prompts
 //  can stack on it). The marquee height tracks the screen and the letter is
 //  set at the largest of three type scales that fits, so nothing scrolls on
 //  any device size.

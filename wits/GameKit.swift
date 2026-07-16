@@ -570,7 +570,7 @@ struct GameResult: Codable, Equatable {
 
 // MARK: - Config
 
-enum GameMode: String, Codable { case workout, freePlay, weekly }
+enum GameMode: String, Codable { case workout, freePlay }
 
 private struct GamePauseSpan {
     let start: Date
@@ -674,11 +674,8 @@ struct GameConfig {
     var mapLevel: Int? = nil
     var difficultyTrack: ChallengeDifficulty? = nil
     var trackLevel: Int? = nil
-    var randomSeed: UInt64? = nil
-    var weeklyChallenge: WeeklyChallenge? = nil
     /// Back-compat: existing call sites read `isFreePlay`.
     var isFreePlay: Bool { mode != .workout }
-    var isWeekly: Bool { mode == .weekly }
     var isSurvival: Bool { false }
     var isPaused: Bool { pauseController?.isPaused == true }
 
@@ -708,39 +705,13 @@ struct GameConfig {
                    trackLevel: trackLevel)
     }
 
-    static func weekly(_ challenge: WeeklyChallenge,
-                       pauseController: GamePauseController? = nil) -> GameConfig {
-        let game = challenge.game
-        let level = DifficultyScale.legacyDifficulty(for: challenge.difficulty,
-                                                     level: challenge.trackLevel)
-        return GameConfig(difficulty: DifficultyState(level: level,
-                                                      mastery: level,
-                                                      variance: 1.2,
-                                                      scoringVersion: game.difficultyScoringVersion),
-                          mode: .weekly,
-                          pauseController: pauseController,
-                          mapLevel: game == .split ? nil : DifficultyScale.contentLevel(for: game,
-                                                                                       difficulty: challenge.difficulty,
-                                                                                       trackLevel: challenge.trackLevel),
-                          difficultyTrack: challenge.difficulty,
-                          trackLevel: challenge.trackLevel,
-                          randomSeed: challenge.seed,
-                          weeklyChallenge: challenge)
+    func resolvedRandomSeed() -> UInt64 {
+        var system = SystemRandomNumberGenerator()
+        return system.next()
     }
 
-    func resolvedRandomSeed(stream: UInt64 = 0) -> UInt64 {
-        let base: UInt64
-        if let randomSeed {
-            base = randomSeed
-        } else {
-            var system = SystemRandomNumberGenerator()
-            base = system.next()
-        }
-        return StableSeed.mix(base, stream: stream)
-    }
-
-    func makeRandomGenerator(stream: UInt64 = 0) -> SeededRandomNumberGenerator {
-        SeededRandomNumberGenerator(seed: resolvedRandomSeed(stream: stream))
+    func makeRandomGenerator() -> SeededRandomNumberGenerator {
+        SeededRandomNumberGenerator(seed: resolvedRandomSeed())
     }
 
     func pause() {
