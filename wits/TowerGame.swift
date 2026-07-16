@@ -233,6 +233,17 @@ final class TowerEngine {
         direction = Bool.random() ? 1 : -1
         movingPos = -direction * (travelBound + 0.12)
     }
+
+    /// One final chance replaces the missed moving slab and preserves the
+    /// tower already built. A second miss ends the run normally.
+    func revive() {
+        guard !alive else { return }
+        alive = true
+        gameOverAt = nil
+        lastUpdateAt = nil
+        streak = 0
+        spawnNext()
+    }
 }
 
 // MARK: - Palette
@@ -391,6 +402,10 @@ struct TowerScreen: View {
     @State private var model: TowerEngine
     @State private var phase: Phase = .playing
     @State private var pauseController = GamePauseController()
+    @State private var usedContinue = false
+    @State private var canContinue = false
+    @State private var adBusy = false
+    @State private var runRecorded = true
     @State private var newAllTimeBest = false
     /// Best across every run since this screen opened, so the bests rows stay
     /// honest through PLAY AGAIN loops.
@@ -423,7 +438,16 @@ struct TowerScreen: View {
             // The playing view stays mounted behind the game-over card so the
             // pulled-back tower sits dimmed under the scrim.
             playing
-            if phase == .over { runOver }
+            if phase == .over {
+                if canContinue {
+                    RewardedReviveOffer(game: .tower,
+                                        busy: adBusy,
+                                        onDecline: declineContinue,
+                                        onSave: continueRun)
+                } else {
+                    runOver
+                }
+            }
         }
         .overlay {
             if phase == .playing, pauseController.isPaused {
@@ -437,6 +461,7 @@ struct TowerScreen: View {
         }
         .onAppear { GameFeel.shared.warmUp() }
         .onDisappear {
+            finalizeRun()
             pauseController.reset()
             GameFeel.shared.teardown()
         }
@@ -516,13 +541,21 @@ struct TowerScreen: View {
             newAllTimeBest = true
         }
         sessionBest = max(sessionBest, model.score)
-        onRunComplete(model.score, model.perfects, model.bestStreak)
+        canContinue = !usedContinue
+        runRecorded = false
+        if !canContinue { finalizeRun() }
         GameFeel.shared.play(.gameOver)
         // Let the camera pull back over the whole tower before the summary.
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(1_500))
             withAnimation(.easeOut(duration: 0.3)) { phase = .over }
         }
+    }
+
+    private func finalizeRun() {
+        guard !runRecorded else { return }
+        runRecorded = true
+        onRunComplete(model.score, model.perfects, model.bestStreak)
     }
 
     private var runOver: some View {
@@ -535,13 +568,40 @@ struct TowerScreen: View {
                                                     week: max(weekBest, sessionBest),
                                                     allTime: max(allTimeBest, sessionBest)),
                         celebrate: newAllTimeBest,
-                        onHome: onQuit,
+                        onHome: {
+                            finalizeRun()
+                            onQuit()
+                        },
                         onPlayAgain: playAgain)
     }
 
+    private func continueRun() {
+        guard !adBusy, canContinue else { return }
+        adBusy = true
+        AdManager.shared.showRewarded { earned in
+            adBusy = false
+            guard earned else { return }
+            usedContinue = true
+            canContinue = false
+            model.revive()
+            pauseController.reset()
+            withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+            pauseController.pause()
+            pauseController.beginResumeCountdown()
+        }
+    }
+
+    private func declineContinue() {
+        withAnimation(.easeOut(duration: 0.2)) { canContinue = false }
+        finalizeRun()
+    }
+
     private func playAgain() {
+        finalizeRun()
         model = TowerEngine(difficulty: difficulty)
         newAllTimeBest = false
+        usedContinue = false
+        canContinue = false
         pauseController.reset()
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }

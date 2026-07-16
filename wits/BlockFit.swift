@@ -313,6 +313,16 @@ final class BlockFitGame {
         self.hand = hand
         alive = anyMoveAvailable
     }
+
+    /// One final chance keeps the run's score and hand, but clears the packed
+    /// board so every remaining piece has somewhere legal to land.
+    func revive() {
+        guard !alive else { return }
+        board = Array(repeating: 0, count: Self.side * Self.side)
+        combo = 0
+        if hand.allSatisfy({ $0 == nil }) { deal() }
+        alive = true
+    }
 }
 
 // MARK: - Screen
@@ -328,6 +338,10 @@ struct BlockFitScreen: View {
     @State private var model: BlockFitGame
     @State private var phase: Phase = .playing
     @State private var pauseController = GamePauseController()
+    @State private var usedContinue = false
+    @State private var canContinue = false
+    @State private var adBusy = false
+    @State private var runRecorded = true
     @State private var boardFrame: CGRect = .zero
     @State private var dragSlot: Int?
     @State private var dragLocation: CGPoint = .zero
@@ -362,7 +376,16 @@ struct BlockFitScreen: View {
             // The playing view stays mounted behind the game-over card so the
             // final board sits dimmed under the scrim.
             playing
-            if phase == .over { runOver }
+            if phase == .over {
+                if canContinue {
+                    RewardedReviveOffer(game: .blockFit,
+                                        busy: adBusy,
+                                        onDecline: declineContinue,
+                                        onSave: continueRun)
+                } else {
+                    runOver
+                }
+            }
         }
         .overlay {
             if phase == .playing, !pauseController.isPaused {
@@ -381,6 +404,7 @@ struct BlockFitScreen: View {
         }
         .onAppear { GameFeel.shared.warmUp() }
         .onDisappear {
+            finalizeRun()
             pauseController.reset()
             GameFeel.shared.teardown()
         }
@@ -684,11 +708,19 @@ struct BlockFitScreen: View {
     // MARK: Game over
 
     private func endRun() {
-        onRunComplete(model.score, model.linesCleared, model.piecesPlaced)
         if referenceBest == 0 && model.score > 0 { newBest = true }
         sessionBest = max(sessionBest, model.score)
+        canContinue = !usedContinue
+        runRecorded = false
+        if !canContinue { finalizeRun() }
         GameFeel.shared.play(.gameOver)
         withAnimation(.easeOut(duration: 0.3)) { phase = .over }
+    }
+
+    private func finalizeRun() {
+        guard !runRecorded else { return }
+        runRecorded = true
+        onRunComplete(model.score, model.linesCleared, model.piecesPlaced)
     }
 
     private var runOver: some View {
@@ -701,13 +733,40 @@ struct BlockFitScreen: View {
                                                    week: max(weekBest, sessionBest),
                                                    allTime: max(best, sessionBest)),
                         celebrate: newBest,
-                        onHome: onQuit,
+                        onHome: {
+                            finalizeRun()
+                            onQuit()
+                        },
                         onPlayAgain: playAgain)
     }
 
+    private func continueRun() {
+        guard !adBusy, canContinue else { return }
+        adBusy = true
+        AdManager.shared.showRewarded { earned in
+            adBusy = false
+            guard earned else { return }
+            usedContinue = true
+            canContinue = false
+            model.revive()
+            pauseController.reset()
+            withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+            pauseController.pause()
+            pauseController.beginResumeCountdown()
+        }
+    }
+
+    private func declineContinue() {
+        withAnimation(.easeOut(duration: 0.2)) { canContinue = false }
+        finalizeRun()
+    }
+
     private func playAgain() {
+        finalizeRun()
         model = BlockFitGame()
         newBest = false
+        usedContinue = false
+        canContinue = false
         pauseController.reset()
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }

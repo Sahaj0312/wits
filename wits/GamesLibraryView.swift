@@ -277,20 +277,32 @@ private struct GameLauncher: View {
     @State private var lastImproved = false
     @State private var attempt = 0   // bump to force a fresh game instance
     @State private var pauseController = GamePauseController()
+    @State private var pendingReviveResult: GameResult?
+    @State private var reviveUsed = false
+    @State private var reviveBusy = false
 
     private enum Phase { case selector, tutorial, reviewTutorial, playing, levelResult }
 
     var body: some View {
-        content
-            .onChange(of: phase) { oldPhase, newPhase in
-                // Endless runs have no dedicated result phase in this host —
-                // the selector is the first static screen after a run, so the
-                // interstitial slot (counted in each onRunComplete) is here.
-                // Backing out of a tutorial isn't a run, so it never counts.
-                guard newPhase == .selector,
-                      oldPhase == .playing || oldPhase == .levelResult else { return }
-                AdManager.shared.maybeShowInterstitial()
+        ZStack {
+            content
+
+            if pendingReviveResult != nil {
+                RewardedReviveOffer(game: game,
+                                    busy: reviveBusy,
+                                    onDecline: declineRevive,
+                                    onSave: redeemRevive)
             }
+        }
+        .onChange(of: phase) { oldPhase, newPhase in
+            // Endless runs have no dedicated result phase in this host —
+            // the selector is the first static screen after a run, so the
+            // interstitial slot (counted in each onRunComplete) is here.
+            // Backing out of a tutorial isn't a run, so it never counts.
+            guard newPhase == .selector,
+                  oldPhase == .playing || oldPhase == .levelResult else { return }
+            AdManager.shared.maybeShowInterstitial()
+        }
     }
 
     @ViewBuilder
@@ -639,6 +651,9 @@ private struct GameLauncher: View {
 
     private func startRun() {
         pauseController.reset()
+        pendingReviveResult = nil
+        reviveUsed = false
+        reviveBusy = false
         attempt += 1
         let needsTutorial = GameTutorialStore.shouldShow(for: game, hasPlayed: app.hasPlayed(game))
         withAnimation(.easeOut(duration: 0.2)) { phase = needsTutorial ? .tutorial : .playing }
@@ -661,6 +676,39 @@ private struct GameLauncher: View {
 
     private func handle(_ result: GameResult) {
         pauseController.reset()
+        if supportsRewardedReplay, !reviveUsed {
+            withAnimation(.easeOut(duration: 0.2)) {
+                pendingReviveResult = result
+            }
+            return
+        }
+        finish(result)
+    }
+
+    private var supportsRewardedReplay: Bool {
+        game.offersRewardedRevive
+    }
+
+    private func declineRevive() {
+        guard let result = pendingReviveResult else { return }
+        pendingReviveResult = nil
+        finish(result)
+    }
+
+    private func redeemRevive() {
+        guard pendingReviveResult != nil, !reviveBusy else { return }
+        reviveBusy = true
+        AdManager.shared.showRewarded { earned in
+            reviveBusy = false
+            guard earned else { return }
+            reviveUsed = true
+            pendingReviveResult = nil
+            pauseController.reset()
+            attempt += 1
+        }
+    }
+
+    private func finish(_ result: GameResult) {
         // Snapshot before recording — recordGameResult merges this run in.
         let passedBefore = app.levels.hasPassed(game: game,
                                                 difficulty: playDifficulty,

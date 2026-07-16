@@ -184,6 +184,23 @@ final class BlockFitTests: XCTestCase {
         XCTAssertFalse(game.alive)
     }
 
+    func testReviveClearsBoardAndRestoresExactlyOnePlayableState() {
+        let game = BlockFitGame(seed: 4)
+        var board = Array(repeating: 1, count: 64)
+        board[0] = 0
+        let domino = piece([(0, 0), (0, 1)])
+        game.load(board: board, hand: [domino, nil, nil])
+        XCTAssertFalse(game.alive)
+
+        game.revive()
+
+        XCTAssertTrue(game.alive)
+        XCTAssertTrue(game.fitsSomewhere(domino))
+        XCTAssertTrue((0..<8).allSatisfy { r in
+            (0..<8).allSatisfy { c in game.color(atRow: r, col: c) == 0 }
+        })
+    }
+
     func testPlacementThatStrandsTheHandEndsTheRun() {
         let game = BlockFitGame(seed: 5)
         // Checkerboard: single holes everywhere, no line completable, and no

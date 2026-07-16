@@ -148,6 +148,25 @@ final class SnakeEngine {
         guard let cell = empty.randomElement(using: &rng) else { return }
         foods.append(cell)
     }
+
+    /// One final chance respawns the snake in a safe lane while preserving
+    /// the run's score. The shorter body is the life reward; the next crash
+    /// still ends the run immediately.
+    func revive() {
+        guard !alive else { return }
+        let x = Self.cols / 2
+        let y = Self.rows * 2 / 3
+        body = (0..<4).map { SnakeCell(x: x, y: y + $0) }
+        prevBody = body
+        foods.removeAll { body.contains($0) }
+        while foods.count < Self.foodCount { spawnFood() }
+        direction = .up
+        pending.removeAll()
+        dragAnchor = nil
+        sparkles.removeAll()
+        lastStepAt = Date().timeIntervalSinceReferenceDate
+        alive = true
+    }
 }
 
 // MARK: - Mode select
@@ -290,6 +309,10 @@ struct SnakeScreen: View {
     @State private var model = SnakeEngine()
     @State private var phase: Phase = .playing
     @State private var pauseController = GamePauseController()
+    @State private var usedContinue = false
+    @State private var canContinue = false
+    @State private var adBusy = false
+    @State private var runRecorded = true
     @State private var newAllTimeBest = false
     /// Best across every run since this screen opened, so the bests rows stay
     /// honest through PLAY AGAIN loops.
@@ -307,7 +330,16 @@ struct SnakeScreen: View {
             // The playing view stays mounted behind the game-over card so the
             // final board sits dimmed under the scrim.
             playing
-            if phase == .over { runOver }
+            if phase == .over {
+                if canContinue {
+                    RewardedReviveOffer(game: .snake,
+                                        busy: adBusy,
+                                        onDecline: declineContinue,
+                                        onSave: continueRun)
+                } else {
+                    runOver
+                }
+            }
         }
         .overlay {
             if phase == .playing, pauseController.isPaused {
@@ -321,6 +353,7 @@ struct SnakeScreen: View {
         }
         .onAppear { GameFeel.shared.warmUp() }
         .onDisappear {
+            finalizeRun()
             pauseController.reset()
             GameFeel.shared.teardown()
         }
@@ -454,9 +487,17 @@ struct SnakeScreen: View {
             newAllTimeBest = true
         }
         sessionBest = max(sessionBest, model.score)
-        onRunComplete(model.score, model.body.count)
+        canContinue = !usedContinue
+        runRecorded = false
+        if !canContinue { finalizeRun() }
         GameFeel.shared.play(.gameOver)
         withAnimation(.easeOut(duration: 0.3)) { phase = .over }
+    }
+
+    private func finalizeRun() {
+        guard !runRecorded else { return }
+        runRecorded = true
+        onRunComplete(model.score, model.body.count)
     }
 
     private var runOver: some View {
@@ -469,13 +510,41 @@ struct SnakeScreen: View {
                                                     week: max(weekBest, sessionBest),
                                                     allTime: max(allTimeBest, sessionBest)),
                         celebrate: newAllTimeBest,
-                        onHome: onQuit,
+                        onHome: {
+                            finalizeRun()
+                            onQuit()
+                        },
                         onPlayAgain: playAgain)
     }
 
+    private func continueRun() {
+        guard !adBusy, canContinue else { return }
+        adBusy = true
+        AdManager.shared.showRewarded { earned in
+            adBusy = false
+            guard earned else { return }
+            usedContinue = true
+            canContinue = false
+            model.revive()
+            runID += 1
+            pauseController.reset()
+            withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+            pauseController.pause()
+            pauseController.beginResumeCountdown()
+        }
+    }
+
+    private func declineContinue() {
+        withAnimation(.easeOut(duration: 0.2)) { canContinue = false }
+        finalizeRun()
+    }
+
     private func playAgain() {
+        finalizeRun()
         model = SnakeEngine()
         newAllTimeBest = false
+        usedContinue = false
+        canContinue = false
         runID += 1
         pauseController.reset()
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }

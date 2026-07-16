@@ -384,7 +384,15 @@ struct SplitSurvivalScreen: View {
             Color.witsBg.ignoresSafeArea()
             switch phase {
             case .playing: playing
-            case .over:    gameOver
+            case .over:
+                if canContinue {
+                    RewardedReviveOffer(game: .split,
+                                        busy: adBusy,
+                                        onDecline: declineContinue,
+                                        onSave: continueRun)
+                } else {
+                    gameOver
+                }
             }
         }
         .overlay {
@@ -538,19 +546,8 @@ struct SplitSurvivalScreen: View {
             .cardSurface()
             .rise()
             Spacer()
-            if canContinue {
-                Cta(title: "continue · watch ad", action: continueRun)
-                    .rise(0.1)
-                Text("pick back up at level \(endLevel) — once per run")
-                    .font(.witsLabel(11.5))
-                    .foregroundStyle(Color.witsFaint)
-                    .padding(.top, 8)
-                QuietButton(title: "play again", action: playAgain)
-                    .padding(.top, 10)
-            } else {
-                Cta(title: "play again", action: playAgain)
-                    .rise(0.1)
-            }
+            Cta(title: "play again", action: playAgain)
+                .rise(0.1)
             QuietButton(title: "done", action: finishAndQuit)
                 .padding(.top, 6)
         }
@@ -578,7 +575,7 @@ struct SplitSurvivalScreen: View {
         GameFeel.shared.play(newBest ? .newBest : .gameOver)
         // A continue offer defers recording — the run isn't over until the
         // player passes on it. No offer → record right away, as before.
-        canContinue = !usedContinue && AdManager.shared.rewardedReady
+        canContinue = !usedContinue
         if canContinue {
             runRecorded = false
         } else {
@@ -618,7 +615,7 @@ struct SplitSurvivalScreen: View {
     }
 
     private func continueRun() {
-        guard !adBusy else { return }
+        guard !adBusy, canContinue else { return }
         adBusy = true
         AdManager.shared.showRewarded { earned in
             adBusy = false
@@ -629,6 +626,11 @@ struct SplitSurvivalScreen: View {
             model.revive()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
         }
+    }
+
+    private func declineContinue() {
+        withAnimation(.easeOut(duration: 0.2)) { canContinue = false }
+        finalizeRun()
     }
 }
 

@@ -215,4 +215,10 @@ final class LevelSystemTests: XCTestCase {
         XCTAssertGreaterThan(late, early * 5)
         XCTAssertEqual(MarathonMath.points(level: 10, quality: 0), 0)
     }
+
+    func testRewardedReviveIsAvailableForEveryIntendedGame() {
+        let excluded = Set(GameID.allCases.filter { !$0.offersRewardedRevive })
+        XCTAssertEqual(excluded, Set([.slidePuzzle, .crossword]))
+        XCTAssertEqual(GameID.allCases.filter(\.offersRewardedRevive).count, 16)
+    }
 }

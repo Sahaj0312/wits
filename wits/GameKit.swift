@@ -73,6 +73,12 @@ enum GameID: String, CaseIterable, Codable, Identifiable, Sendable {
 
     /// Some games place their own primary top-left control inside the playfield.
     var usesEmbeddedQuitControl: Bool { false }
+
+    /// Every game gets one rewarded final chance except the two board formats
+    /// where replaying before results would be confusing rather than helpful.
+    var offersRewardedRevive: Bool {
+        self != .slidePuzzle && self != .crossword
+    }
 }
 
 enum CognitiveDomain: String, Codable, CaseIterable, Identifiable {

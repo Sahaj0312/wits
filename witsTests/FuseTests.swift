@@ -120,6 +120,22 @@ final class FuseTests: XCTestCase {
         XCTAssertFalse(g.slide(.up))
     }
 
+    func testReviveRemovesFourWeakestCellsAndRestoresMovement() {
+        let g = engine([
+            2, 4, 8, 16,
+            32, 64, 128, 256,
+            2, 4, 8, 16,
+            32, 64, 128, 256,
+        ])
+        XCTAssertFalse(g.alive)
+
+        g.revive()
+
+        XCTAssertTrue(g.alive)
+        XCTAssertEqual(g.tiles.count, 12)
+        XCTAssertTrue(g.anyMoveAvailable)
+    }
+
     func testFullBoardWithAdjacentPairStaysAlive() {
         let g = engine([
             2, 2, 8, 16,

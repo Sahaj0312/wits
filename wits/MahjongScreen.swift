@@ -41,13 +41,7 @@ struct MahjongScreen: View {
     /// One-deep undo: only the immediately previous move can be taken back,
     /// and taking it back consumes it until the next move.
     @State private var lastMove: Move?
-    /// One rewarded-ad revive per attempt: empties the rack back onto the
-    /// board. Spent it? The next out-of-space ends the run.
-    @State private var reviveUsed = false
-    @State private var adBusy = false
-    @State private var revives = 0
     @State private var undos = 0
-    @State private var restarts = 0
     @State private var blockedTaps = 0
     @State private var elapsed = 0.0
     @State private var timerStartedAt = Date()
@@ -77,8 +71,6 @@ struct MahjongScreen: View {
 
     private var pairs: Int { (tiles?.count ?? 0) / 2 }
     private var traySlots: Int { spec?.traySlots ?? 4 }
-    private var canRevive: Bool { !reviveUsed && AdManager.shared.rewardedReady }
-
     /// Time budget prices in scanning and rack planning, not reflexes.
     private var parSeconds: Double { Double(pairs) * 6.0 + 25 }
 
@@ -115,11 +107,6 @@ struct MahjongScreen: View {
                         boardView(tiles, in: geo.size)
 
                         Spacer(minLength: 12)
-                    }
-
-                    if outOfSpace {
-                        outOfSpaceCard
-                            .transition(.scale(scale: 0.9).combined(with: .opacity))
                     }
                 }
             }
@@ -224,79 +211,6 @@ struct MahjongScreen: View {
                               lineWidth: rack.count >= slots - 1 && !rack.isEmpty ? 2 : 1)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: rack.count)
-    }
-
-    private var outOfSpaceCard: some View {
-        VStack(spacing: 14) {
-            Text("out of space")
-                .font(.system(size: 20, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-            Text(canRevive
-                 ? "the rack is full — revive to clear it and keep this run going"
-                 : "the rack is full and the revive is spent — this run is over")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white.opacity(0.75))
-                .multilineTextAlignment(.center)
-            if canRevive {
-                Button {
-                    revive()
-                } label: {
-                    Label("revive · watch ad", systemImage: "play.rectangle.fill")
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.black.opacity(0.85))
-                        .padding(.horizontal, 18)
-                        .frame(height: 46)
-                        .frame(maxWidth: .infinity)
-                        .background(world.accent, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .disabled(adBusy)
-
-                Button {
-                    restart()
-                } label: {
-                    Label("restart board", systemImage: "arrow.counterclockwise")
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 18)
-                        .frame(height: 44)
-                        .background(.white.opacity(0.18), in: Capsule())
-                }
-                .buttonStyle(.plain)
-            } else {
-                Button {
-                    restart()
-                } label: {
-                    Label("replay level", systemImage: "arrow.counterclockwise")
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.black.opacity(0.85))
-                        .padding(.horizontal, 18)
-                        .frame(height: 46)
-                        .frame(maxWidth: .infinity)
-                        .background(world.accent, in: Capsule())
-                }
-                .buttonStyle(.plain)
-
-                Button {
-                    finishFailed()
-                } label: {
-                    Label("end run", systemImage: "flag.checkered")
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 18)
-                        .frame(height: 44)
-                        .background(.white.opacity(0.18), in: Capsule())
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(22)
-        .frame(maxWidth: 320)
-        .background(Color.black.opacity(0.72), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(.white.opacity(0.15), lineWidth: 1))
-        .shadow(color: .black.opacity(0.4), radius: 18, y: 8)
-        .padding(.horizontal, WitsMetrics.screenPadding)
-        .disabled(adBusy)
     }
 
     // MARK: Board
@@ -442,6 +356,10 @@ struct MahjongScreen: View {
                     outOfSpace = true
                 }
                 GameFeel.shared.play(.wrong)
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(550))
+                    finishFailed()
+                }
             }
         }
     }
@@ -492,56 +410,10 @@ struct MahjongScreen: View {
         }
     }
 
-    /// The one rewarded revive per attempt: every rack tile flies home to its
-    /// board slot, leaving the rack empty.
-    private func revive() {
-        guard !adBusy, canRevive else { return }
-        adBusy = true
-        AdManager.shared.showRewarded { earned in
-            adBusy = false
-            guard earned else { return }   // closed early — the offer stands
-            reviveUsed = true
-            revives += 1
-            lastMove = nil
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                outOfSpace = false
-                boardIDs.formUnion(rack)
-                rack.removeAll()
-            }
-            GameFeel.shared.uiSuccess()
-        }
-    }
-
-    /// A fresh attempt at the same deal: board, rack, clock, and the revive
-    /// all reset as if the level had just loaded.
-    private func restart() {
-        guard !finished, popping.isEmpty, let tiles,
-              !clearedIDs.isEmpty || !rack.isEmpty else { return }
-        restarts += 1
-        lastMove = nil
-        reviveUsed = false
-        rack = []
-        clearedIDs = []
-        hint = ""
-        elapsed = 0
-        timerStartedAt = Date()
-        withAnimation(.spring(response: 0.24, dampingFraction: 0.85)) {
-            outOfSpace = false
-            boardIDs = Set(tiles.map(\.id))
-        }
-        // replay the deal-in cascade
-        dealt = false
-        Task { @MainActor in
-            try? await Task.sleep(for: .milliseconds(60))
-            dealt = true
-        }
-    }
-
     // MARK: Flow
 
     private func setUpAndRun() async {
         if tiles == nil {
-            AdManager.shared.loadRewardedIfNeeded()
             let generated = MahjongEngine.generate(mapLevel: mapLevel,
                                                    seed: cfg.resolvedRandomSeed())
             tiles = generated.tiles
@@ -567,8 +439,8 @@ struct MahjongScreen: View {
         }
     }
 
-    /// Out of space with the revive spent: the run ends and grades as a
-    /// partial clear (never a pass) — the host offers retry / back from there.
+    /// Out of space ends this attempt as a partial clear. The launcher owns
+    /// the one rewarded replay and shows it before recording this result.
     private func finishFailed() {
         guard !finished else { return }
         finished = true
@@ -605,8 +477,6 @@ struct MahjongScreen: View {
             "tiles": Double(tiles?.count ?? 0),
             "traySlots": Double(traySlots),
             "undos": Double(undos),
-            "restarts": Double(restarts),
-            "revives": Double(revives),
             "blockedTaps": Double(blockedTaps),
             "parSeconds": parSeconds.rounded(),
             "seconds": seconds.rounded(),

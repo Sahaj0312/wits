@@ -78,7 +78,16 @@ struct LastSeenScreen: View {
             // The playing view stays mounted behind the game-over card so the
             // final board sits dimmed under the scrim.
             playing
-            if phase == .over { runOver }
+            if phase == .over {
+                if canContinue {
+                    RewardedReviveOffer(game: .lastSeen,
+                                        busy: adBusy,
+                                        onDecline: declineContinue,
+                                        onSave: continueRun)
+                } else {
+                    runOver
+                }
+            }
         }
         .overlay {
             if phase == .playing, pauseController.isPaused {
@@ -223,7 +232,7 @@ struct LastSeenScreen: View {
         sessionBest = max(sessionBest, score)
         // A continue offer defers recording — the run isn't over until the
         // player passes on it. No offer → record right away.
-        canContinue = !usedContinue && AdManager.shared.rewardedReady
+        canContinue = !usedContinue
         runRecorded = false
         if !canContinue { finalizeRun() }
         GameFeel.shared.play(.gameOver)
@@ -237,9 +246,7 @@ struct LastSeenScreen: View {
     }
 
     private var runOver: some View {
-        var continueAction: (() -> Void)?
-        if canContinue { continueAction = { continueRun() } }
-        return GameRunOverView(game: .lastSeen,
+        GameRunOverView(game: .lastSeen,
                                contextTitle: "\(difficulty.shortTitle) mode",
                                badgeSymbol: difficulty.symbol,
                                score: score,
@@ -247,9 +254,7 @@ struct LastSeenScreen: View {
                                bests: RunBestLine.standard(today: max(todayBest, sessionBest),
                                                            week: max(weekBest, sessionBest),
                                                            allTime: max(allTimeBest, sessionBest)),
-                               celebrate: newAllTimeBest && !canContinue,
-                               onContinue: continueAction,
-                               continueBusy: adBusy,
+                               celebrate: newAllTimeBest,
                                onHome: {
                                    finalizeRun()
                                    onQuit()
@@ -258,7 +263,7 @@ struct LastSeenScreen: View {
     }
 
     private func continueRun() {
-        guard !adBusy else { return }
+        guard !adBusy, canContinue else { return }
         adBusy = true
         AdManager.shared.showRewarded { earned in
             adBusy = false
@@ -275,6 +280,11 @@ struct LastSeenScreen: View {
             pauseController.pause()
             pauseController.beginResumeCountdown()
         }
+    }
+
+    private func declineContinue() {
+        withAnimation(.easeOut(duration: 0.2)) { canContinue = false }
+        finalizeRun()
     }
 
     private func playAgain() {

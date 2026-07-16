@@ -52,13 +52,14 @@ final class AdManager {
     private init() {}
 
     /// Idempotent. Asks for tracking consent first so the SDK knows whether
-    /// it may use the IDFA, then warms up the first interstitial.
+    /// it may use the IDFA, then warms rewarded inventory for the optional
+    /// Save Me flow. Paid users skip interstitial loading entirely.
     func startIfNeeded() async {
-        guard !started, !adFreeProvider() else { return }
+        guard !started else { return }
         started = true
         _ = await ATTrackingManager.requestTrackingAuthorization()
         await MobileAds.shared.start()
-        loadInterstitial()
+        if !adFreeProvider() { loadInterstitial() }
         loadRewardedIfNeeded()
     }
 

@@ -171,6 +171,21 @@ final class FuseEngine {
         }
     }
 
+    /// One final chance removes the four weakest cells from a jammed board,
+    /// preserving the score and strongest merges while restoring movement.
+    func revive() {
+        guard !alive else { return }
+        let removed = Set(tiles.sorted {
+            if $0.value == $1.value { return $0.id < $1.id }
+            return $0.value < $1.value
+        }.prefix(4).map(\.id))
+        tiles.removeAll { removed.contains($0.id) }
+        doomedIDs.removeAll()
+        growingIDs.removeAll()
+        calm()
+        alive = true
+    }
+
     private func cell(line: Int, slot: Int, dir: FuseSwipe) -> (Int, Int) {
         switch dir {
         case .left:  (line, slot)
@@ -253,6 +268,10 @@ struct FuseScreen: View {
     @State private var model: FuseEngine
     @State private var phase: Phase = .playing
     @State private var pauseController = GamePauseController()
+    @State private var usedContinue = false
+    @State private var canContinue = false
+    @State private var adBusy = false
+    @State private var runRecorded = true
     @State private var newBest = false
     /// Best across every run since this screen opened, so the bests rows stay
     /// honest through PLAY AGAIN loops.
@@ -284,7 +303,16 @@ struct FuseScreen: View {
             // The playing view stays mounted behind the game-over card so the
             // final board sits dimmed under the scrim.
             playing
-            if phase == .over { runOver }
+            if phase == .over {
+                if canContinue {
+                    RewardedReviveOffer(game: .fuse,
+                                        busy: adBusy,
+                                        onDecline: declineContinue,
+                                        onSave: continueRun)
+                } else {
+                    runOver
+                }
+            }
         }
         .overlay {
             if phase == .playing, !pauseController.isPaused {
@@ -303,6 +331,7 @@ struct FuseScreen: View {
         }
         .onAppear { GameFeel.shared.warmUp() }
         .onDisappear {
+            finalizeRun()
             pauseController.reset()
             GameFeel.shared.teardown()
         }
@@ -497,11 +526,19 @@ struct FuseScreen: View {
     // MARK: Game over
 
     private func endRun() {
-        onRunComplete(model.score, model.bestTile, model.moves)
         if referenceBest == 0 && model.score > 0 { newBest = true }
         sessionBest = max(sessionBest, model.score)
+        canContinue = !usedContinue
+        runRecorded = false
+        if !canContinue { finalizeRun() }
         GameFeel.shared.play(.gameOver)
         withAnimation(.easeOut(duration: 0.3)) { phase = .over }
+    }
+
+    private func finalizeRun() {
+        guard !runRecorded else { return }
+        runRecorded = true
+        onRunComplete(model.score, model.bestTile, model.moves)
     }
 
     private var runOver: some View {
@@ -514,14 +551,42 @@ struct FuseScreen: View {
                                                    week: max(weekBest, sessionBest),
                                                    allTime: max(best, sessionBest)),
                         celebrate: newBest,
-                        onHome: onQuit,
+                        onHome: {
+                            finalizeRun()
+                            onQuit()
+                        },
                         onPlayAgain: playAgain)
     }
 
+    private func continueRun() {
+        guard !adBusy, canContinue else { return }
+        adBusy = true
+        AdManager.shared.showRewarded { earned in
+            adBusy = false
+            guard earned else { return }
+            usedContinue = true
+            canContinue = false
+            resolving = false
+            model.revive()
+            pauseController.reset()
+            withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
+            pauseController.pause()
+            pauseController.beginResumeCountdown()
+        }
+    }
+
+    private func declineContinue() {
+        withAnimation(.easeOut(duration: 0.2)) { canContinue = false }
+        finalizeRun()
+    }
+
     private func playAgain() {
+        finalizeRun()
         model = FuseEngine()
         newBest = false
         resolving = false
+        usedContinue = false
+        canContinue = false
         pauseController.reset()
         withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
     }

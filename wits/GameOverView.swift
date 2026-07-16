@@ -49,11 +49,6 @@ struct GameRunOverView: View {
     let bests: [RunBestLine]
     /// Confetti — the run set a new all-time best.
     var celebrate: Bool = false
-    /// Present → a "watch ad to keep playing" button sits above the buttons;
-    /// the host owns the rewarded-ad flow and revives the run on success.
-    var onContinue: (() -> Void)? = nil
-    /// Disables the continue button while the rewarded ad is presenting.
-    var continueBusy: Bool = false
     let onHome: () -> Void
     let onPlayAgain: () -> Void
 
@@ -61,7 +56,7 @@ struct GameRunOverView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let compact = geo.size.height < 760 || onContinue != nil
+            let compact = geo.size.height < 760
 
             ZStack {
                 scrim
@@ -81,9 +76,7 @@ struct GameRunOverView: View {
         }
         .transition(.opacity.combined(with: .scale(scale: 1.04)))
         .onAppear {
-            // Interstitial slot: this card is a static screen, but never
-            // interrupt a live rewarded-continue decision.
-            if onContinue == nil { AdManager.shared.maybeShowInterstitial() }
+            AdManager.shared.maybeShowInterstitial()
         }
     }
 
@@ -291,34 +284,7 @@ struct GameRunOverView: View {
     // MARK: Buttons
 
     private func buttons(compact: Bool) -> some View {
-        VStack(spacing: compact ? 9 : 12) {
-            if let onContinue {
-                Button(action: onContinue) {
-                    HStack(spacing: 9) {
-                        Image(systemName: "play.rectangle.fill")
-                            .font(.system(size: 18, weight: .black))
-                        Text(continueBusy ? "LOADING AD…" : "WATCH AD · KEEP PLAYING")
-                            .font(.system(size: 16, weight: .black, design: world.titleDesign))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                    }
-                    .foregroundStyle(world.ink)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: compact ? 50 : 56)
-                    .background(world.surface.opacity(0.96),
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(world.accent, lineWidth: 2)
-                    )
-                }
-                .buttonStyle(PressScale())
-                .disabled(continueBusy)
-                .opacity(continueBusy ? 0.6 : 1)
-            }
-
-            homeAndPlayAgain(compact: compact)
-        }
+        homeAndPlayAgain(compact: compact)
     }
 
     private func homeAndPlayAgain(compact: Bool) -> some View {
@@ -349,6 +315,104 @@ struct GameRunOverView: View {
                     .shadow(color: world.accent.opacity(0.25), radius: 10, y: 5)
             }
             .buttonStyle(PressScale())
+        }
+    }
+}
+
+/// A dedicated rewarded-ad decision shown before any results. The finished
+/// game remains mounted behind the scrim so declining flows naturally into
+/// its normal post-game screen, while accepting grants one final chance.
+struct RewardedReviveOffer: View {
+    let game: GameID
+    var busy = false
+    let onDecline: () -> Void
+    let onSave: () -> Void
+
+    @State private var ads = AdManager.shared
+
+    private var world: GameWorld { game.world }
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.58)
+            world.background.opacity(0.42)
+
+            VStack(spacing: 0) {
+                Text("Game Over")
+                    .font(.system(size: 52, weight: .black, design: world.titleDesign))
+                    .foregroundStyle(world.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+
+                Text("Tap 'Save Me' to receive an extra life to keep playing")
+                    .font(.system(size: 20, weight: .black, design: world.bodyDesign))
+                    .foregroundStyle(world.ink)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 28)
+
+                HStack(spacing: 12) {
+                    Button(action: onDecline) {
+                        Text("NO THANKS")
+                            .font(.system(size: 16, weight: .black, design: world.titleDesign))
+                            .foregroundStyle(world.ink)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 58)
+                            .background(world.raised.opacity(0.96),
+                                        in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(PressScale())
+
+                    Button(action: onSave) {
+                        HStack(spacing: 10) {
+                            saveIcon
+                            Text(saveTitle)
+                                .font(.system(size: 17, weight: .black, design: world.titleDesign))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                        }
+                        .foregroundStyle(world.background)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 58)
+                        .background(world.accent,
+                                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    }
+                    .buttonStyle(PressScale())
+                    .disabled(busy || !ads.rewardedReady)
+                    .opacity(busy || !ads.rewardedReady ? 0.65 : 1)
+                }
+                .padding(.top, 34)
+            }
+            .padding(.horizontal, 28)
+            .frame(maxWidth: 430)
+            .offset(y: -24)
+        }
+        .ignoresSafeArea()
+        .disabled(busy)
+        .onAppear { ads.loadRewardedIfNeeded() }
+        .transition(.opacity)
+    }
+
+    private var saveTitle: String {
+        if busy { return "OPENING…" }
+        return ads.rewardedReady ? "SAVE ME!" : "LOADING…"
+    }
+
+    private var saveIcon: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Circle()
+                .fill(world.ink)
+                .frame(width: 38, height: 38)
+                .overlay {
+                    Image(systemName: "heart.fill")
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundStyle(world.secondary)
+                }
+            Image(systemName: "play.rectangle.fill")
+                .font(.system(size: 10, weight: .black))
+                .foregroundStyle(world.background)
+                .padding(4)
+                .background(world.accent, in: Circle())
+                .offset(x: 3, y: 3)
         }
     }
 }
