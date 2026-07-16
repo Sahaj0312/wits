@@ -157,7 +157,7 @@ struct EndlessRunHUD: View {
     private var world: GameWorld { game.world }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Button(action: onQuit) {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 17, weight: .black))
@@ -168,8 +168,6 @@ struct EndlessRunHUD: View {
             .buttonStyle(PressScale())
             .accessibilityLabel("quit run")
 
-            Spacer(minLength: 0)
-
             chip(title: "\(difficulty.shortTitle.uppercased()) MODE",
                  value: score,
                  tint: world.ink,
@@ -178,8 +176,6 @@ struct EndlessRunHUD: View {
                  value: max(allTimeBest, score),
                  tint: world.accent,
                  crowned: true)
-
-            Spacer(minLength: 0)
 
             Button(action: onPause) {
                 Image(systemName: "pause.fill")
@@ -199,15 +195,18 @@ struct EndlessRunHUD: View {
                 .font(.system(size: 10.5, weight: .black, design: world.bodyDesign))
                 .foregroundStyle(tint)
                 .lineLimit(1)
+                .minimumScaleFactor(0.7)
             Text(String(value))
                 .font(.system(size: 21, weight: .black, design: world.titleDesign))
                 .foregroundStyle(tint)
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.65)
                 .contentTransition(.numericText())
                 .animation(.snappy(duration: 0.2), value: value)
         }
-        .frame(minWidth: 108)
-        .padding(.horizontal, 13)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 6)
         .padding(.vertical, 6)
         .background(world.surface.opacity(0.9),
                     in: RoundedRectangle(cornerRadius: 7, style: .continuous))

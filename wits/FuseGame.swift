@@ -351,7 +351,7 @@ struct FuseScreen: View {
             if model.bestTile >= 128 {
                 Text("CELL \(String(model.bestTile))")
                     .lineLimit(1)
-                    .fixedSize()
+                    .minimumScaleFactor(0.7)
                     .font(.system(size: 11, weight: .black, design: world.bodyDesign))
                     .foregroundStyle(FusePalette.ink(model.bestTile))
                     .padding(.horizontal, 9)

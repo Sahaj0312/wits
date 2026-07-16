@@ -140,26 +140,30 @@ struct WaterSortScreen: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 4) {
             // clears the pause button the host overlays at top-leading
             Spacer()
                 .frame(width: 38)
 
-            HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 Text(Self.clock(elapsed))
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
                     .monospacedDigit()
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Spacer(minLength: 0)
-                Text("pours \(moves)")
-                    .font(.system(size: 16, weight: .semibold, design: .rounded))
-                    .monospacedDigit()
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
+                ViewThatFits(in: .horizontal) {
+                    Text("pours \(moves)")
+                    Text(String(moves))
+                }
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .accessibilityLabel("\(moves) pours")
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
             .frame(height: 42)
             .background(Color.black.opacity(0.35), in: Capsule())
 

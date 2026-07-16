@@ -344,68 +344,12 @@ struct SnakeScreen: View {
     }
 
     private var hud: some View {
-        HStack(spacing: 10) {
-            Button(action: onQuit) {
-                Image(systemName: "chevron.left")
-                    .font(.system(size: 17, weight: .black))
-                    .foregroundStyle(world.ink)
-                    .frame(width: 44, height: 44)
-                    .background(world.surface.opacity(0.9), in: Circle())
-            }
-            .buttonStyle(PressScale())
-            .accessibilityLabel("quit run")
-
-            Spacer(minLength: 0)
-
-            hudChip(title: "\(difficulty.shortTitle.uppercased()) MODE",
-                    value: model.score,
-                    tint: world.ink,
-                    crowned: false)
-            hudChip(title: "ALL TIME",
-                    value: max(allTimeBest, model.score),
-                    tint: world.accent,
-                    crowned: true)
-
-            Spacer(minLength: 0)
-
-            Button { pauseController.pause() } label: {
-                Image(systemName: "pause.fill")
-                    .font(.system(size: 16, weight: .heavy))
-                    .foregroundStyle(world.ink)
-                    .frame(width: 44, height: 44)
-                    .background(world.surface.opacity(0.9), in: Circle())
-            }
-            .buttonStyle(PressScale())
-            .accessibilityLabel("pause game")
-        }
-    }
-
-    private func hudChip(title: String, value: Int, tint: Color, crowned: Bool) -> some View {
-        VStack(spacing: 0) {
-            Text(title)
-                .font(.system(size: 10.5, weight: .black, design: world.bodyDesign))
-                .foregroundStyle(tint)
-                .lineLimit(1)
-            Text(String(value))
-                .font(.system(size: 21, weight: .black, design: world.titleDesign))
-                .foregroundStyle(tint)
-                .monospacedDigit()
-                .contentTransition(.numericText())
-                .animation(.snappy(duration: 0.2), value: value)
-        }
-        .frame(minWidth: 108)
-        .padding(.horizontal, 13)
-        .padding(.vertical, 6)
-        .background(world.surface.opacity(0.9),
-                    in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-        .overlay(alignment: .top) {
-            if crowned {
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 10, weight: .black))
-                    .foregroundStyle(world.accent)
-                    .offset(y: -12)
-            }
-        }
+        EndlessRunHUD(game: .snake,
+                      difficulty: difficulty,
+                      score: model.score,
+                      allTimeBest: allTimeBest,
+                      onQuit: onQuit,
+                      onPause: { pauseController.pause() })
     }
 
     // MARK: Board

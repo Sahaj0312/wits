@@ -417,22 +417,26 @@ struct PegSolitaireScreen: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 6) {
             Spacer()
                 .frame(width: 38)
 
-            HStack(spacing: 16) {
+            HStack(spacing: 8) {
                 Text(Self.clock(elapsed))
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .monospacedDigit()
-                    .frame(minWidth: 66, alignment: .leading)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(minWidth: 54, alignment: .leading)
                 Spacer(minLength: 0)
                 Text("pegs: \(pegsLeft)")
-                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .font(.system(size: 16, weight: .semibold, design: .rounded))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 18)
+            .padding(.horizontal, 10)
             .frame(height: 42)
             .background(Color.black.opacity(0.35), in: Capsule())
 
@@ -442,7 +446,7 @@ struct PegSolitaireScreen: View {
                 Image(systemName: "arrow.uturn.backward")
                     .font(.system(size: 17, weight: .heavy))
                     .foregroundStyle(.white.opacity(history.isEmpty ? 0.35 : 1))
-                    .frame(width: 48, height: 48)
+                    .frame(width: 44, height: 44)
                     .background(.white.opacity(0.18), in: Circle())
             }
             .buttonStyle(.plain)
@@ -455,7 +459,7 @@ struct PegSolitaireScreen: View {
                 Image(systemName: "questionmark")
                     .font(.system(size: 20, weight: .heavy))
                     .foregroundStyle(.white)
-                    .frame(width: 48, height: 48)
+                    .frame(width: 44, height: 44)
                     .background(.white.opacity(0.18), in: Circle())
             }
             .buttonStyle(.plain)

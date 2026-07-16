@@ -98,16 +98,20 @@ struct CrosswordScreen: View {
             Spacer()
                 .frame(width: 38)
 
-            HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 Text(Self.clock(elapsed))
                     .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 Spacer(minLength: 0)
                 Text(hints > 0 ? "reveals \(hints)" : "no reveals")
                     .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(world.ink)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
             .frame(height: 42)
             .background(world.ink.opacity(0.07), in: Capsule())
 

@@ -430,6 +430,8 @@ struct BlockFitScreen: View {
                     .font(.system(size: 34, weight: .black, design: world.titleDesign))
                     .foregroundStyle(world.ink)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.55)
                     .contentTransition(.numericText())
                     .animation(.snappy(duration: 0.25), value: model.score)
             }
@@ -438,6 +440,8 @@ struct BlockFitScreen: View {
                 Text("COMBO ×\(model.combo)")
                     .font(.system(size: 11, weight: .black, design: world.bodyDesign))
                     .foregroundStyle(world.background)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                     .padding(.horizontal, 9)
                     .padding(.vertical, 5)
                     .background(world.secondary, in: Capsule())
@@ -454,6 +458,8 @@ struct BlockFitScreen: View {
                     .font(.system(size: 20, weight: .black, design: world.titleDesign))
                     .foregroundStyle(newBest ? world.accent : world.ink)
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
             }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.combo >= 2)

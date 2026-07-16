@@ -420,20 +420,24 @@ struct NumberNestsScreen: View {
     }
 
     private var topBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Spacer().frame(width: 38)
 
-            HStack(spacing: 10) {
+            HStack(spacing: 6) {
                 Image(systemName: "timer")
                 Text(Self.clock(elapsed))
                     .monospacedDigit()
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 Spacer(minLength: 0)
                 Text(wrongChecks == 0 ? "clean" : "checks \(wrongChecks)")
                     .foregroundStyle(wrongChecks == 0 ? world.accent : world.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
-            .font(.system(size: 14, weight: .heavy, design: .rounded))
+            .font(.system(size: 13, weight: .heavy, design: .rounded))
             .foregroundStyle(world.ink)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
             .frame(height: 42)
             .background(world.surface.opacity(0.9), in: Capsule())
 

@@ -147,7 +147,7 @@ struct MahjongScreen: View {
                 Spacer(minLength: 0)
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 12)
+            .padding(.horizontal, 8)
             .frame(height: 42)
             .background(Color.black.opacity(0.35), in: Capsule())
 

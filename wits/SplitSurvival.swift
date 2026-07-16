@@ -425,6 +425,7 @@ struct SplitSurvivalScreen: View {
                         target: model.target,
                         lookAlike: model.lookAlike)
                 .padding(.leading, 48)
+                .padding(.trailing, 16)
 
             GeometryReader { geo in
                 ZStack {

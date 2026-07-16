@@ -34,8 +34,11 @@ struct GamePauseButtonLayer: View {
         // bar, aligned with the leading slot games reserve in their top bars.
         GeometryReader { _ in
             GamePauseButton(game: game, action: action)
-                .position(x: 36,
-                          y: 26)
+                .padding(.leading, 14)
+                .padding(.top, 4)
+                .frame(maxWidth: .infinity,
+                       maxHeight: .infinity,
+                       alignment: .topLeading)
         }
     }
 }
