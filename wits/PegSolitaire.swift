@@ -337,7 +337,8 @@ struct PegSolitaireScreen: View {
     @State private var startPegs = 2
     @State private var parSeconds = 30.0
     @State private var selected: Int?
-    @State private var history: [PegPuzzle] = []
+    /// One-deep undo. Each jump replaces this snapshot and undo consumes it.
+    @State private var undoSnapshot: PegPuzzle?
     @State private var undos = 0
     @State private var elapsed = 0.0
     @State private var timerStartedAt = Date()
@@ -445,12 +446,12 @@ struct PegSolitaireScreen: View {
             } label: {
                 Image(systemName: "arrow.uturn.backward")
                     .font(.system(size: 17, weight: .heavy))
-                    .foregroundStyle(.white.opacity(history.isEmpty ? 0.35 : 1))
+                    .foregroundStyle(.white.opacity(undoSnapshot == nil ? 0.35 : 1))
                     .frame(width: 44, height: 44)
                     .background(.white.opacity(0.18), in: Circle())
             }
             .buttonStyle(.plain)
-            .disabled(history.isEmpty || finished)
+            .disabled(undoSnapshot == nil || finished)
             .accessibilityLabel("Undo last jump")
 
             Button {
@@ -572,7 +573,7 @@ struct PegSolitaireScreen: View {
             }
             return
         }
-        history.append(puzzle)
+        undoSnapshot = puzzle
         vanishing = move.over
         withAnimation(.spring(response: 0.24, dampingFraction: 0.85)) {
             PegSolitaireEngine.apply(move, to: &puzzle)
@@ -585,7 +586,8 @@ struct PegSolitaireScreen: View {
     }
 
     private func undo() {
-        guard let last = history.popLast(), !finished else { return }
+        guard let last = undoSnapshot, !finished else { return }
+        undoSnapshot = nil
         undos += 1
         selected = nil
         withAnimation(.spring(response: 0.24, dampingFraction: 0.85)) {

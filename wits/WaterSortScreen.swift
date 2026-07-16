@@ -42,7 +42,9 @@ struct WaterSortScreen: View {
     @State private var preTubes: [WaterSortEngine.Tube]?
     @State private var tubeFrames: [Int: CGRect] = [:]
     @State private var initialTubes: [WaterSortEngine.Tube]?
-    @State private var history: [[WaterSortEngine.Tube]] = []
+    /// One-deep undo. A successful pour replaces this snapshot; undo consumes
+    /// it, so repeated taps can never walk back through the whole board.
+    @State private var undoSnapshot: [WaterSortEngine.Tube]?
     @State private var undos = 0
     @State private var restarts = 0
     @State private var deadEnd = false
@@ -172,12 +174,12 @@ struct WaterSortScreen: View {
             } label: {
                 Image(systemName: "arrow.uturn.backward")
                     .font(.system(size: 16, weight: .heavy))
-                    .foregroundStyle(.white.opacity(history.isEmpty ? 0.35 : 1))
+                    .foregroundStyle(.white.opacity(undoSnapshot == nil ? 0.35 : 1))
                     .frame(width: 42, height: 42)
                     .background(.white.opacity(0.18), in: Circle())
             }
             .buttonStyle(.plain)
-            .disabled(history.isEmpty || finished || pour != nil)
+            .disabled(undoSnapshot == nil || finished || pour != nil)
             .accessibilityLabel("Undo last pour")
 
             Button {
@@ -581,7 +583,7 @@ struct WaterSortScreen: View {
         hint = ""
         selected = nil
         preTubes = snapshot
-        history.append(snapshot)
+        undoSnapshot = snapshot
 
         let side: CGFloat
         if let s = tubeFrames[source], let d = tubeFrames[dest], d.midX < s.midX {
@@ -654,9 +656,11 @@ struct WaterSortScreen: View {
     }
 
     /// Rewinds one pour. The spent move is not refunded — undo is an escape
-    /// hatch, not a free trial-and-error loop toward par.
+    /// hatch, not a free trial-and-error loop toward par. Consuming the sole
+    /// snapshot prevents another rewind until the player makes a new pour.
     private func undo() {
-        guard pour == nil, !finished, let last = history.popLast() else { return }
+        guard pour == nil, !finished, let last = undoSnapshot else { return }
+        undoSnapshot = nil
         positionRevision &+= 1
         undos += 1
         selected = nil
@@ -673,7 +677,7 @@ struct WaterSortScreen: View {
         guard pour == nil, !finished, let initialTubes else { return }
         positionRevision &+= 1
         restarts += 1
-        history = []
+        undoSnapshot = nil
         selected = nil
         moves = 0
         hint = ""
