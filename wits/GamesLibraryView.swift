@@ -639,7 +639,8 @@ private struct GameLauncher: View {
                     playLevel = app.levels.currentLevel(for: game, difficulty: playDifficulty)
                     startRun()
                 },
-                onSelector: { withAnimation(.easeOut(duration: 0.2)) { phase = .selector } }
+                onSelector: { withAnimation(.easeOut(duration: 0.2)) { phase = .selector } },
+                onHome: { dismiss() }
             )
         }
     }

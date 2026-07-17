@@ -17,6 +17,7 @@ struct DifficultyLevelResultView: View {
     let onRetry: () -> Void
     let onNext: () -> Void
     let onSelector: () -> Void
+    let onHome: () -> Void
 
     private var world: GameWorld { game.world }
     private var difficultyColor: Color { world.difficultyColor(difficulty) }
@@ -147,14 +148,36 @@ struct DifficultyLevelResultView: View {
             }
             .buttonStyle(PressScale())
 
-            Button(action: onSelector) {
-                Text("CHANGE DIFFICULTY")
-                    .font(.system(size: 11.5, weight: .black, design: world.bodyDesign))
-                    .foregroundStyle(world.muted)
-                    .padding(.vertical, 8)
+            HStack(spacing: 10) {
+                secondaryAction(title: "CHANGE DIFFICULTY",
+                                symbol: "slider.horizontal.3",
+                                action: onSelector)
+                secondaryAction(title: "HOME",
+                                symbol: "house.fill",
+                                action: onHome)
             }
-            .buttonStyle(.plain)
         }
+    }
+
+    private func secondaryAction(title: String,
+                                 symbol: String,
+                                 action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol)
+                .font(.system(size: 10.5, weight: .black, design: world.bodyDesign))
+                .foregroundStyle(world.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(world.surface.opacity(0.72),
+                            in: RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .strokeBorder(world.accent.opacity(0.26), lineWidth: 1)
+                )
+        }
+        .buttonStyle(PressScale())
     }
 
     private var headline: String {
