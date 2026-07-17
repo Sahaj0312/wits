@@ -7,10 +7,12 @@
 //
 
 import SwiftUI
+import StoreKit
 import UIKit
 
 struct GamesLibraryView: View {
     @Environment(AppModel.self) private var app
+    @Environment(\.requestReview) private var requestReview
     @State private var launch: GameID?
     @State private var showSettings = false
     @State private var showPaywall = false
@@ -55,11 +57,18 @@ struct GamesLibraryView: View {
             .padding(.bottom, 24)
         }
         .background(Color(hexAny: 0x09090B).ignoresSafeArea())
-        .fullScreenCover(item: $launch) { g in
+        .fullScreenCover(item: $launch, onDismiss: requestPendingReview) { g in
             GameLauncher(game: g)
         }
         .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
         .sheet(isPresented: $showSettings) { SettingsView() }
+    }
+
+    /// The game cover has finished dismissing, so the library is visible and
+    /// it is safe for StoreKit to present without interrupting active play.
+    private func requestPendingReview() {
+        guard ReviewPrompter.takePendingRequest() else { return }
+        requestReview()
     }
 
     /// Opens a random game's level map, a "surprise me" for the library.
