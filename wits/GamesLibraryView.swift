@@ -28,9 +28,14 @@ struct GamesLibraryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .center, spacing: 10) {
-                    Text("games")
-                        .font(.system(size: 29, weight: .black, design: .default))
-                        .foregroundStyle(.white)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("games")
+                            .font(.system(size: 29, weight: .black, design: .default))
+                            .foregroundStyle(.white)
+                        Rectangle()
+                            .fill(Color.witsAccent)
+                            .frame(width: 30, height: 4)
+                    }
                     Spacer()
                     StreakPill(count: app.streak.current)
                     shuffleButton
