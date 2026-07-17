@@ -58,7 +58,7 @@ struct WelcomeView: View {
                         paragraphSpacing: CGFloat,
                         topPadding: CGFloat) -> some View {
         VStack(alignment: .leading, spacing: paragraphSpacing) {
-            Text("welcome to wits")
+            Text("welcome to \(Text("wits").foregroundStyle(Color.witsAccent))")
                 .font(.system(size: titleSize, weight: .semibold, design: .serif))
                 .foregroundStyle(.white)
                 .padding(.top, topPadding)
