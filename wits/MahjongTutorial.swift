@@ -423,8 +423,6 @@ private struct MahjongDemo: View {
         let grid = { (col: CGFloat, row: CGFloat) -> CGPoint in
             CGPoint(x: rect.midX + (col - 1) * cell, y: rect.midY + (row - 1) * cell)
         }
-        let pipColors = [Self.inkBlue, Self.inkRed, Self.inkGreen]
-
         func dot(_ point: CGPoint, _ d: CGFloat, _ color: Color) {
             let r = CGRect(x: point.x - d / 2, y: point.y - d / 2, width: d, height: d)
             context.fill(Path(ellipseIn: r), with: .color(color))

@@ -434,6 +434,7 @@ struct CrosswordScreen: View {
             // using the prevalidated seeded safety net.
             let searchBudget: Duration = .milliseconds(600)
             let seeds = (0..<4).map { _ in cfg.resolvedRandomSeed() }
+            let recentFingerprints = CrosswordRecentBoards.fingerprints()
             let generationTask = Task.detached(priority: .userInitiated) { () -> CrosswordPuzzle in
                 var pick = CrosswordEngine.generate(mapLevel: target,
                                                     seed: seeds[0],
@@ -441,13 +442,14 @@ struct CrosswordScreen: View {
                 // Redraw a board the player has seen recently; the last draw
                 // stands even if it repeats, so a stubborn streak can never
                 // stall startup.
-                for seed in seeds.dropFirst()
-                where CrosswordRecentBoards.contains(pick) && !Task.isCancelled {
+                for seed in seeds.dropFirst() {
+                    guard !Task.isCancelled else { break }
+                    let fingerprint = pick.words.map(\.answer).sorted().joined(separator: ",")
+                    guard recentFingerprints.contains(fingerprint) else { break }
                     pick = CrosswordEngine.generate(mapLevel: target,
                                                     seed: seed,
                                                     searchBudget: searchBudget)
                 }
-                CrosswordRecentBoards.record(pick)
                 return pick
             }
             let generated = await withTaskCancellationHandler {
@@ -456,6 +458,7 @@ struct CrosswordScreen: View {
                 generationTask.cancel()
             }
             guard !Task.isCancelled else { return }
+            CrosswordRecentBoards.record(generated)
             puzzle = generated
             entries = Array(repeating: Array(repeating: "", count: generated.size),
                             count: generated.size)
@@ -559,8 +562,8 @@ private enum CrosswordRecentBoards {
         puzzle.words.map(\.answer).sorted().joined(separator: ",")
     }
 
-    static func contains(_ puzzle: CrosswordPuzzle) -> Bool {
-        UserDefaults.standard.stringArray(forKey: key)?.contains(fingerprint(puzzle)) ?? false
+    static func fingerprints() -> Set<String> {
+        Set(UserDefaults.standard.stringArray(forKey: key) ?? [])
     }
 
     static func record(_ puzzle: CrosswordPuzzle) {

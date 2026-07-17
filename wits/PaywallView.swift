@@ -143,8 +143,7 @@ struct PaywallView: View {
             featureCard(
                 symbol: "xmark",
                 tint: .witsWarm,
-                title: Text("REMOVE\n").foregroundColor(.witsWarm)
-                    + Text("AUTOMATIC ADS").foregroundColor(.white),
+                title: Text("\(Text("REMOVE").foregroundColor(.witsWarm))\n\(Text("AUTOMATIC ADS").foregroundColor(.white))"),
                 detail: "no forced break after a game.",
                 height: layout.firstFeatureHeight,
                 layout: layout
@@ -153,8 +152,7 @@ struct PaywallView: View {
             featureCard(
                 symbol: "play.fill",
                 tint: .witsAccent,
-                title: Text("KEEP ").foregroundColor(.witsAccent)
-                    + Text("OPTIONAL ADS\nFOR REWARDS").foregroundColor(.white),
+                title: Text("\(Text("KEEP").foregroundColor(.witsAccent)) \(Text("OPTIONAL ADS").foregroundColor(.white))\n\(Text("FOR REWARDS").foregroundColor(.white))"),
                 detail: "extra life or continue — only when you choose.",
                 height: layout.secondFeatureHeight,
                 layout: layout
