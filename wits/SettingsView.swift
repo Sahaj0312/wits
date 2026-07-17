@@ -52,39 +52,6 @@ struct SettingsView: View {
                                       isOn: notificationToggle)
                 }
 
-                settingsSection("ad-free") {
-                    if PurchasesManager.shared.isAdFree {
-                        settingsValueRow(icon: "checkmark.seal.fill",
-                                         tint: .witsAccent,
-                                         title: "ad-free",
-                                         value: "active")
-                    } else {
-                        Button {
-                            GameFeel.shared.uiTap()
-                            showPaywall = true
-                        } label: {
-                            settingsValueRow(icon: "sparkles",
-                                             tint: .witsAccent,
-                                             title: "remove ads",
-                                             value: "",
-                                             showsChevron: true)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    settingsDivider
-                    Button {
-                        GameFeel.shared.uiPrimary()
-                        restorePurchases()
-                    } label: {
-                        settingsValueRow(icon: "arrow.clockwise",
-                                         tint: .witsSky,
-                                         title: "restore purchases",
-                                         value: restoring ? "…" : "")
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(restoring)
-                }
-
                 settingsSection("support") {
                     ShareLink(item: shareMessage) {
                         settingsValueRow(icon: "square.and.arrow.up",
@@ -146,6 +113,39 @@ struct SettingsView: View {
                                      title: "terms of service",
                                      value: "coming soon",
                                      isDimmed: true)
+                }
+
+                settingsSection("ad-free") {
+                    if PurchasesManager.shared.isAdFree {
+                        settingsValueRow(icon: "checkmark.seal.fill",
+                                         tint: .witsAccent,
+                                         title: "ad-free",
+                                         value: "active")
+                    } else {
+                        Button {
+                            GameFeel.shared.uiTap()
+                            showPaywall = true
+                        } label: {
+                            settingsValueRow(icon: "sparkles",
+                                             tint: .witsAccent,
+                                             title: "remove ads",
+                                             value: "",
+                                             showsChevron: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    settingsDivider
+                    Button {
+                        GameFeel.shared.uiPrimary()
+                        restorePurchases()
+                    } label: {
+                        settingsValueRow(icon: "arrow.clockwise",
+                                         tint: .witsSky,
+                                         title: "restore purchases",
+                                         value: restoring ? "…" : "")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(restoring)
                 }
 
                 if let restoreMessage {
