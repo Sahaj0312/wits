@@ -323,12 +323,12 @@ private struct CrowdControlDemo: View {
                 let scale = 1 - 0.35 * CGFloat(gone)
                 var filled = ctx.resolve(Image(systemName: "heart.fill"))
                 filled.shading = .color(Self.heartColor.opacity(1 - gone))
-                ctx.draw(filled, in: geo.dotRect(center, scale: scale * side / geo.dot * 2))
+                ctx.draw(filled, in: geo.dotRect(center, scale: scale * side / geo.dot))
             }
             if gone > 0 {
                 var empty = ctx.resolve(Image(systemName: "heart"))
                 empty.shading = .color(world.muted.opacity(0.45 * gone))
-                ctx.draw(empty, in: geo.dotRect(center, scale: 0.88 * side / geo.dot * 2))
+                ctx.draw(empty, in: geo.dotRect(center, scale: 0.88 * side / geo.dot))
             }
         }
     }
