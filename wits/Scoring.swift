@@ -157,6 +157,57 @@ enum ScoringEngine {
     }
 }
 
+/// Decides whether a completed adaptive-level result represents a failure
+/// that can legitimately be retried through Save Me. Puzzle completion must
+/// win over a merely low efficiency grade: clearing a board is never a death.
+enum RewardedReviveEligibility {
+    static func shouldOffer(for result: GameResult,
+                            previous: DifficultyState,
+                            alreadyUsed: Bool) -> Bool {
+        guard !alreadyUsed, result.game.offersRewardedRevive else { return false }
+
+        switch result.game {
+        case .echoGrid:
+            // Echo Grid always ends after its fixed round set, so its shared
+            // pass grade is the authoritative success/failure signal.
+            return gradedFailure(result, previous: previous)
+
+        case .pegSolitaire:
+            let solved = (result.raw["solved"] ?? 0) >= 1
+            guard solved else { return true }
+            let onTarget = (result.raw["onTarget"] ?? 1) >= 1
+            // One peg on the required target is an unequivocal clear. An
+            // off-target single peg follows the normal grade for that level.
+            return onTarget ? false : gradedFailure(result, previous: previous)
+
+        case .mahjong:
+            // The rack filling is the only failure exit. A cleared layout is
+            // complete even if excessive undos lower its cleanliness grade.
+            return (result.raw["solved"] ?? 1) < 1
+
+        case .slidePuzzle, .crossword:
+            // Explicit product exclusions: these games never offer Save Me.
+            return false
+
+        case .blockEscape, .waterSort, .numberNests:
+            // These screens emit a result only after the puzzle is solved.
+            return false
+
+        case .arrowStorm, .crowdControl, .colorClash, .tileShift, .lastSeen,
+             .split, .blockFit, .fuse, .snake, .tower:
+            // Standalone games own their death/continue flow inside the game
+            // screen and never pass results through this adaptive gate.
+            return false
+        }
+    }
+
+    private static func gradedFailure(_ result: GameResult,
+                                      previous: DifficultyState) -> Bool {
+        let quality = ScoringEngine.score(result, previous: previous).run.performance
+        return !LevelGrader.passed(quality: quality)
+    }
+}
+
 enum ScoringCalibrator {
     static let maxWPI = 5000.0
 

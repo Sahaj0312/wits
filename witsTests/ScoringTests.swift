@@ -77,6 +77,70 @@ final class ScoringTests: XCTestCase {
         XCTAssertTrue(LevelGrader.passed(quality: run.performance))
     }
 
+    func testRewardedReviveEligibilityAcrossEveryAdaptiveGame() {
+        let prior = DifficultyState(level: 5, mastery: 5, confidence: 1)
+
+        var echoPass = GameResult(game: .echoGrid, score: 8, accuracy: 1, trials: 8)
+        echoPass.raw = ["correct": 8, "wrong": 0, "nearMisses": 0]
+        var echoFail = GameResult(game: .echoGrid, score: 0, accuracy: 0, trials: 8)
+        echoFail.raw = ["correct": 0, "wrong": 8, "nearMisses": 0]
+        XCTAssertFalse(RewardedReviveEligibility.shouldOffer(for: echoPass,
+                                                             previous: prior,
+                                                             alreadyUsed: false))
+        XCTAssertTrue(RewardedReviveEligibility.shouldOffer(for: echoFail,
+                                                            previous: prior,
+                                                            alreadyUsed: false))
+
+        var pegClear = GameResult(game: .pegSolitaire, score: 500, accuracy: 1, trials: 12)
+        pegClear.raw = ["solved": 1, "onTarget": 1]
+        var pegFailure = pegClear
+        pegFailure.raw = ["solved": 0, "onTarget": 0]
+        XCTAssertFalse(RewardedReviveEligibility.shouldOffer(for: pegClear,
+                                                             previous: prior,
+                                                             alreadyUsed: false))
+        XCTAssertTrue(RewardedReviveEligibility.shouldOffer(for: pegFailure,
+                                                            previous: prior,
+                                                            alreadyUsed: false))
+
+        var mahjongClear = GameResult(game: .mahjong, score: 500, accuracy: 1, trials: 12)
+        mahjongClear.raw = ["solved": 1]
+        var mahjongFailure = mahjongClear
+        mahjongFailure.raw = ["solved": 0]
+        XCTAssertFalse(RewardedReviveEligibility.shouldOffer(for: mahjongClear,
+                                                             previous: prior,
+                                                             alreadyUsed: false))
+        XCTAssertTrue(RewardedReviveEligibility.shouldOffer(for: mahjongFailure,
+                                                            previous: prior,
+                                                            alreadyUsed: false))
+
+        // These puzzle screens only emit results after a successful clear.
+        for game in [GameID.blockEscape, .waterSort, .numberNests] {
+            let clear = GameResult(game: game, score: 1, accuracy: 0, trials: 100)
+            XCTAssertFalse(RewardedReviveEligibility.shouldOffer(for: clear,
+                                                                 previous: prior,
+                                                                 alreadyUsed: false),
+                           "\(game.rawValue) clears must never show Save Me")
+        }
+
+        // Product exclusions stay excluded even for a deliberately poor run.
+        for game in [GameID.slidePuzzle, .crossword] {
+            let result = GameResult(game: game, score: 0, accuracy: 0, trials: 10)
+            XCTAssertFalse(RewardedReviveEligibility.shouldOffer(for: result,
+                                                                 previous: prior,
+                                                                 alreadyUsed: false))
+        }
+    }
+
+    func testRewardedReviveCanOnlyBeUsedOnce() {
+        let prior = DifficultyState(level: 5, mastery: 5, confidence: 1)
+        var failure = GameResult(game: .pegSolitaire, score: 0, accuracy: 0, trials: 5)
+        failure.raw = ["solved": 0]
+
+        XCTAssertFalse(RewardedReviveEligibility.shouldOffer(for: failure,
+                                                             previous: prior,
+                                                             alreadyUsed: true))
+    }
+
     func testEqualMasteryMapsConsistentlyAcrossLaunchPriors() {
         let arrow = ScoringCalibrator.calibratedAbility(game: .arrowStorm, mastery: 7)
         let pegs = ScoringCalibrator.calibratedAbility(game: .pegSolitaire, mastery: 7)

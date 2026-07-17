@@ -680,17 +680,16 @@ private struct GameLauncher: View {
 
     private func handle(_ result: GameResult) {
         pauseController.reset()
-        if supportsRewardedReplay, !reviveUsed {
+        let previous = app.difficultyState(for: game, difficulty: playDifficulty)
+        if RewardedReviveEligibility.shouldOffer(for: result,
+                                                 previous: previous,
+                                                 alreadyUsed: reviveUsed) {
             withAnimation(.easeOut(duration: 0.2)) {
                 pendingReviveResult = result
             }
             return
         }
         finish(result)
-    }
-
-    private var supportsRewardedReplay: Bool {
-        game.offersRewardedRevive
     }
 
     private func declineRevive() {
