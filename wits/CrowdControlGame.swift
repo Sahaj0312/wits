@@ -2,7 +2,7 @@
 //  CrowdControlGame.swift
 //  wits
 //
-//  Crowd control (multiple object tracking — divided attention), played as an
+//  Crowd control (multiple object tracking, divided attention), played as an
 //  endless run. A few dots flash, then turn identical to the rest and
 //  everything starts drifting. Track the marked ones through the chaos and
 //  point them out when the dots freeze. Based on the multiple-object-tracking
@@ -10,7 +10,7 @@
 //
 //  Pick a mode, then survive round after round as the crowd grows and speeds
 //  up. Every target you pick correctly is a point; every target you lose
-//  costs a heart. Out of hearts, a rewarded ad buys one last life — the
+//  costs a heart. Out of hearts, a rewarded ad buys one last life, the
 //  hearts stay grey, and the next dropped target ends the run for good.
 //
 //  The crowd simulates in board points on a display-synced TimelineView:
@@ -382,7 +382,7 @@ struct CrowdControlScreen: View {
                 guard gen == generation else { return }
             }
             // Hold before the mark while paused (or counting back in after an
-            // ad continue) — the player must actually see which dots glow.
+            // ad continue), the player must actually see which dots glow.
             while pauseController.isPaused {
                 try? await Task.sleep(for: .milliseconds(80))
                 guard gen == generation else { return }
@@ -443,7 +443,7 @@ struct CrowdControlScreen: View {
             newAllTimeBest = true
         }
         sessionBest = max(sessionBest, score)
-        // A continue offer defers recording — the run isn't over until the
+        // A continue offer defers recording, the run isn't over until the
         // player passes on it. No offer → record right away.
         canContinue = !usedContinue
         runRecorded = false
@@ -478,12 +478,12 @@ struct CrowdControlScreen: View {
         adBusy = true
         AdManager.shared.showRewarded { earned in
             adBusy = false
-            guard earned else { return }   // closed early — offer stays on the table
+            guard earned else { return }   // closed early, offer stays on the table
             usedContinue = true
             canContinue = false
             pauseController.reset()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
-            // Count the player back in — the fresh round holds its mark phase
+            // Count the player back in, the fresh round holds its mark phase
             // until the 3…2…1 finishes.
             pauseController.pause()
             pauseController.beginResumeCountdown()

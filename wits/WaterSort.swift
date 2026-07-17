@@ -5,7 +5,7 @@
 //  Liquid-sorting engine. Tubes hold four units of colour; a pour moves the
 //  top run onto a matching colour or into an empty tube. Every level is a
 //  fresh random deal whose exact minimum pour count is found with A* before
-//  the board is served — so puzzles never repeat and par is honest.
+//  the board is served, so puzzles never repeat and par is honest.
 //
 //  Pure computation (no SwiftUI): the screen lives in WaterSortScreen.swift,
 //  and this file compiles standalone in the scratchpad -O profiling harness.
@@ -84,7 +84,7 @@ nonisolated enum WaterSortEngine {
     // MARK: Optimal solve (A*)
 
     /// Segments above the solved baseline. A pour merges at most one colour
-    /// run into another, so this never overestimates — admissible and
+    /// run into another, so this never overestimates, admissible and
     /// consistent, which keeps the A* below exact without reopening.
     private static func heuristic(_ tubes: [Tube]) -> Int {
         var segments = 0
@@ -133,7 +133,7 @@ nonisolated enum WaterSortEngine {
     static func solve(_ tubes: [Tube], capacity: Int, nodeCap: Int = 200_000) -> Int? {
         if isSolved(tubes, capacity: capacity) { return 0 }
 
-        // Binary min-heap on (f, then deeper g first — ties resolve toward
+        // Binary min-heap on (f, then deeper g first, ties resolve toward
         // finished plans, which cuts expansions roughly in half).
         var heap: [OpenNode] = []
         func push(_ node: OpenNode) {

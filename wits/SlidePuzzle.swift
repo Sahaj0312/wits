@@ -169,7 +169,7 @@ struct SlidePuzzleScreen: View {
         let (blankRow, blankCol) = (blank / size, blank % size)
         guard row == blankRow || col == blankCol else {
             flash(cell)
-            hint = "that tile can't reach the gap — pick one in its row or column"
+            hint = "that tile can't reach the gap. pick one in its row or column"
             cfg.report(.nearMiss)
             return
         }
@@ -268,7 +268,7 @@ struct SlidePuzzleScreen: View {
     /// (steps at 4 and 8); depth ramps smoothly with the *continuous* level
     /// inside each band, so every fractional adaptive gain deepens the next
     /// board a little. Each new size starts shallower than the previous
-    /// band's end — a fresh, learnable start instead of a wall.
+    /// band's end, a fresh, learnable start instead of a wall.
     static func boardSpec(for level: Double) -> (size: Int, depth: Int) {
         let l = min(10, max(1, level))
         if l < 4 {
@@ -283,7 +283,7 @@ struct SlidePuzzleScreen: View {
         return (5, Int((36 + t * 54).rounded()))        // 36 → 90
     }
 
-    /// Scramble by random-walking the blank — always solvable. Boards are
+    /// Scramble by random-walking the blank, always solvable. Boards are
     /// re-rolled until their Manhattan distance lands in a small window
     /// around the level's target, so two boards at the same level feel
     /// comparably hard instead of swinging with walk luck.
@@ -358,7 +358,7 @@ struct SlidePuzzleScreen: View {
         return true
     }
 
-    /// Sum of every tile's Manhattan distance from home — a lower bound on the
+    /// Sum of every tile's Manhattan distance from home, a lower bound on the
     /// remaining moves, used to derive a human par for efficiency scoring.
     static func manhattan(_ tiles: [Int], size: Int) -> Int {
         var total = 0

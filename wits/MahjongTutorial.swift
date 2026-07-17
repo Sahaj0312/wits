@@ -6,20 +6,20 @@
 //  four-slot rack below: a blocked tile refuses the tap, a free tile flies
 //  into the rack, twins pop gold and vanish, and a rack full of singles turns
 //  the border red until undo rewinds the risky pick. Tiles are drawn like the
-//  real game — ivory faces on jade sides, buried tiles falling into shade.
+//  real game, ivory faces on jade sides, buried tiles falling into shade.
 //
 
 import SwiftUI
 
 enum MahjongTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "tap a free tile — an open side and nothing on top — to lift it into the rack") {
+        TutorialSlide(caption: "tap a tile with an open side and nothing on top to lift it into the rack") {
             MahjongDemo(page: .pick)
         },
         TutorialSlide(caption: "when its twin lands in the rack, the pair vanishes") {
             MahjongDemo(page: .match)
         },
-        TutorialSlide(caption: "four singles fill the rack and end the run — undo rewinds a risky pick") {
+        TutorialSlide(caption: "four singles fill the rack and end the run. undo rewinds a risky pick") {
             MahjongDemo(page: .danger)
         },
     ]
@@ -53,7 +53,7 @@ private struct MahjongDemo: View {
 
     // MARK: Script
 
-    /// Simplified drawn faces — one of each suit family so the pair on the
+    /// Simplified drawn faces, one of each suit family so the pair on the
     /// match page is unmistakable.
     enum Face { case dot1, dot2, dot3, bam2, char, wind }
 

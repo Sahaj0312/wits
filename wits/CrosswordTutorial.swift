@@ -12,7 +12,7 @@ import SwiftUI
 
 enum CrosswordTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "tap a square, then type — the cursor advances through the answer") {
+        TutorialSlide(caption: "tap a square, then type. the cursor advances through the answer") {
             CrosswordDemo(page: .type)
         },
         TutorialSlide(caption: "tap a crossing square again to flip between across and down") {

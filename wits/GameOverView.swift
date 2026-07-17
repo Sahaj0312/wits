@@ -43,7 +43,7 @@ struct GameRunOverView: View {
     /// Optional one-liner under the score for game-specific stats.
     var caption: String? = nil
     let bests: [RunBestLine]
-    /// Confetti — the run set a new all-time best.
+    /// Confetti, the run set a new all-time best.
     var celebrate: Bool = false
     let onHome: () -> Void
     let onPlayAgain: () -> Void

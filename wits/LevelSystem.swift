@@ -203,8 +203,8 @@ enum SplitProgress {
 }
 
 /// Rolling day/week bests for an endless run (the post-game card's
-/// "Today's best" and "Week's best" rows). Keys are device-local — the
-/// calendar the player actually lives in — matching the app's day convention.
+/// "Today's best" and "Week's best" rows). Keys are device-local, the
+/// calendar the player actually lives in, matching the app's day convention.
 struct PeriodBests: Codable, Equatable {
     var day: String
     var dayBest: Int

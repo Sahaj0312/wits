@@ -18,9 +18,9 @@ struct ArcadeInputLayer: View {
     @State private var dragID: Int?
     @State private var traceIDs: [Int] = []
 
-    private let tapSlop: CGFloat = 14          // pt — below this a drag counts as a tap
-    private let swipeMin: CGFloat = 24         // pt — swipe magnitude threshold
-    private let pickRadius: CGFloat = 0.11     // unit — grab/tap tolerance
+    private let tapSlop: CGFloat = 14          // pt, below this a drag counts as a tap
+    private let swipeMin: CGFloat = 24         // pt, swipe magnitude threshold
+    private let pickRadius: CGFloat = 0.11     // unit, grab/tap tolerance
     private let traceRadius: CGFloat = 0.10
 
     var body: some View {

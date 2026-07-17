@@ -5,7 +5,7 @@
 //  Mini-crossword engine. Every level is a fresh 5×5 grid: a block template
 //  (randomly mirrored for variety) sets the shape, and a seeded backtracking
 //  fill drops wits-original clue-bank words (CrosswordBank.swift) into the
-//  slots — most-constrained slot first. Difficulty comes from tightening the
+//  slots, most-constrained slot first. Difficulty comes from tightening the
 //  time par and biasing the fill toward rarer vocabulary. A small set of
 //  prevalidated fills guarantees startup if a randomized search reaches its
 //  short wall-clock budget.
@@ -15,7 +15,7 @@
 //  ~1.4k, and the staircase ~1.0k, so no shape can feel repetitive. Shapes
 //  with three or more interlocked five-letter slots collapse to a handful of
 //  fills at this bank size (the retired "twist" template had 8 total, which
-//  made every high level look identical) — rerun the counter before adding
+//  made every high level look identical), rerun the counter before adding
 //  a shape.
 //
 //  Pure computation (no SwiftUI): the screen lives in CrosswordScreen.swift.
@@ -170,7 +170,7 @@ nonisolated enum CrosswordEngine {
         // delay in unoptimized builds. The tier bias
         // is a WEAK noisy preference, never a strict ordering: front-loading
         // one tier funnels the whole search into that tier's subspace, and
-        // the single-tier subspaces are too thin to fill from — a strict
+        // the single-tier subspaces are too thin to fill from, a strict
         // sort here made easy levels hang for seconds in profiling.
         var poolsByLength: [Int: [CrosswordEntry]] = [:]
         for length in Set(slots.map { $0.cells.count }) {
@@ -221,7 +221,7 @@ nonisolated enum CrosswordEngine {
             return usedAnswers[pools[slot][index].answer, default: 0] == 0
         }
 
-        /// Candidate count, stopping at `limit` — the MRV scan only needs to
+        /// Candidate count, stopping at `limit`, the MRV scan only needs to
         /// know whether a slot beats the current best.
         func candidateCount(for slot: Int, limit: Int) -> Int {
             var count = 0

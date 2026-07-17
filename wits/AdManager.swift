@@ -4,7 +4,7 @@
 //
 //  Interstitial ads between games keep the app fully free. Placement rule:
 //  ads are only ever presented over static screens (result cards, workout
-//  interludes, the summary) — never over live gameplay, where a covered
+//  interludes, the summary), never over live gameplay, where a covered
 //  timer would eat the player's run.
 //
 //  Call sites:
@@ -20,7 +20,7 @@ import AppTrackingTransparency
 final class AdManager {
     static let shared = AdManager()
 
-    /// DEBUG builds use Google's public test units — clicking real ads in
+    /// DEBUG builds use Google's public test units, clicking real ads in
     /// your own builds violates AdMob policy and risks the account.
     #if DEBUG
     private static let interstitialUnitID = "ca-app-pub-3940256099942544/4411468910"
@@ -63,7 +63,7 @@ final class AdManager {
         loadRewardedIfNeeded()
     }
 
-    // MARK: Rewarded (opt-in "watch to continue" — not gated by ad-free)
+    // MARK: Rewarded (opt-in "watch to continue", not gated by ad-free)
 
     var rewardedReady: Bool { rewarded != nil }
 
@@ -78,7 +78,7 @@ final class AdManager {
     }
 
     /// Presents a rewarded ad. `completion(earned)` fires once the ad is
-    /// dismissed — resuming gameplay any earlier would run it behind the ad.
+    /// dismissed, resuming gameplay any earlier would run it behind the ad.
     func showRewarded(completion: @escaping (Bool) -> Void) {
         guard let ad = rewarded, let top = Self.topViewController() else {
             loadRewardedIfNeeded()
@@ -102,13 +102,13 @@ final class AdManager {
     }
 
     /// Presents an interstitial if the frequency cap allows and one is ready.
-    /// Safe to call optimistically — it's a no-op most of the time.
+    /// Safe to call optimistically, it's a no-op most of the time.
     func maybeShowInterstitial() {
         guard started, !adFreeProvider() else { return }
         guard completedGames >= Self.gamesPerAd else { return }
         if let last = lastAdShownAt, Date().timeIntervalSince(last) < Self.minSecondsBetweenAds { return }
         guard let ad = interstitial, let top = Self.topViewController() else {
-            loadInterstitial()   // not ready — make sure one is on the way
+            loadInterstitial()   // not ready, make sure one is on the way
             return
         }
         let priorCompleted = completedGames
@@ -122,7 +122,7 @@ final class AdManager {
                 self.interstitialWatcher = nil
                 AdFreeOfferGate.recordInterstitialShown()
                 if AdFreeOfferGate.shouldOfferNow(isAdFree: self.adFreeProvider()) {
-                    // The pitch lands directly behind the ad it follows — the
+                    // The pitch lands directly behind the ad it follows, the
                     // moment the pain of the ad is most concrete.
                     self.presentPaywall()
                 }
@@ -153,7 +153,7 @@ final class AdManager {
         }
     }
 
-    /// Presents the one-time-purchase upsell over whatever is on screen —
+    /// Presents the one-time-purchase upsell over whatever is on screen ,
     /// UIKit presentation, like the ads themselves, so it works above the
     /// game's fullScreenCover where a root SwiftUI sheet cannot appear.
     private func presentPaywall() {
@@ -175,7 +175,7 @@ final class AdManager {
 }
 
 /// Fires onDismiss when a full-screen ad closes after really showing, and
-/// onFail when it never opened — callers that count impressions must not
+/// onFail when it never opened, callers that count impressions must not
 /// treat the two the same. Omitting onFail folds both into onDismiss.
 private final class FullScreenAdWatcher: NSObject, FullScreenContentDelegate {
     private let onDismiss: () -> Void

@@ -433,7 +433,7 @@ struct PegSolitairePolicy: GameScoringPolicy {
     /// Any solution is exactly startPegs−1 jumps, so there is no move par.
     /// Solving IS the exam: a stranded board never reaches the 1★ pass line
     /// (its clear ratio maps into 0...0.55 as partial mastery signal), an
-    /// off-target solve caps below 2★, and a true solve always passes — time
+    /// off-target solve caps below 2★, and a true solve always passes, time
     /// against a generous budget and undo count decide 1–3★.
     static func quality(clear: Double, timeEfficiency: Double,
                         solved: Bool, onTarget: Bool, undos: Double) -> Double {

@@ -5,7 +5,7 @@
 //  The real-time substrate every arcade game runs on. Entities live in
 //  resolution-independent unit space [0,1]; a scene holds them and advances on a
 //  display-synced loop (driven by ArcadeGameView). Difficulty is a spawner that
-//  ramps speed / rate / clutter — the flow-channel knob — not a shrinking timer.
+//  ramps speed / rate / clutter, the flow-channel knob, not a shrinking timer.
 //
 
 import SwiftUI

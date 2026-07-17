@@ -2,7 +2,7 @@
 //  SnakeGame.swift
 //  wits
 //
-//  Snake: the classic endless steering run. No levels — three speed modes
+//  Snake: the classic endless steering run. No levels, three speed modes
 //  (easy / medium / hard) each keep their own best score, and one all-time
 //  best stands across every mode. The snake never stops; every apple adds a
 //  segment and quietly raises the tempo, and one clip of a wall or your own
@@ -11,7 +11,7 @@
 //  Rendering follows the Split playbook: the engine is a plain class stepped
 //  by an async loop, and a TimelineView-driven Canvas interpolates segment
 //  positions between ticks so the snake glides instead of hopping cells.
-//  Steering works mid-drag — every ~22pt of travel in a new direction queues
+//  Steering works mid-drag, every ~22pt of travel in a new direction queues
 //  a turn, so a held finger can whip through corners without lifting.
 //
 
@@ -115,7 +115,7 @@ final class SnakeEngine {
         let next = SnakeCell(x: head.x + direction.dx, y: head.y + direction.dy)
         let ate = foods.contains(next)
 
-        // The tail cell vacates this tick, so moving into it is legal —
+        // The tail cell vacates this tick, so moving into it is legal ,
         // unless this move grows the snake and the tail stays put.
         var occupied = body
         if !ate { occupied.removeLast() }

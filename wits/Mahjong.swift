@@ -5,8 +5,8 @@
 //  Mahjong solitaire engine. Tiles stack in layers on a half-tile grid; a
 //  tile is free when nothing rests on it and its left or right side is open,
 //  and two free tiles with the same face clear together. Every level is a
-//  fresh seeded deal built by reverse play — pairs are assigned in a legal
-//  removal order — so every board served is guaranteed clearable.
+//  fresh seeded deal built by reverse play, pairs are assigned in a legal
+//  removal order, so every board served is guaranteed clearable.
 //
 //  Traditional tile faces (dots, bamboo, characters, winds, dragons) are
 //  centuries-old public-domain iconography; the app draws its own renditions
@@ -45,7 +45,7 @@ nonisolated struct MahjongFace: Hashable, Sendable {
 
 /// A tile slot on the stacking grid. Coordinates are half-tile units: a tile
 /// occupies [x, x+2) × [y, y+2) on layer z, so slots offset by 1 straddle two
-/// tiles of the layer below — the classic mahjong overlap.
+/// tiles of the layer below, the classic mahjong overlap.
 nonisolated struct MahjongSlot: Hashable, Sendable {
     let x: Int
     let y: Int
@@ -79,7 +79,7 @@ nonisolated enum MahjongEngine {
 
     // MARK: Face catalog
 
-    /// Full catalog (no flowers/seasons — their group-match special rule adds
+    /// Full catalog (no flowers/seasons, their group-match special rule adds
     /// noise, not signal).
     static let catalog: [MahjongFace] = {
         var faces: [MahjongFace] = []
@@ -118,8 +118,8 @@ nonisolated enum MahjongEngine {
     // MARK: Level ladder
 
     /// Frozen exam spec per map level (1...40): bigger, deeper boards and more
-    /// face variety (fewer quads). The rack is always 4 slots — the Vita
-    /// pressure — and the scrambled layout is rolled fresh from the run's
+    /// face variety (fewer quads). The rack is always 4 slots, the Vita
+    /// pressure, and the scrambled layout is rolled fresh from the run's
     /// seed. Depth grows instead of footprint, so tiles stay big.
     static func spec(forMapLevel level: Int) -> MahjongSpec {
         switch min(max(level, 1), 40) {
@@ -260,7 +260,7 @@ nonisolated enum MahjongEngine {
         present.filter { isFree($0, slots: slots, present: present) }.sorted()
     }
 
-    /// Whether any two free tiles share a face — false means the player is
+    /// Whether any two free tiles share a face, false means the player is
     /// stuck (recoverable through undo).
     static func hasAvailablePair(tiles: [MahjongTile], present: Set<Int>) -> Bool {
         let slots = tiles.map(\.slot)
@@ -304,7 +304,7 @@ nonisolated enum MahjongEngine {
 
         let tiles = slots.indices.map { MahjongTile(id: $0, face: faceFor[$0]!, slot: slots[$0]) }
         // The pick order removed free pairs from the live board, exactly as a
-        // player would — so it IS the forward solution, unreversed.
+        // player would, so it IS the forward solution, unreversed.
         return (tiles, solution)
     }
 

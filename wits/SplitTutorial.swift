@@ -15,10 +15,10 @@ enum SplitTutorial {
         TutorialSlide(caption: "tap the left side to lift the flyer through the gates") {
             SplitDemo(page: .fly)
         },
-        TutorialSlide(caption: "on the right, tap the apple before it fades — never tap the tomato") {
+        TutorialSlide(caption: "on the right, tap the apple before it fades. never tap the tomato") {
             SplitDemo(page: .pick)
         },
-        TutorialSlide(caption: "watch both sides at once — one collision, wrong pick, or missed apple ends the run") {
+        TutorialSlide(caption: "watch both sides at once. one collision, wrong pick, or missed apple ends the run") {
             SplitDemo(page: .survive)
         },
     ]

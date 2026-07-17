@@ -41,7 +41,7 @@ extension Color {
     static let witsAccent = Color(light: 0x17B3A3, dark: 0x1BC7B5)
     static let witsWarm = Color(light: 0xF0795F, dark: 0xFF8A70)
 
-    // Extended palette — every non-domain tint in the app comes from here,
+    // Extended palette, every non-domain tint in the app comes from here,
     // never from ad-hoc hex values inside views.
     static let witsSky = Color(light: 0x0E9BD8, dark: 0x38C4F2)
     static let witsViolet = Color(light: 0x7C5CF0, dark: 0xA78BFA)
@@ -98,7 +98,7 @@ extension CognitiveDomain {
 }
 
 extension Color {
-    /// Fixed (non-adaptive) color from hex — used where art must read the same
+    /// Fixed (non-adaptive) color from hex, used where art must read the same
     /// in light and dark mode, e.g. hero gradients.
     init(hexAny: UInt32) {
         self.init(
@@ -112,7 +112,7 @@ extension Color {
 // MARK: - Type
 
 extension Font {
-    /// Heavy display type — reserved for screen titles and hero headlines only.
+    /// Heavy display type, reserved for screen titles and hero headlines only.
     static func witsDisplay(_ size: CGFloat) -> Font {
         .system(size: size, weight: .heavy, design: .rounded)
     }
@@ -120,7 +120,7 @@ extension Font {
     static func witsHeading(_ size: CGFloat = 17) -> Font {
         .system(size: size, weight: .bold, design: .rounded)
     }
-    /// Stat values, badges, buttons — semibold, not heavy.
+    /// Stat values, badges, buttons, semibold, not heavy.
     static func witsValue(_ size: CGFloat = 16) -> Font {
         .system(size: size, weight: .semibold, design: .rounded)
     }
@@ -232,7 +232,7 @@ struct Wordmark: View {
     }
 }
 
-/// Small accent "wits" brandmark — sits above each page's title so the brand is
+/// Small accent "wits" brandmark, sits above each page's title so the brand is
 /// present on every screen.
 struct WitsBrandMark: View {
     var body: some View {

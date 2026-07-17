@@ -11,13 +11,13 @@ import SwiftUI
 
 enum SnakeTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "swipe to steer — the snake keeps moving between every turn") {
+        TutorialSlide(caption: "swipe to steer. the snake keeps moving between every turn") {
             SnakeDemo(page: .steer)
         },
-        TutorialSlide(caption: "eat apples to score and grow — every apple also quickens the pace") {
+        TutorialSlide(caption: "eat apples to score and grow. every apple also quickens the pace") {
             SnakeDemo(page: .eat)
         },
-        TutorialSlide(caption: "don't hit a wall or your own body — one collision ends the run") {
+        TutorialSlide(caption: "don't hit a wall or your own body. one collision ends the run") {
             SnakeDemo(page: .crash)
         },
     ]

@@ -2,8 +2,8 @@
 //  TileShiftTutorial.swift
 //  wits
 //
-//  Animated how-to-play demos for Tile Shift: a banner names the rule —
-//  match by colour or by shape — and the hand taps the candidate tile that
+//  Animated how-to-play demos for Tile Shift: a banner names the rule ,
+//  match by colour or by shape, and the hand taps the candidate tile that
 //  fits the target. Page two flips the rule over identical tiles so the
 //  "same tiles, different answer" insight lands; page three spends a heart
 //  on a tap made by the stale rule.
@@ -16,7 +16,7 @@ enum TileShiftTutorial {
         TutorialSlide(caption: "read the rule, then tap the tile that matches the target by that rule") {
             TileShiftDemo(page: .matchRule)
         },
-        TutorialSlide(caption: "the rule keeps flipping — same tiles, different right answer") {
+        TutorialSlide(caption: "the rule keeps flipping. same tiles, different right answer") {
             TileShiftDemo(page: .ruleFlip)
         },
         TutorialSlide(caption: "you have three hearts: a wrong tap or a timeout costs one") {
@@ -84,7 +84,7 @@ private struct TileShiftDemo: View {
     private var script: Script {
         switch page {
         case .matchRule:
-            // COLOUR rule twice over — two different trials so the tap-after-tap
+            // COLOUR rule twice over, two different trials so the tap-after-tap
             // rhythm of a run reads, not just one lucky answer.
             return Script(
                 duration: 5.6,
@@ -111,7 +111,7 @@ private struct TileShiftDemo: View {
                 flipAt: 1.7)
         case .hearts:
             // Rule says SHAPE but the hand answers by the old COLOUR rule
-            // under a short deadline — red feedback, one heart gone.
+            // under a short deadline, red feedback, one heart gone.
             return Script(
                 duration: 5.4,
                 trials: [Trial(start: 0, byColor: false,

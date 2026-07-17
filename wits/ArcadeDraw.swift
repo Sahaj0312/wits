@@ -2,7 +2,7 @@
 //  ArcadeDraw.swift
 //  wits
 //
-//  Shared Canvas drawing helpers that give the arcade games depth and glow — a
+//  Shared Canvas drawing helpers that give the arcade games depth and glow, a
 //  dark "arena" stage and glossy, lit entities instead of flat primitives.
 //
 
@@ -25,7 +25,7 @@ extension GraphicsContext {
         fill(Path(ellipseIn: hl), with: .color(.white.opacity(0.55)))
     }
 
-    /// A rounded chip with a soft drop shadow + subtle top sheen — a "game piece".
+    /// A rounded chip with a soft drop shadow + subtle top sheen, a "game piece".
     func chip(_ rect: CGRect, fill color: Color, corner: CGFloat, glow: Color? = nil) {
         var g = self
         g.addFilter(.shadow(color: (glow ?? .black).opacity(glow == nil ? 0.35 : 0.6),
@@ -50,7 +50,7 @@ extension GraphicsContext {
     }
 }
 
-/// The dark game stage behind every arcade field — gradient + soft accent glows.
+/// The dark game stage behind every arcade field, gradient + soft accent glows.
 struct ArcadeArena: View {
     var game: GameID = .split
 

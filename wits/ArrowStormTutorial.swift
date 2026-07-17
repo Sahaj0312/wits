@@ -5,7 +5,7 @@
 //  Animated how-to-play demos for Arrow Storm on a mini trial screen: a row of
 //  five arrows where only the middle one matters, a per-trial deadline bar that
 //  drains faster as you score, and three hearts that a wrong tap or timeout
-//  burns through. Everything renders like the real game — storm-yellow
+//  burns through. Everything renders like the real game, storm-yellow
 //  monospaced world, heavy triangle glyphs, and the two answer buttons.
 //
 
@@ -13,13 +13,13 @@ import SwiftUI
 
 enum ArrowStormTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "only the middle arrow matters — tap the side it points, the flankers lie") {
+        TutorialSlide(caption: "only the middle arrow matters. tap the side it points, the flankers lie") {
             ArrowStormDemo(page: .answer)
         },
-        TutorialSlide(caption: "beat the shrinking deadline — too slow counts as a miss") {
+        TutorialSlide(caption: "beat the shrinking deadline. too slow counts as a miss") {
             ArrowStormDemo(page: .deadline)
         },
-        TutorialSlide(caption: "every miss costs a heart — lose all three and the run ends") {
+        TutorialSlide(caption: "every miss costs a heart. lose all three and the run ends") {
             ArrowStormDemo(page: .hearts)
         },
     ]
@@ -75,7 +75,7 @@ private struct ArrowStormDemo: View {
                 livesAtStart: 3,
                 pulseMiddle: true)
         case .deadline:
-            // The bar drains for real here — both answers land in the red
+            // The bar drains for real here, both answers land in the red
             // sliver, and the second trial's window is visibly tighter.
             return Script(
                 duration: 5.4,
@@ -206,7 +206,7 @@ private struct ArrowStormDemo: View {
     }
 
     /// Symbols must go through a resolved image (Text-wrapped images don't
-    /// survive Canvas snapshotting) — draw fitted to `height`, keeping aspect.
+    /// survive Canvas snapshotting), draw fitted to `height`, keeping aspect.
     private func drawGlyph(_ context: GraphicsContext, systemName: String,
                            at center: CGPoint, height: CGFloat, color: Color) {
         var glyph = context.resolve(Image(systemName: systemName))

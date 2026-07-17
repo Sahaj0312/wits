@@ -62,7 +62,7 @@ struct GamesLibraryView: View {
         .sheet(isPresented: $showSettings) { SettingsView() }
     }
 
-    /// Opens a random game's level map — a "surprise me" for the library.
+    /// Opens a random game's level map, a "surprise me" for the library.
     private var shuffleButton: some View {
         Button {
             guard let pick = games.randomElement() else { return }
@@ -322,7 +322,7 @@ struct GamesLibraryView: View {
     }
 
     private var shareMessage: String {
-        "I’ve been playing Wits — quick brain games for memory, logic, words, maths, and focus. Give it a try!"
+        "I’ve been playing Wits, a collection of quick brain games for memory, logic, words, maths, and focus. Give it a try!"
     }
 
 }
@@ -358,7 +358,7 @@ private struct GameLauncher: View {
             }
         }
         .onChange(of: phase) { oldPhase, newPhase in
-            // Endless runs have no dedicated result phase in this host —
+            // Endless runs have no dedicated result phase in this host ,
             // the selector is the first static screen after a run, so the
             // interstitial slot (counted in each onRunComplete) is here.
             // Backing out of a tutorial isn't a run, so it never counts.
@@ -436,7 +436,7 @@ private struct GameLauncher: View {
                 )
             }
         case .reviewTutorial:
-            // Re-opened from the selector's "?" — finishing returns there.
+            // Re-opened from the selector's "?", finishing returns there.
             if let slides = game.animatedTutorialSlides {
                 AnimatedHowToPlay(
                     game: game,
@@ -776,7 +776,7 @@ private struct GameLauncher: View {
     }
 
     private func finish(_ result: GameResult) {
-        // Snapshot before recording — recordGameResult merges this run in.
+        // Snapshot before recording, recordGameResult merges this run in.
         let passedBefore = app.levels.hasPassed(game: game,
                                                 difficulty: playDifficulty,
                                                 level: playLevel)

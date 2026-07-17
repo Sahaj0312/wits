@@ -2,7 +2,7 @@
 //  ReviewPrompter.swift
 //  wits
 //
-//  Asks for an App Store review right after a finished game — the moment the
+//  Asks for an App Store review right after a finished game, the moment the
 //  player has just accomplished something. Apple never reports whether the
 //  user actually reviewed (or even saw the prompt), so the schedule assumes
 //  "not reviewed yet" and simply re-asks with spacing: the first game ever
@@ -10,7 +10,7 @@
 //  app session, up to 3 asks total (Apple's own yearly cap).
 //
 //  Asking only on a session's first finished game also keeps the prompt from
-//  ever stacking with an interstitial — those need three finished games in a
+//  ever stacking with an interstitial, those need three finished games in a
 //  session before they can show.
 //
 

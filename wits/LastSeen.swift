@@ -2,11 +2,11 @@
 //  LastSeen.swift
 //  wits
 //
-//  Short-term memory, played as an endless run. Tap each object once — never
+//  Short-term memory, played as an endless run. Tap each object once, never
 //  one you've already chosen. The board reshuffles every pick and grows as
 //  you clear it. Pick a mode (starting set size), then keep going: every new
 //  object is a point. Three hearts: tapping something you already chose costs
-//  one. Out of hearts, a rewarded ad buys one last life — the hearts stay
+//  one. Out of hearts, a rewarded ad buys one last life, the hearts stay
 //  grey, and the next repeat ends the run for good.
 //
 //  No clock, deliberately: stalling earns nothing in an endless run, so the
@@ -187,7 +187,7 @@ struct LastSeenScreen: View {
             GameFeel.shared.play(.newBest)
         }
         if tapped.count == icons.count {
-            // cleared the set — grow it
+            // cleared the set, grow it
             let nextSize = icons.count + 1
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
                 guard phase == .playing else { return }
@@ -230,7 +230,7 @@ struct LastSeenScreen: View {
             newAllTimeBest = true
         }
         sessionBest = max(sessionBest, score)
-        // A continue offer defers recording — the run isn't over until the
+        // A continue offer defers recording, the run isn't over until the
         // player passes on it. No offer → record right away.
         canContinue = !usedContinue
         runRecorded = false
@@ -265,12 +265,12 @@ struct LastSeenScreen: View {
         adBusy = true
         AdManager.shared.showRewarded { earned in
             adBusy = false
-            guard earned else { return }   // closed early — offer stays on the table
+            guard earned else { return }   // closed early, offer stays on the table
             usedContinue = true
             canContinue = false
             flash = nil
             pauseController.reset()
-            // Resume the same set right where it died — the reshuffle keeps
+            // Resume the same set right where it died, the reshuffle keeps
             // the next pick honest.
             reshuffle()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }

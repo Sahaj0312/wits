@@ -19,7 +19,7 @@ struct SettingsView: View {
     @State private var restoreMessage: String?
     @State private var restoring = false
 
-    // The home screen's fixed dark chrome, not the adaptive wits palette —
+    // The home screen's fixed dark chrome, not the adaptive wits palette ,
     // this sheet sits directly over the library and should read as one place.
     private let pageBg = Color(hexAny: 0x09090B)
     private let cardFill = Color(hexAny: 0x1B1B20)
@@ -156,7 +156,7 @@ struct SettingsView: View {
                 let restored = try await PurchasesManager.shared.restore()
                 restoreMessage = restored ? "purchases restored." : "no purchases to restore."
             } catch {
-                restoreMessage = "restore failed — try again later."
+                restoreMessage = "restore failed. try again later."
             }
         }
     }

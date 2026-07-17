@@ -15,10 +15,10 @@ enum ColorClashTutorial {
         TutorialSlide(caption: "tap the colour of the ink, not what the word says") {
             ColorClashDemo(page: .ink)
         },
-        TutorialSlide(caption: "beat the shrinking deadline — too slow counts as a miss") {
+        TutorialSlide(caption: "beat the shrinking deadline. too slow counts as a miss") {
             ColorClashDemo(page: .deadline)
         },
-        TutorialSlide(caption: "tapping the word costs a heart — lose all three and the run ends") {
+        TutorialSlide(caption: "tapping the word costs a heart. lose all three and the run ends") {
             ColorClashDemo(page: .trap)
         },
     ]
@@ -79,7 +79,7 @@ private struct ColorClashDemo: View {
     private var script: Script {
         switch page {
         case .ink:
-            // "blue" in green ink — the hand ignores the word and taps GREEN.
+            // "blue" in green ink, the hand ignores the word and taps GREEN.
             return Script(duration: 5.0,
                           first: Trial(word: .blue, ink: .green),
                           next: Trial(word: .red, ink: .blue),
@@ -95,7 +95,7 @@ private struct ColorClashDemo: View {
                           tapTime: 3.0, tapHue: .yellow, correct: true,
                           barStart: 0.5, barEnd: 3.4)
         case .trap:
-            // "green" in red ink — the hand falls for the word and taps GREEN.
+            // "green" in red ink, the hand falls for the word and taps GREEN.
             return Script(duration: 5.6,
                           first: Trial(word: .green, ink: .red),
                           tapTime: 1.9, tapHue: .green, correct: false,
@@ -220,7 +220,7 @@ private struct ColorClashDemo: View {
             }
             layer.opacity = 1
 
-            // Feedback border: teal for a hit, world pink for a miss — the
+            // Feedback border: teal for a hit, world pink for a miss, the
             // miss border lingers so the lesson lands.
             let holdOut = s.correct ? s.tapTime + 0.75 : s.tapTime + 2.6
             let flash = DemoEase.ramp(t, s.tapTime, s.tapTime + 0.12)

@@ -2,7 +2,7 @@
 //  GameFeel.swift
 //  wits
 //
-//  The "juice" layer — one place every game calls to feel alive. Restrained
+//  The "juice" layer, one place every game calls to feel alive. Restrained
 //  outcome samples, haptics, and SwiftUI modifiers for screen shake, colour
 //  flash, and particle bursts. Routine interactions stay haptic-only.
 //
@@ -16,7 +16,7 @@ import UIKit
 enum FeelEvent {
     case correct(combo: Int)     // pitch rises with the combo
     case wrong
-    case nearMiss                // "so close" — feels almost, still counts as a miss
+    case nearMiss                // "so close", feels almost, still counts as a miss
     case timeout
     case lifeLost(remaining: Int)
     case levelUp                 // survival escalation tier crossed

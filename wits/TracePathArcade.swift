@@ -2,10 +2,10 @@
 //  TracePathArcade.swift
 //  wits
 //
-//  "Trace the Path" — nodes light up in sequence, then you tap them back in
+//  "Trace the Path", nodes light up in sequence, then you tap them back in
 //  order (forward = Path Keeper; reverse = Echo Grid). A single transposition
 //  is the near-miss. Each map level is a frozen exam spec (board × span ×
-//  flash speed) served for a fixed number of rounds — no wall clock, so an
+//  flash speed) served for a fixed number of rounds, no wall clock, so an
 //  idle run never ends and unplayed rounds can't inflate the grade.
 //
 
@@ -51,7 +51,7 @@ final class TracePathArcade: ArcadeGame {
 
     /// The exam spec for a map level. Bands overlap on purpose: a bigger board
     /// resets span, so each band opens with a sideways-then-up step instead of
-    /// one unbroken ramp. Echo Grid runs one span lower — reverse recall is a
+    /// one unbroken ramp. Echo Grid runs one span lower, reverse recall is a
     /// notch harder at the same length.
     static func spec(for game: GameID, mapLevel: Int) -> (grid: Int, span: Int, step: Double, rounds: Int) {
         let n = min(max(mapLevel, 1), 40)

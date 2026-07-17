@@ -13,7 +13,7 @@ import SwiftUI
 
 enum EndlessMetrics {
     /// Horizontal inset for run content (trial cards, answer buttons, boards).
-    /// Wider than WitsMetrics.screenPadding on purpose — full-bleed cards on a
+    /// Wider than WitsMetrics.screenPadding on purpose, full-bleed cards on a
     /// phone read as "too wide" (user feedback 2026-07-14).
     static let sidePadding: CGFloat = 34
 }
@@ -223,7 +223,7 @@ struct EndlessRunHUD: View {
 
 // MARK: - Hearts
 
-/// The lives row. After a rewarded continue every heart shows grey — the
+/// The lives row. After a rewarded continue every heart shows grey, the
 /// player is running on their last life.
 struct EndlessHeartsRow: View {
     let game: GameID

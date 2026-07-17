@@ -3,10 +3,10 @@
 //  wits
 //
 //  Task switching, played as an endless run. Match the target by the rule on
-//  screen — colour or shape — and the rule keeps flipping. Pick a mode, then
+//  screen, colour or shape, and the rule keeps flipping. Pick a mode, then
 //  answer trial after trial against a deadline that tightens as you score.
 //  Three hearts: a wrong tap or a timeout costs one. Out of hearts, a
-//  rewarded ad buys one last life — the hearts stay grey, and the next slip
+//  rewarded ad buys one last life, the hearts stay grey, and the next slip
 //  ends the run for good.
 //
 
@@ -321,7 +321,7 @@ struct TileShiftScreen: View {
             newAllTimeBest = true
         }
         sessionBest = max(sessionBest, score)
-        // A continue offer defers recording — the run isn't over until the
+        // A continue offer defers recording, the run isn't over until the
         // player passes on it. No offer → record right away.
         canContinue = !usedContinue
         runRecorded = false
@@ -356,7 +356,7 @@ struct TileShiftScreen: View {
         adBusy = true
         AdManager.shared.showRewarded { earned in
             adBusy = false
-            guard earned else { return }   // closed early — offer stays on the table
+            guard earned else { return }   // closed early, offer stays on the table
             usedContinue = true
             canContinue = false
             feedback = nil
@@ -364,7 +364,7 @@ struct TileShiftScreen: View {
             pauseController.reset()
             next()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
-            // Count the player back in — the trial clock stays frozen until
+            // Count the player back in, the trial clock stays frozen until
             // the 3…2…1 finishes.
             pauseController.pause()
             pauseController.beginResumeCountdown()

@@ -452,7 +452,7 @@ private struct GameWorldPattern: View {
 // MARK: - Vignette host
 
 /// The illustrated gameplay preview that fills a library card. Purely
-/// decorative — the card's texts carry accessibility.
+/// decorative, the card's texts carry accessibility.
 struct GamePosterArt: View {
     let game: GameID
 
@@ -488,7 +488,7 @@ struct GamePosterArt: View {
     }
 }
 
-// MARK: - Arrow storm — flankers pull left, the middle arrow points right.
+// MARK: - Arrow storm, flankers pull left, the middle arrow points right.
 
 private struct ArrowStormPoster: View {
     let w: CGFloat, h: CGFloat
@@ -515,7 +515,7 @@ private struct ArrowStormPoster: View {
     }
 }
 
-// MARK: - Crowd control — a few glowing dots hide in an identical crowd.
+// MARK: - Crowd control, a few glowing dots hide in an identical crowd.
 
 private struct CrowdControlPoster: View {
     let w: CGFloat, h: CGFloat
@@ -542,12 +542,12 @@ private struct CrowdControlPoster: View {
     }
 }
 
-// MARK: - Echo grid — a lit path to play back in reverse.
+// MARK: - Echo grid, a lit path to play back in reverse.
 
 private struct EchoGridPoster: View {
     let w: CGFloat, h: CGFloat
 
-    // (index, step label) — the path the player has to echo backwards.
+    // (index, step label), the path the player has to echo backwards.
     private let lit: [Int: Int] = [6: 1, 4: 2, 2: 3]
 
     var body: some View {
@@ -575,7 +575,7 @@ private struct EchoGridPoster: View {
     }
 }
 
-// MARK: - Color clash — the word never matches its ink.
+// MARK: - Color clash, the word never matches its ink.
 
 private struct ColorClashPoster: View {
     let w: CGFloat, h: CGFloat
@@ -601,7 +601,7 @@ private struct ColorClashPoster: View {
     }
 }
 
-// MARK: - Tile shift — the matching rule keeps flipping.
+// MARK: - Tile shift, the matching rule keeps flipping.
 
 private struct TileShiftPoster: View {
     let w: CGFloat, h: CGFloat
@@ -648,7 +648,7 @@ private struct TrianglePoster: Shape {
     }
 }
 
-// MARK: - Last seen — one of these was already tapped.
+// MARK: - Last seen, one of these was already tapped.
 
 private struct LastSeenPoster: View {
     let w: CGFloat, h: CGFloat
@@ -682,7 +682,7 @@ private struct LastSeenPoster: View {
     }
 }
 
-// MARK: - Slide puzzle — scrambled tiles, one gap.
+// MARK: - Slide puzzle, scrambled tiles, one gap.
 
 private struct SlidePuzzlePoster: View {
     let w: CGFloat, h: CGFloat
@@ -712,7 +712,7 @@ private struct SlidePuzzlePoster: View {
     }
 }
 
-// MARK: - Block escape — free the big red block (bottom exit).
+// MARK: - Block escape, free the big red block (bottom exit).
 
 private struct BlockEscapePoster: View {
     let w: CGFloat, h: CGFloat
@@ -760,7 +760,7 @@ private struct BlockEscapePoster: View {
     }
 }
 
-// MARK: - Peg solitaire — jump pegs, leave one.
+// MARK: - Peg solitaire, jump pegs, leave one.
 
 private struct PegSolitairePoster: View {
     let w: CGFloat, h: CGFloat
@@ -802,7 +802,7 @@ private struct PegSolitairePoster: View {
     }
 }
 
-// MARK: - Water sort — pour the top colours until every tube runs clean.
+// MARK: - Water sort, pour the top colours until every tube runs clean.
 
 private struct WaterSortPoster: View {
     let w: CGFloat, h: CGFloat
@@ -867,7 +867,7 @@ private struct WaterSortPoster: View {
     }
 }
 
-// MARK: - Number Nests — arithmetic cages inside a Latin-square grid.
+// MARK: - Number Nests, arithmetic cages inside a Latin-square grid.
 
 private struct NumberNestsPoster: View {
     let w: CGFloat, h: CGFloat
@@ -938,7 +938,7 @@ private struct NumberNestsPoster: View {
     }
 }
 
-// MARK: - Mahjong — a small stack with a matched pair glowing gold.
+// MARK: - Mahjong, a small stack with a matched pair glowing gold.
 
 private struct MahjongPoster: View {
     let w: CGFloat, h: CGFloat
@@ -979,7 +979,7 @@ private struct MahjongPoster: View {
     }
 }
 
-// MARK: - Split — steer on the left, pick on the right, all at once.
+// MARK: - Split, steer on the left, pick on the right, all at once.
 
 private struct SplitPoster: View {
     let w: CGFloat, h: CGFloat
@@ -1039,7 +1039,7 @@ private struct SplitPoster: View {
     }
 }
 
-// MARK: - Block fit — a hand piece hovers over the almost-full bottom row.
+// MARK: - Block fit, a hand piece hovers over the almost-full bottom row.
 
 private struct BlockFitPoster: View {
     let w: CGFloat, h: CGFloat
@@ -1107,7 +1107,7 @@ private struct BlockFitPoster: View {
     }
 }
 
-// MARK: - Fuse — two 32s about to fuse under the charged result.
+// MARK: - Fuse, two 32s about to fuse under the charged result.
 
 private struct FusePoster: View {
     let w: CGFloat, h: CGFloat
@@ -1183,7 +1183,7 @@ private struct FusePosterTile: View {
     }
 }
 
-// MARK: - Snake — a green snake winds across the pitch toward one red apple.
+// MARK: - Snake, a green snake winds across the pitch toward one red apple.
 
 private struct SnakePoster: View {
     let w: CGFloat, h: CGFloat
@@ -1256,7 +1256,7 @@ private struct SnakePoster: View {
     }
 }
 
-// MARK: - Crossword — a mini grid mid-solve, one word inked in blue.
+// MARK: - Crossword, a mini grid mid-solve, one word inked in blue.
 
 private struct CrosswordPoster: View {
     let w: CGFloat, h: CGFloat
@@ -1301,7 +1301,7 @@ private struct CrosswordPoster: View {
     }
 }
 
-// MARK: - Tower — an isometric stack climbing the sky, one block sliding in.
+// MARK: - Tower, an isometric stack climbing the sky, one block sliding in.
 
 private struct TowerPoster: View {
     let w: CGFloat, h: CGFloat

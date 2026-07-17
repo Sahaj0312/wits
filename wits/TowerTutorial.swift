@@ -13,13 +13,13 @@ import SwiftUI
 
 enum TowerTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "tap anywhere to drop the sliding block — the overhang past the edge is sliced off") {
+        TutorialSlide(caption: "tap anywhere to drop the sliding block. the overhang past the edge is sliced off") {
             TowerDemo(page: .slice)
         },
         TutorialSlide(caption: "land dead-center to keep the block whole and grow a perfect streak") {
             TowerDemo(page: .perfect)
         },
-        TutorialSlide(caption: "every slice shrinks the block — miss the stack completely and the run ends") {
+        TutorialSlide(caption: "every slice shrinks the block. miss the stack completely and the run ends") {
             TowerDemo(page: .miss)
         },
     ]
@@ -33,7 +33,7 @@ private struct TowerDemo: View {
 
     /// Matches TowerEngine.layerHeight so slab proportions read like the game.
     private static let layerH = 0.28
-    /// Fixed start of the hue walk — the stratosphere's block pink.
+    /// Fixed start of the hue walk, the stratosphere's block pink.
     private static let baseHue = 0.945
 
     private var world: GameWorld { GameID.tower.world }
@@ -183,7 +183,7 @@ private struct TowerDemo: View {
                 drawFallingCut(drawBox, cx: shedCx, cz: top.cz, w: shedW, d: top.d,
                                age: age, vx: -0.30)
                 // The next block spawns at the kept size and slides the other
-                // axis — the loop goes on.
+                // axis, the loop goes on.
                 if age > 0.9 {
                     drawBox(cx: keptCx, cz: -1.05 + 0.7 * (age - 0.9),
                             w: overlap, d: top.d,
@@ -200,7 +200,7 @@ private struct TowerDemo: View {
         }
 
         if page == .perfect, dropped {
-            // Glint, expanding rings, and a rising PERFECT — the game's juice.
+            // Glint, expanding rings, and a rising PERFECT, the game's juice.
             if age < 0.22 {
                 fillQuad(topFaceQuad(cx: top.cx, cz: top.cz, w: top.w, d: top.d,
                                      y: Self.topY + h),
@@ -241,7 +241,7 @@ private struct TowerDemo: View {
     }
 
     /// A sliced-off piece: keeps a little slide velocity, falls with gravity,
-    /// fades out — same feel as the engine's cuts.
+    /// fades out, same feel as the engine's cuts.
     private func drawFallingCut(_ drawBox: (Double, Double, Double, Double, Double, Double, Int, Double) -> Void,
                                 cx: Double, cz: Double, w: Double, d: Double,
                                 age: Double, vx: Double) {

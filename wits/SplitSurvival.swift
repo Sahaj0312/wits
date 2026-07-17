@@ -2,9 +2,9 @@
 //  SplitSurvival.swift
 //  wits
 //
-//  "split" — a survival-only divided-attention game. The screen splits LEFT /
+//  "split", a survival-only divided-attention game. The screen splits LEFT /
 //  RIGHT: left thumb keeps a flappy-style flyer alive; right thumb works a
-//  go/no-go stream — tap the target, never the look-alike, don't let a target
+//  go/no-go stream, tap the target, never the look-alike, don't let a target
 //  slip by. One mistake of any kind ends the run. Levels are time-gated and
 //  grow longer + harder. This mode is standalone: it records its own best run,
 //  but it does not feed WPI, mastery, or adaptive difficulty.
@@ -41,7 +41,7 @@ final class SplitGame {
     let birdRy: CGFloat = 0.032        // collision radius, height units
     let pipeW: CGFloat = 0.085         // pipe width, width units
 
-    // Flight feel — CONSTANT across levels (only the course gets harder).
+    // Flight feel, CONSTANT across levels (only the course gets harder).
     let gravity: CGFloat = 2.2
     let flapV: CGFloat = -0.86
 
@@ -87,10 +87,10 @@ final class SplitGame {
     private var emojiInterval: Double { 2.9 - 0.13 * Double(k()) }    // 2.9 → 1.34 s
     private var emojiTTL: Double { 2.7 - 0.12 * Double(k()) }         // 2.7 → 1.26 s
     private var forbiddenProb: Double { 0.16 + 0.013 * Double(k()) }  // 0.16 → 0.32
-    /// Seconds to clear the current level — short early, growing each level.
+    /// Seconds to clear the current level, short early, growing each level.
     func timeForLevel(_ l: Int) -> Double { 12 + 3 * Double(l - 1) }
 
-    /// How far into the current level the run ended (0…1) — the secondary signal
+    /// How far into the current level the run ended (0…1), the secondary signal
     /// the domain score uses to break ties between equal levels reached.
     var depthIntoLevel: Double { min(1, levelElapsed / timeForLevel(level)) }
 
@@ -494,7 +494,7 @@ struct SplitSurvivalScreen: View {
         .task { await runCountdown() }
     }
 
-    /// 3…2…1…go — then launch. Pause freezes the count; a rerun (fresh model)
+    /// 3…2…1…go, then launch. Pause freezes the count; a rerun (fresh model)
     /// counts again, while re-appearing mid-run does not.
     private func runCountdown() async {
         guard !model.started, countdown == nil else { return }
@@ -549,7 +549,7 @@ struct SplitSurvivalScreen: View {
         endReason = model.deathReason
         newBest = currentProgressValue > comparisonBestValue
         GameFeel.shared.play(newBest ? .newBest : .gameOver)
-        // A continue offer defers recording — the run isn't over until the
+        // A continue offer defers recording, the run isn't over until the
         // player passes on it. No offer → record right away, as before.
         canContinue = !usedContinue
         if canContinue {
@@ -591,7 +591,7 @@ struct SplitSurvivalScreen: View {
         adBusy = true
         AdManager.shared.showRewarded { earned in
             adBusy = false
-            guard earned else { return }   // closed early — offer stays on the table
+            guard earned else { return }   // closed early, offer stays on the table
             usedContinue = true
             canContinue = false
             pauseController.reset()

@@ -31,7 +31,7 @@ enum StreakEngine {
             } else if gap == 1 {
                 next.current += 1                          // consecutive day
             } else {
-                next.current = 1                           // missed a day — start fresh
+                next.current = 1                           // missed a day, start fresh
             }
         } else {
             next.current = 1                               // first ever session
@@ -49,9 +49,9 @@ enum StreakEngine {
         let day = calendar.startOfDay(for: today)
         let lastDay = calendar.startOfDay(for: last)
         let gap = calendar.dateComponents([.day], from: lastDay, to: day).day ?? 0
-        guard gap > 1 else { return s }                    // active today or yesterday — safe
+        guard gap > 1 else { return s }                    // active today or yesterday, safe
         var next = s
-        next.current = 0                                   // missed a day — streak broke
+        next.current = 0                                   // missed a day, streak broke
         return next
     }
 }

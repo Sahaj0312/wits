@@ -4,7 +4,7 @@
 //
 //  Animated how-to-play demos for Crowd Control on a mini six-dot board: two
 //  dots glow and pulse, the glow drops and the whole crowd drifts while every
-//  dot looks identical, then the freeze — the hand picks the tracked dots for
+//  dot looks identical, then the freeze, the hand picks the tracked dots for
 //  points, and a dropped target burns a heart. Board, dots, glow treatment,
 //  and the reveal rings all mirror the real game's rendering.
 //
@@ -16,10 +16,10 @@ enum CrowdControlTutorial {
         TutorialSlide(caption: "memorize the glowing dots, then track them while every dot moves") {
             CrowdControlDemo(page: .track)
         },
-        TutorialSlide(caption: "when they freeze, tap the ones you were tracking — each catch is a point") {
+        TutorialSlide(caption: "when they freeze, tap the ones you were tracking. each catch is a point") {
             CrowdControlDemo(page: .pick)
         },
-        TutorialSlide(caption: "every target you lose costs a heart — lose all three and the run ends") {
+        TutorialSlide(caption: "every target you lose costs a heart. lose all three and the run ends") {
             CrowdControlDemo(page: .hearts)
         },
     ]

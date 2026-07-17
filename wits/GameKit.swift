@@ -146,7 +146,7 @@ extension GameID {
         switch self {
         case .arrowStorm: "answer only to the middle arrow."
         case .crowdControl: "track the dots through the crowd."
-        case .echoGrid: "play the path back — backwards."
+        case .echoGrid: "play the path back in reverse."
         case .colorClash: "tap the colour, not the word."
         case .tileShift: "the rule keeps changing."
         case .lastSeen: "never tap the same one twice."
@@ -202,31 +202,31 @@ extension GameID {
         }
     }
 
-    /// First card paragraph — what you do.
+    /// First card paragraph, what you do.
     var cardHow: String {
         switch self {
-        case .arrowStorm: "spot which way the middle arrow points while the crowd around it tries to pull your answer the other way. the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
-        case .crowdControl: "keep your eyes on a few glowing dots as they scatter into an identical crowd, then pick them back out. every round the crowd grows and speeds up, and you have three hearts — every target you lose costs one."
+        case .arrowStorm: "spot which way the middle arrow points while the crowd around it tries to pull your answer the other way. the deadline tightens as you score, and you have three hearts. a wrong tap or a timeout costs one."
+        case .crowdControl: "keep your eyes on a few glowing dots as they scatter into an identical crowd, then pick them back out. every round the crowd grows and speeds up, and you have three hearts. every target you lose costs one."
         case .echoGrid: "watch a path of tiles light up, then tap them back in reverse order."
-        case .colorClash: "tap the colour a word is printed in, not the word it spells. the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
-        case .tileShift: "follow the rule on screen — sometimes match by colour, sometimes by shape. it keeps flipping, the deadline tightens as you score, and you have three hearts — a wrong tap or a timeout costs one."
-        case .lastSeen: "tap each object once — never tap one you've already chosen. the board reshuffles every pick and grows as you clear it, and you have three hearts — a repeat costs one."
-        case .slidePuzzle: "the numbered tiles are scrambled around one empty square. slide them through the gap until they read in order — in as few moves as you can."
-        case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit — in as few moves as you can."
-        case .pegSolitaire: "every jump leaps one peg over a neighbour into an empty hole, and the jumped peg is removed. keep jumping until a single peg remains — on the marked hole at higher levels."
-        case .waterSort: "the tubes come scrambled. pour the top colour onto a matching colour or into an empty tube until every tube holds a single colour — in as few pours as you can."
+        case .colorClash: "tap the colour a word is printed in, not the word it spells. the deadline tightens as you score, and you have three hearts. a wrong tap or a timeout costs one."
+        case .tileShift: "follow the rule on screen. sometimes match by colour, sometimes by shape. it keeps flipping, the deadline tightens as you score, and you have three hearts. a wrong tap or a timeout costs one."
+        case .lastSeen: "tap each object once, and never tap one you've already chosen. the board reshuffles every pick and grows as you clear it. you have three hearts, and a repeat costs one."
+        case .slidePuzzle: "the numbered tiles are scrambled around one empty square. slide them through the gap until they read in order using as few moves as you can."
+        case .blockEscape: "mixed-size blocks jam a small tray. slide them along rows and columns to clear a path, then walk the big block out the bottom exit using as few moves as you can."
+        case .pegSolitaire: "every jump leaps one peg over a neighbour into an empty hole, and the jumped peg is removed. keep jumping until a single peg remains. at higher levels, it must finish on the marked hole."
+        case .waterSort: "the tubes come scrambled. pour the top colour onto a matching colour or into an empty tube until every tube holds a single colour. use as few pours as you can."
         case .numberNests: "fill the grid with 1 through its size without repeating a number in any row or column. inside each outlined nest, the numbers must combine to its target using the shown operation."
-        case .mahjong: "tap free tiles to lift them into the rack — the moment a twin lands, the pair vanishes. the rack holds only a few, so every pick is a bet on which pairs you can actually reach before the space runs out."
-        case .crossword: "fill the mini grid so every across and down answer matches its clue. tap a square to aim, tap it again to flip direction, and type — each letter you land helps the crossing word too."
-        case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run — see how many levels you clear."
-        case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate, but the next hand is always shown — the run ends the moment nothing in your hand fits."
-        case .fuse: "every swipe slides the whole board. matching cells fuse and double, and each fusion pays its new value. keep space open and build the biggest cell you can — the run ends when no swipe can move anything."
-        case .snake: "swipe to steer a snake that never stops. every apple adds a segment and quickens the pace — the run ends the moment you clip a wall or your own body."
-        case .tower: "a block glides across the top of the tower — tap to drop it. whatever hangs over the edge is sliced away, so every miss leaves less to land on. the run ends when a block misses the stack completely."
+        case .mahjong: "tap free tiles to lift them into the rack. the moment a twin lands, the pair vanishes. the rack holds only a few, so every pick is a bet on which pairs you can actually reach before the space runs out."
+        case .crossword: "fill the mini grid so every across and down answer matches its clue. tap a square to aim, tap it again to flip direction, and type. each letter you land helps the crossing word too."
+        case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run, so see how many levels you can clear."
+        case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate, but the next hand is always shown. the run ends the moment nothing in your hand fits."
+        case .fuse: "every swipe slides the whole board. matching cells fuse and double, and each fusion pays its new value. keep space open and build the biggest cell you can. the run ends when no swipe can move anything."
+        case .snake: "swipe to steer a snake that never stops. every apple adds a segment and quickens the pace. the run ends the moment you clip a wall or your own body."
+        case .tower: "a block glides across the top of the tower. tap to drop it. whatever hangs over the edge is sliced away, so every miss leaves less to land on. the run ends when a block misses the stack completely."
         }
     }
 
-    /// Second card paragraph — what the skill is.
+    /// Second card paragraph, what the skill is.
     var cardAbout: String {
         switch self {
         case .arrowStorm: "selective attention is focusing on what matters while ignoring everything competing for your eyes."
@@ -235,18 +235,18 @@ extension GameID {
         case .lastSeen: "short-term memory is keeping recent items in mind so you don't repeat yourself."
         case .colorClash: "response inhibition is overriding the automatic answer to give the correct one."
         case .tileShift: "task switching is adapting quickly when the goal keeps changing underneath you."
-        case .slidePuzzle: "spatial planning is seeing moves ahead — how each slide reshapes the board and which tile it frees up next."
-        case .blockEscape: "forward planning is simulating moves in your head — seeing how each slide opens or closes the big block's path several steps ahead."
-        case .pegSolitaire: "strategic planning is ordering moves so nothing gets stranded — every jump has to leave the rest of the board still clearable."
-        case .waterSort: "sequencing is ordering steps under constraints — every pour opens some moves and blocks others, so the whole plan matters before the first tube tips."
-        case .numberNests: "arithmetic deduction is using totals, products and exclusions together — every number placed narrows both its nest and the lines crossing it."
-        case .mahjong: "visual scanning is searching a busy field quickly and precisely — weighing which tiles to bank when every rack slot you spend narrows what you can chase next."
-        case .crossword: "word retrieval is pulling vocabulary from memory on demand — the crossings hand you letters, and your lexicon has to do the rest."
-        case .split: "divided attention is doing two demanding things at once — steering one hand while deciding with the other — without dropping either."
-        case .blockFit: "spatial packing is planning placements ahead — keeping the board open so future pieces still have somewhere to live."
-        case .fuse: "lookahead planning is thinking several swipes ahead — where each merge leaves the board decides whether the next one is even possible."
-        case .snake: "sustained attention is holding steady focus as pressure builds — the longer the run, the less room there is for a single lapse."
-        case .tower: "response timing is committing at exactly the right instant — anticipation and rhythm under pressure, with the target shrinking after every slip."
+        case .slidePuzzle: "spatial planning is seeing moves ahead, including how each slide reshapes the board and which tile it frees up next."
+        case .blockEscape: "forward planning is simulating moves in your head to see how each slide opens or closes the big block's path several steps ahead."
+        case .pegSolitaire: "strategic planning is ordering moves so nothing gets stranded. every jump has to leave the rest of the board still clearable."
+        case .waterSort: "sequencing is ordering steps under constraints. every pour opens some moves and blocks others, so the whole plan matters before the first tube tips."
+        case .numberNests: "arithmetic deduction is using totals, products and exclusions together. every number placed narrows both its nest and the lines crossing it."
+        case .mahjong: "visual scanning is searching a busy field quickly and precisely while weighing which tiles to bank as every rack slot narrows what you can chase next."
+        case .crossword: "word retrieval is pulling vocabulary from memory on demand. the crossings hand you letters, and your lexicon has to do the rest."
+        case .split: "divided attention is doing two demanding things at once, steering with one hand while deciding with the other without dropping either."
+        case .blockFit: "spatial packing is planning placements ahead and keeping the board open so future pieces still have somewhere to live."
+        case .fuse: "lookahead planning is thinking several swipes ahead. where each merge leaves the board decides whether the next one is even possible."
+        case .snake: "sustained attention is holding steady focus as pressure builds. the longer the run, the less room there is for a single lapse."
+        case .tower: "response timing is committing at exactly the right instant through anticipation and rhythm under pressure, with the target shrinking after every slip."
         }
     }
 
@@ -452,7 +452,7 @@ struct GameResult: Codable, Equatable {
     let game: GameID
     var score: Int
     var baseScore: Int? = nil
-    var accuracy: Double            // 0...1 — the mastery adjustment signal
+    var accuracy: Double            // 0...1, the mastery adjustment signal
     var medianRTms: Int? = nil
     var threshold: Double? = nil    // converged difficulty parameter this run
     var trials: Int = 0
@@ -589,7 +589,7 @@ private struct GamePauseSpan {
 final class GamePauseController {
     var isPaused = false
     /// 3…2…1 shown over the still-frozen game before a resume lands (nil when
-    /// not counting). The game stays paused — clocks and input included —
+    /// not counting). The game stays paused, clocks and input included ,
     /// until the count finishes.
     var resumeCountdown: Int?
     @ObservationIgnored private var pauseStartedAt: Date?

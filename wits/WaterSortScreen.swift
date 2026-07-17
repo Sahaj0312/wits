@@ -78,7 +78,7 @@ struct WaterSortScreen: View {
                                                                      legacyDifficulty: cfg.difficulty.level)
     }
 
-    /// Time budget prices in planning, not just execution — deep thought on a
+    /// Time budget prices in planning, not just execution, deep thought on a
     /// hard board shouldn't tank the grade.
     private var parSeconds: Double { Double(par) * 5.0 + 30 }
 
@@ -216,7 +216,7 @@ struct WaterSortScreen: View {
             Text("this position is stuck")
                 .font(.system(size: 20, weight: .heavy, design: .rounded))
                 .foregroundStyle(.white)
-            Text("the remaining pours only loop — rewind a pour or start this board over")
+            Text("the remaining pours only loop. rewind a pour or start this board over")
                 .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.75))
                 .multilineTextAlignment(.center)
@@ -317,7 +317,7 @@ struct WaterSortScreen: View {
         let unitH = (tubeH - 6) / CGFloat(capacity)
 
         // Park the mouth above the destination's opening, shifted so the low
-        // lip — where the stream leaves — sits over the destination's centre.
+        // lip, where the stream leaves, sits over the destination's centre.
         let midTilt = (p.baseAngle + p.extraAngle / 2) * .pi / 180
         let mouthStart = CGPoint(x: slot.midX, y: slot.minY)
         let mouthTarget = CGPoint(x: dest.midX - p.side * tubeW / 2 * cos(midTilt),
@@ -488,7 +488,7 @@ struct WaterSortScreen: View {
 
     /// The tilted, draining source tube. The whole view is rotated by the
     /// caller, so liquid surfaces are drawn with the opposite slope to stay
-    /// level with the world — the signature water sort look.
+    /// level with the world, the signature water sort look.
     private func pouringTubeView(_ tube: WaterSortEngine.Tube, drained: Double, angle: Double,
                                  width: CGFloat, height: CGFloat) -> some View {
         let shape = UnevenRoundedRectangle(topLeadingRadius: width * 0.16,
@@ -655,7 +655,7 @@ struct WaterSortScreen: View {
         return false
     }
 
-    /// Rewinds one pour. The spent move is not refunded — undo is an escape
+    /// Rewinds one pour. The spent move is not refunded, undo is an escape
     /// hatch, not a free trial-and-error loop toward par. Consuming the sole
     /// snapshot prevents another rewind until the player makes a new pour.
     private func undo() {

@@ -5,8 +5,8 @@
 //  Animated how-to-play demos for Peg Solitaire on the mini diamond board:
 //  tap a peg and the empty hole two spaces away to jump, the peg leapt over
 //  pops off the board, and chaining jumps clears down to a single peg.
-//  Rendering mirrors the real game — felt-green surface, cream pegs, the red
-//  selection tint and dashed landing rings — so nothing needs relearning.
+//  Rendering mirrors the real game, felt-green surface, cream pegs, the red
+//  selection tint and dashed landing rings, so nothing needs relearning.
 //
 
 import SwiftUI
@@ -16,7 +16,7 @@ enum PegSolitaireTutorial {
         TutorialSlide(caption: "tap a peg, then tap the empty hole two spaces away to jump it") {
             PegSolitaireDemo(page: .jump)
         },
-        TutorialSlide(caption: "the peg you jump over is removed — land and jump again to keep clearing") {
+        TutorialSlide(caption: "the peg you jump over is removed. land and jump again to keep clearing") {
             PegSolitaireDemo(page: .chain)
         },
         TutorialSlide(caption: "clear the board down to a single peg") {
@@ -31,7 +31,7 @@ private struct PegSolitaireDemo: View {
 
     private static let cols = 5
     private static let jumpTime = 0.35
-    /// diamond13 — the shape the first levels use.
+    /// diamond13, the shape the first levels use.
     private static let holes: [Int] = [2, 6, 7, 8, 10, 11, 12, 13, 14, 16, 17, 18, 22]
 
     private var world: GameWorld { GameID.pegSolitaire.world }
@@ -87,7 +87,7 @@ private struct PegSolitaireDemo: View {
                 taps: [(1.0, 10), (1.9, 12), (2.9, 12), (3.8, 14)])
         case .clear:
             // Down the spine: 2 over 7 into the centre, then over 17 to the
-            // bottom point — three pegs become one.
+            // bottom point, three pegs become one.
             return Script(
                 duration: 6.0,
                 pegs: [2, 7, 17],

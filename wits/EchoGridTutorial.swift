@@ -4,7 +4,7 @@
 //
 //  Animated how-to-play demos for Echo Grid on a mini 3×3 board: tiles glow
 //  violet one at a time, the board goes dark, and the hand plays the path
-//  back in reverse — mint taps landing 3 → 2 → 1. The third slide shows the
+//  back in reverse, mint taps landing 3 → 2 → 1. The third slide shows the
 //  trap: starting from the first tile fails the round.
 //
 
@@ -15,10 +15,10 @@ enum EchoGridTutorial {
         TutorialSlide(caption: "watch the tiles light up in order") {
             EchoGridDemo(page: .watch)
         },
-        TutorialSlide(caption: "when the board goes dark, tap them backwards — last tile first") {
+        TutorialSlide(caption: "when the board goes dark, tap them backwards, starting with the last tile") {
             EchoGridDemo(page: .echo)
         },
-        TutorialSlide(caption: "replaying it forwards fails the round — clear enough rounds to pass") {
+        TutorialSlide(caption: "replaying it forwards fails the round. clear enough rounds to pass") {
             EchoGridDemo(page: .wrongWay)
         },
     ]
@@ -157,7 +157,7 @@ private struct EchoGridDemo: View {
             case .watch:
                 let start = b.show[step]
                 if t >= start && t < start + b.showLen {
-                    // actively lit — bright violet with a glow, like the real game
+                    // actively lit, bright violet with a glow, like the real game
                     fill = world.accent; glow = 1; scale = 1.14
                     number = ("\(step + 1)", world.background)
                 } else if t >= start + b.showLen {
@@ -168,7 +168,7 @@ private struct EchoGridDemo: View {
                 }
             case .echo, .wrongWay:
                 if let i = b.tappedCells.firstIndex(of: cell), t >= b.taps[i] {
-                    // tap landed — mint (or danger on the forwards mistake),
+                    // tap landed, mint (or danger on the forwards mistake),
                     // revealing the tile's original order number
                     let pop = DemoEase.ramp(t, b.taps[i], b.taps[i] + 0.12)
                     scale = 1 + 0.14 * CGFloat(pop)

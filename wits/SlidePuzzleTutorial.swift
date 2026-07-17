@@ -4,7 +4,7 @@
 //
 //  Animated how-to-play demos for Slide Puzzle on a mini 3×3 board: tap a tile
 //  in line with the gap to slide it, one tap moves a whole line, and finishing
-//  the ordering solves the board. Tiles render like the real game — raised
+//  the ordering solves the board. Tiles render like the real game, raised
 //  navy squares that turn orange once they sit in their solved spot.
 //
 
@@ -18,7 +18,7 @@ enum SlidePuzzleTutorial {
         TutorialSlide(caption: "one tap slides every tile between it and the gap") {
             SlidePuzzleDemo(page: .lineSlide)
         },
-        TutorialSlide(caption: "put the tiles back in order — fewer moves and a faster solve score higher") {
+        TutorialSlide(caption: "put the tiles back in order. fewer moves and a faster solve score higher") {
             SlidePuzzleDemo(page: .solve)
         },
     ]
@@ -60,7 +60,7 @@ private struct SlidePuzzleDemo: View {
     private var script: Script {
         switch page {
         case .slide:
-            // r0: 1 2 3 / r1: 4 · 5 / r2: 7 8 6 — tap 8 (slides up a column),
+            // r0: 1 2 3 / r1: 4 · 5 / r2: 7 8 6, tap 8 (slides up a column),
             // then tap 6 (slides along a row).
             return Script(
                 duration: 4.4,
@@ -69,7 +69,7 @@ private struct SlidePuzzleDemo: View {
                         Move(value: 6, from: 8, to: 7, start: 2.7)],
                 taps: [(1.1, 7), (2.7, 8)])
         case .lineSlide:
-            // r0: · 2 1 — tapping 1 pushes both tiles left in one move.
+            // r0: · 2 1, tapping 1 pushes both tiles left in one move.
             return Script(
                 duration: 4.2,
                 base: [2: 1, 1: 2, 3: 3, 5: 4, 4: 5, 6: 6, 7: 7, 8: 8],

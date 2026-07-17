@@ -4,7 +4,7 @@
 //
 //  The crossword's clue bank: wits-original clues over common English words,
 //  written for this app (no licensed puzzle data). Each line is
-//  ANSWER|tier|clue — tier 1 is everyday, 2 is moderate, 3 is tricky — and
+//  ANSWER|tier|clue, tier 1 is everyday, 2 is moderate, 3 is tricky, and
 //  the generator draws on it to fill fresh mini grids, so the same answer can
 //  reappear but never the same puzzle.
 //

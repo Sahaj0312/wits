@@ -5,7 +5,7 @@
 //  Animated how-to-play demos for Water Sort on a mini three-tube board: tap
 //  a tube to lift it, tap another and it flies over, tilts, and streams its
 //  top colour across; a mismatched target refuses the pour; the last pour
-//  sorts the board. Tubes render like the real game — round-bottomed glass,
+//  sorts the board. Tubes render like the real game, round-bottomed glass,
 //  stacked liquid units with a surface sheen, and the signature tilted pour
 //  whose liquid stays level with the world.
 //
@@ -171,7 +171,7 @@ private struct WaterSortDemo: View {
         let baseAngle = 55.0
         let extraAngle = 14.0
 
-        // Park the low lip — where the stream leaves — over the destination.
+        // Park the low lip, where the stream leaves, over the destination.
         let midTilt = (baseAngle + extraAngle / 2) * .pi / 180
         let start = CGPoint(x: src.midX, y: src.minY)
         let target = CGPoint(x: dst.midX - side * geo.tubeW / 2 * cos(midTilt),
@@ -353,7 +353,7 @@ private struct WaterSortDemo: View {
 
     /// The tilted, draining source tube. The layer is rotated around the
     /// mouth, so liquid surfaces are drawn with the opposite slope to stay
-    /// level with the world — the signature water sort look.
+    /// level with the world, the signature water sort look.
     private func drawPouringTube(_ context: GraphicsContext, colors: [Int], drained: Double,
                                  mouth: CGPoint, angleDeg: Double, geo: Geo, capacity: Int) {
         let w = geo.tubeW
@@ -405,7 +405,7 @@ private struct WaterSortDemo: View {
 
     // MARK: Feedback
 
-    /// A crossed-out ring above the mismatched tube — the pour is refused.
+    /// A crossed-out ring above the mismatched tube, the pour is refused.
     private func drawRefusal(_ context: GraphicsContext, over rect: CGRect,
                              t: Double, start: Double) {
         let alpha = DemoEase.ramp(t, start, start + 0.15)

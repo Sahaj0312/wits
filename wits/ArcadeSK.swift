@@ -140,14 +140,14 @@ final class ArcadeSKScene: SKScene {
     /// (GamePauseButtonLayer: a 44pt button ending at x ≈ 58). Start the HUD
     /// row in that button's vertical strip and to its right so the score
     /// never sits under it. The SKView reports safe-area insets of 0 until it
-    /// joins a window — after the scene is already presented — so the layout
+    /// joins a window, after the scene is already presented, so the layout
     /// re-runs from update() whenever the reported inset changes.
     private var hudSafeTop: CGFloat = -1
 
     private func layoutHUD() {
         // The SKView itself always reports zero insets (SwiftUI's SpriteView +
         // ignoresSafeArea consumes them), so read the window's. It can be nil
-        // until the view attaches — layoutHUDIfNeeded retries from update().
+        // until the view attaches, layoutHUDIfNeeded retries from update().
         hudSafeTop = view?.window?.safeAreaInsets.top ?? -1
         let topInset = max(20, hudSafeTop >= 0 ? hudSafeTop : 59) + 10
         scoreLabel.position = CGPoint(x: 72, y: size.height - topInset)

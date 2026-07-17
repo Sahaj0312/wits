@@ -4,7 +4,7 @@
 //
 //  Fuse: an endless sliding-merge survival. Every swipe slides the whole 4×4
 //  board; matching cells fuse and double, and each fusion pays its new value.
-//  No clock — every swipe is a lookahead-planning decision and a jammed board
+//  No clock, every swipe is a lookahead-planning decision and a jammed board
 //  dies suddenly.
 //
 //  The engine is pure logic and deterministic under a seed: spawn cells and

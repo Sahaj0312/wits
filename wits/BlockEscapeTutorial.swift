@@ -5,16 +5,16 @@
 //  Animated how-to-play demos for Block Escape on a mini 4×4 tray: a hand
 //  drags a block sideways into a neighbour (blocked, so it shudders), slides
 //  it along its free axis, clears the corridor under the big red block, and
-//  walks the hero out the bottom exit. Rendering mirrors the real tray —
+//  walks the hero out the bottom exit. Rendering mirrors the real tray ,
 //  same warm surface, tan blocks, red hero with its down arrow, and the
-//  accent exit notch — so nothing needs relearning in play.
+//  accent exit notch, so nothing needs relearning in play.
 //
 
 import SwiftUI
 
 enum BlockEscapeTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "drag blocks along their row or column — they can't jump or turn") {
+        TutorialSlide(caption: "drag blocks along their row or column. they can't jump or turn") {
             BlockEscapeDemo(page: .dragAxis)
         },
         TutorialSlide(caption: "slide blocks aside to clear a path for the big red block") {

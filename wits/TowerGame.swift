@@ -2,11 +2,11 @@
 //  TowerGame.swift
 //  wits
 //
-//  Tower: the classic tap-timing stacker. No levels — three speed modes
+//  Tower: the classic tap-timing stacker. No levels, three speed modes
 //  (easy / medium / hard) each keep their own best score, and one all-time
 //  best stands across every mode. A block glides across the top of the tower
 //  on alternating axes; a tap drops it, the overhang is sliced away, and a
-//  perfect drop keeps the block whole — chain perfects and the block slowly
+//  perfect drop keeps the block whole, chain perfects and the block slowly
 //  grows back. The run ends when a block misses the stack completely.
 //
 //  Rendering is a single TimelineView-driven Canvas painting an isometric
@@ -168,7 +168,7 @@ final class TowerEngine {
 
         if abs(movingPos - topCenter) <= tolerance {
             // Perfect: snap to center at the block's own (possibly regrown)
-            // size — no slice, ripple out, streak climbs.
+            // size, no slice, ripple out, streak climbs.
             streak += 1
             perfects += 1
             bestStreak = max(bestStreak, streak)

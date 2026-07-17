@@ -3,7 +3,7 @@
 //  wits
 //
 //  The contract a concrete arcade game implements. The ArcadeGameView wrapper
-//  owns the loop, HUD, scoring, cfg.report plumbing and end conditions — a game
+//  owns the loop, HUD, scoring, cfg.report plumbing and end conditions, a game
 //  only describes how to spawn, draw, escalate, and resolve a player action into
 //  a hit / miss / near-miss. Keeps every game ~100 lines.
 //

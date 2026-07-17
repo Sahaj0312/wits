@@ -3,7 +3,7 @@
 //  wits
 //
 //  Animated how-to-play demos for Block Fit: a hand drags pieces from a mini
-//  tray onto a 6×6 board and the core beats play out on loop — place, clear a
+//  tray onto a 6×6 board and the core beats play out on loop, place, clear a
 //  line, clear two lines at once, and the no-moves ending. Rendering mirrors
 //  the real game (same palette, ghost preview, telegraphed clears) so nothing
 //  in the tutorial needs relearning in play.
@@ -22,7 +22,7 @@ enum BlockFitTutorial {
         TutorialSlide(caption: "clear more than one line in a single move for bonus points") {
             BlockFitDemo(page: .doubleClear)
         },
-        TutorialSlide(caption: "pieces never rotate — the run ends when nothing in the tray fits") {
+        TutorialSlide(caption: "pieces never rotate. the run ends when nothing in the tray fits") {
             BlockFitDemo(page: .gameOver)
         },
     ]

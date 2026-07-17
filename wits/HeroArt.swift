@@ -139,14 +139,14 @@ enum HeroPattern {
             } else if litPath || i != 8 {
                 ctx.stroke(p, with: i % 2 == 0 ? ink : soft, lineWidth: 2)
             } else {
-                // ruleFinder: the missing cell — dashed outline
+                // ruleFinder: the missing cell, dashed outline
                 ctx.stroke(p, with: glow, style: StrokeStyle(lineWidth: 2, dash: [6, 6]))
             }
         }
     }
 
 
-    /// Interlocking rings — color vs word tension.
+    /// Interlocking rings, color vs word tension.
     private static func rings(_ ctx: inout GraphicsContext, _ size: CGSize,
                               ink: GraphicsContext.Shading, soft: GraphicsContext.Shading,
                               glow: GraphicsContext.Shading) {

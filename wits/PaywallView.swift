@@ -153,7 +153,7 @@ struct PaywallView: View {
                 symbol: "play.fill",
                 tint: .witsAccent,
                 title: Text("\(Text("KEEP").foregroundColor(.witsAccent)) \(Text("OPTIONAL ADS").foregroundColor(.white))\n\(Text("FOR REWARDS").foregroundColor(.white))"),
-                detail: "extra life or continue — only when you choose.",
+                detail: "extra life or continue, only when you choose.",
                 height: layout.secondFeatureHeight,
                 layout: layout
             )

@@ -2,12 +2,12 @@
 //  ArrowStormGame.swift
 //  wits
 //
-//  Arrow storm (Eriksen flanker task — interference control), played as an
+//  Arrow storm (Eriksen flanker task, interference control), played as an
 //  endless run. Five arrows flash; only the middle one matters and the
 //  flankers usually disagree. Pick a speed mode, then answer trial after
 //  trial against a deadline that tightens as you score. Three hearts: a
 //  wrong tap or a timeout costs one. Out of hearts, a rewarded ad buys one
-//  last life — the hearts stay grey, and the next slip ends the run for good.
+//  last life, the hearts stay grey, and the next slip ends the run for good.
 //
 
 import SwiftUI
@@ -331,7 +331,7 @@ struct ArrowStormScreen: View {
             newAllTimeBest = true
         }
         sessionBest = max(sessionBest, score)
-        // A continue offer defers recording — the run isn't over until the
+        // A continue offer defers recording, the run isn't over until the
         // player passes on it. No offer → record right away.
         canContinue = !usedContinue
         runRecorded = false
@@ -366,7 +366,7 @@ struct ArrowStormScreen: View {
         adBusy = true
         AdManager.shared.showRewarded { earned in
             adBusy = false
-            guard earned else { return }   // closed early — offer stays on the table
+            guard earned else { return }   // closed early, offer stays on the table
             usedContinue = true
             canContinue = false
             feedback = nil
@@ -374,7 +374,7 @@ struct ArrowStormScreen: View {
             pauseController.reset()
             nextTrial()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
-            // Count the player back in — the trial clock stays frozen until
+            // Count the player back in, the trial clock stays frozen until
             // the 3…2…1 finishes.
             pauseController.pause()
             pauseController.beginResumeCountdown()

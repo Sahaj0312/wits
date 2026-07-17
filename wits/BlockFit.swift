@@ -4,7 +4,7 @@
 //
 //  Block Fit: an endless block-packing survival. Three pieces at a time go
 //  onto an 8×8 board; full rows and columns clear; the run ends the moment
-//  nothing in the hand fits. No rotations, no clock — every placement is a
+//  nothing in the hand fits. No rotations, no clock, every placement is a
 //  small spatial-planning decision and runs die suddenly, which is the hook.
 //
 //  The engine is pure logic and deterministic under a seed: the piece stream
@@ -182,7 +182,7 @@ final class BlockFitGame {
         hand.contains { $0.map(fitsSomewhere) ?? false }
     }
 
-    /// Which rows/columns a hypothetical placement would complete — the view
+    /// Which rows/columns a hypothetical placement would complete, the view
     /// tints them in the ghost preview so clears feel telegraphed, not lucky.
     func linesCompleted(byPlacing piece: BlockPiece, atRow r: Int, col c: Int) -> (rows: [Int], cols: [Int]) {
         var filled = Set<Int>()

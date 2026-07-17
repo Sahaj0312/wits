@@ -4,14 +4,14 @@
 //
 //  The playable mahjong screen, Vita-style rack mechanic: tap any free tile
 //  to lift it into the rack at the top; the moment its twin lands there the
-//  pair flashes and clears. The rack holds only a few tiles — fill it with
+//  pair flashes and clears. The rack holds only a few tiles, fill it with
 //  unmatched singles and the run is out of space. Strategy is deciding which
 //  singles are worth banking and which pairs are actually reachable.
 //
 //  Every deal is reverse-play generated (Mahjong.swift) so a full clear is
 //  always reachable, and undo rewinds one pick at a time. Tile faces are
-//  drawn in SwiftUI — original renditions of the traditional public-domain
-//  iconography — so the game reads instantly as mahjong without image assets.
+//  drawn in SwiftUI, original renditions of the traditional public-domain
+//  iconography, so the game reads instantly as mahjong without image assets.
 //
 
 import SwiftUI
@@ -241,7 +241,7 @@ struct MahjongScreen: View {
                 return a.slot.x < b.slot.x
             }
         let present = boardIDs
-        // Training wheels: only the first band spotlights what's playable —
+        // Training wheels: only the first band spotlights what's playable ,
         // after that, reading the stack (and peeking under it) is the skill.
         let covered = mapLevel <= 4 ? coveredIDs(tiles, present: present) : []
 
@@ -277,7 +277,7 @@ struct MahjongScreen: View {
     }
 
     /// Slide a tile aside to inspect the layers beneath it; on release it
-    /// springs back. Pure reconnaissance — the engine never hears about it.
+    /// springs back. Pure reconnaissance, the engine never hears about it.
     private func peekGesture(_ tile: MahjongTile) -> some Gesture {
         DragGesture(minimumDistance: 12)
             .onChanged { value in
@@ -298,7 +298,7 @@ struct MahjongScreen: View {
             }
     }
 
-    /// Tiles with anything resting on them render dimmed — the depth cue that
+    /// Tiles with anything resting on them render dimmed, the depth cue that
     /// makes free tiles pop (side-blocking stays for the player to read).
     private func coveredIDs(_ tiles: [MahjongTile], present: Set<Int>) -> Set<Int> {
         var covered: Set<Int> = []
@@ -329,7 +329,7 @@ struct MahjongScreen: View {
 
         guard MahjongEngine.isFree(tile.id, slots: tiles.map(\.slot), present: present) else {
             blockedTaps += 1
-            hint = "that tile is blocked — it needs an open side and nothing on top"
+            hint = "that tile is blocked. it needs an open side and nothing on top"
             withAnimation(.linear(duration: 0.34)) {
                 shakes[tile.id, default: 0] += 1
             }
@@ -389,7 +389,7 @@ struct MahjongScreen: View {
         }
     }
 
-    /// Rewinds ONE move — the last one, once. A lone pick returns to the
+    /// Rewinds ONE move, the last one, once. A lone pick returns to the
     /// board; undoing a match restores the partner to the rack and the pick
     /// to the board. Making another move re-arms the button.
     private func undo() {
@@ -454,7 +454,7 @@ struct MahjongScreen: View {
         let pairCount = Double(max(1, pairs))
         let clearFraction = Double(clearedIDs.count) / Double(max(1, tiles?.count ?? 1))
         // Undos are the real mistakes (a pick that trapped the rack); taps on
-        // blocked tiles cost a little — reading what's free is the skill.
+        // blocked tiles cost a little, reading what's free is the skill.
         let cleanliness = min(1, pairCount / (pairCount + Double(undos) + Double(blockedTaps) * 0.25))
         let timeEfficiency = min(1, parSeconds / seconds)
         // Clearing earns the floor and clean play dominates the rest; a
@@ -488,7 +488,7 @@ struct MahjongScreen: View {
 
     private func showHelp() {
         GameFeel.shared.uiTap()
-        hint = "free tiles have an open side and nothing on top — bank them, twins pair off. drag any tile aside to peek underneath"
+        hint = "free tiles have an open side and nothing on top. bank them and twins pair off. drag any tile aside to peek underneath"
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
             if !finished {
                 hint = ""
@@ -521,7 +521,7 @@ private struct TileShake: GeometryEffect {
 // MARK: - Tile
 
 /// One drawn tile: ivory face over the classic jade-green side, dimmed when
-/// something rests on it. Purely visual — freeness and matching live in the
+/// something rests on it. Purely visual, freeness and matching live in the
 /// engine.
 struct MahjongTileView: View {
     let face: MahjongFace

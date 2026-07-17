@@ -4,7 +4,7 @@
 //
 //  Animated how-to-play demos for Fuse: a hand swipes across the 4×4 board,
 //  every cell slides to the wall, and matching numbers fuse and double. Three
-//  beats — the swipe itself, fusions paying points toward a big glowing cell,
+//  beats, the swipe itself, fusions paying points toward a big glowing cell,
 //  and the jammed-board ending. Rendering mirrors the real board (same
 //  palette, gaps, corner radii, fuse pop) so nothing needs relearning.
 //
@@ -13,13 +13,13 @@ import SwiftUI
 
 enum FuseTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "swipe any direction — every cell slides as far as it can") {
+        TutorialSlide(caption: "swipe any direction. every cell slides as far as it can") {
             FuseDemo(page: .swipe)
         },
-        TutorialSlide(caption: "matching numbers fuse into one and double — build the biggest cell you can") {
+        TutorialSlide(caption: "matching numbers fuse into one and double. build the biggest cell you can") {
             FuseDemo(page: .fuse)
         },
-        TutorialSlide(caption: "keep the board open — the run ends when nothing can move") {
+        TutorialSlide(caption: "keep the board open. the run ends when nothing can move") {
             FuseDemo(page: .gameOver)
         },
     ]

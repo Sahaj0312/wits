@@ -52,7 +52,7 @@ struct CountUpText: View {
 
 // MARK: - Confetti
 
-/// One-shot confetti burst rendered in Canvas — deterministic particles, no
+/// One-shot confetti burst rendered in Canvas, deterministic particles, no
 /// state churn, removes itself from the render loop when finished.
 struct ConfettiBurst: View {
     var colors: [Color] = [.witsAccent, .witsGold, .witsViolet, .witsPink, .witsSky, .witsWarm]

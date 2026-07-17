@@ -5,7 +5,7 @@
 //  Animated how-to-play demos for Number Nests on a mini 3×3 board: tap a
 //  square then a keypad number to fill it, nests glow when their arithmetic
 //  target is met, row repeats flash coral until corrected, and CHECK sweeps
-//  the finished grid. Mirrors the real chalkboard rendering — slate cells,
+//  the finished grid. Mirrors the real chalkboard rendering, slate cells,
 //  heavy nest outlines, corner clues, and the 1–3 keypad with NOTES/CHECK.
 //
 
@@ -13,10 +13,10 @@ import SwiftUI
 
 enum NumberNestsTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "tap a square, then a number — each outlined nest must combine to its target") {
+        TutorialSlide(caption: "tap a square, then a number. each outlined nest must combine to its target") {
             NumberNestsDemo(page: .nest)
         },
-        TutorialSlide(caption: "every row and column uses 1–3 once — repeats flash until you fix them") {
+        TutorialSlide(caption: "every row and column uses 1–3 once. repeats flash until you fix them") {
             NumberNestsDemo(page: .conflict)
         },
         TutorialSlide(caption: "pencil notes to test ideas, then check the full grid to win") {

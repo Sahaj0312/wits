@@ -5,7 +5,7 @@
 //  Animated how-to-play demos for Last Seen on a mini 3×2 board: tap an
 //  object you haven't chosen yet for a point, watch the board reshuffle
 //  after every pick, and see a repeat tap cost a heart. Tiles render like
-//  the real game — cream cards with heavy ink glyphs, blue flash for a new
+//  the real game, cream cards with heavy ink glyphs, blue flash for a new
 //  pick, red-orange flash for a repeat.
 //
 
@@ -13,13 +13,13 @@ import SwiftUI
 
 enum LastSeenTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "tap an object you haven't chosen yet — every new one is a point") {
+        TutorialSlide(caption: "tap an object you haven't chosen yet. every new one is a point") {
             LastSeenDemo(page: .pick)
         },
-        TutorialSlide(caption: "the board reshuffles after each pick — clear the whole set and it grows") {
+        TutorialSlide(caption: "the board reshuffles after each pick. clear the whole set and it grows") {
             LastSeenDemo(page: .reshuffle)
         },
-        TutorialSlide(caption: "tapping a repeat costs a heart — lose all three and the run ends") {
+        TutorialSlide(caption: "tapping a repeat costs a heart. lose all three and the run ends") {
             LastSeenDemo(page: .mistake)
         },
     ]
@@ -60,7 +60,7 @@ private struct LastSeenDemo: View {
         let shuffles: [Double]
         let taps: [TapBeat]
         let foundStart: Int
-        /// Icons chosen on earlier (implied) picks — ghost-echoed on a mistake.
+        /// Icons chosen on earlier (implied) picks, ghost-echoed on a mistake.
         var picked: [Int] = []
         var heartLossAt: Double? = nil
     }
@@ -77,7 +77,7 @@ private struct LastSeenDemo: View {
                 taps: [TapBeat(time: 1.3, icon: 0, ok: true)],
                 foundStart: 0)
         case .reshuffle:
-            // Two picks, two reshuffles — the memory load is the same objects
+            // Two picks, two reshuffles, the memory load is the same objects
             // landing in new places.
             return Script(
                 duration: 6.0,
@@ -89,7 +89,7 @@ private struct LastSeenDemo: View {
                        TapBeat(time: 3.2, icon: 3, ok: true)],
                 foundStart: 1)
         case .mistake:
-            // The star was already chosen — tapping it again flashes red,
+            // The star was already chosen, tapping it again flashes red,
             // echoes the other past picks, and breaks a heart.
             return Script(
                 duration: 5.4,

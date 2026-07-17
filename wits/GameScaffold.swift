@@ -349,39 +349,39 @@ extension GameID {
         switch self {
         case .arrowStorm:
             [
-                "watch the row of arrows — answer only the middle one's direction.",
+                "watch the row of arrows. answer only the middle one's direction.",
                 "beat the shrinking deadline: too slow counts as a miss.",
-                "you have three hearts. every miss costs one — lose them all and the run ends."
+                "you have three hearts. every miss costs one. lose them all and the run ends."
             ]
         case .crowdControl:
             [
                 "memorize the glowing dots, then track them while every dot moves.",
-                "when they freeze, tap the ones you were tracking — each one you catch is a point.",
-                "you have three hearts. every target you lose costs one — lose them all and the run ends."
+                "when they freeze, tap the ones you were tracking. each one you catch is a point.",
+                "you have three hearts. every target you lose costs one. lose them all and the run ends."
             ]
         case .echoGrid:
             [
                 "watch the tiles light up in order.",
                 "when the board goes dark, tap them backwards.",
-                "you get a fixed set of rounds — clear enough of them to pass."
+                "you get a fixed set of rounds. clear enough of them to pass."
             ]
         case .colorClash:
             [
-                "look at the ink colour, not the word — tap the matching colour button.",
+                "look at the ink colour, not the word. tap the matching colour button.",
                 "beat the shrinking deadline: too slow counts as a miss.",
-                "you have three hearts. every miss costs one — lose them all and the run ends."
+                "you have three hearts. every miss costs one. lose them all and the run ends."
             ]
         case .tileShift:
             [
                 "read the current rule, then tap the tile that matches by that rule.",
                 "the rule keeps flipping, and the deadline shrinks as you score.",
-                "you have three hearts. every miss costs one — lose them all and the run ends."
+                "you have three hearts. every miss costs one. lose them all and the run ends."
             ]
         case .lastSeen:
             [
-                "tap an object you have not chosen yet — every new one is a point.",
+                "tap an object you have not chosen yet. every new one is a point.",
                 "the board reshuffles after each pick, and clearing a set grows it.",
-                "you have three hearts. tapping a repeat costs one — lose them all and the run ends."
+                "you have three hearts. tapping a repeat costs one. lose them all and the run ends."
             ]
         case .slidePuzzle:
             [
@@ -391,7 +391,7 @@ extension GameID {
             ]
         case .blockEscape:
             [
-                "drag blocks along rows and columns — they can't jump or turn.",
+                "drag blocks along rows and columns. they can't jump or turn.",
                 "clear a path for the big red block.",
                 "walk it out the bottom exit in as few moves as you can."
             ]
@@ -409,19 +409,19 @@ extension GameID {
             ]
         case .numberNests:
             [
-                "fill every row and column with 1 through the grid size — no repeats.",
+                "fill every row and column with 1 through the grid size, with no repeats.",
                 "numbers inside each outlined nest must combine to its target using the shown operation.",
                 "use NOTES to test possibilities; CHECK when the whole grid is full."
             ]
         case .mahjong:
             [
-                "tap a free tile — one with an open side and nothing on top — to lift it into the rack.",
+                "tap a tile with an open side and nothing on top to lift it into the rack.",
                 "when its twin lands in the rack, the pair vanishes.",
                 "clear every tile before the rack fills with singles. undo rewinds a risky pick."
             ]
         case .crossword:
             [
-                "tap a square, then type — tap the square again to flip between across and down.",
+                "tap a square, then type. tap the square again to flip between across and down.",
                 "every answer crosses others, so each letter you land is a free hint elsewhere.",
                 "stuck? the bulb reveals the selected square, but clean solves grade higher."
             ]
@@ -435,24 +435,24 @@ extension GameID {
             [
                 "drag pieces from the tray onto the board.",
                 "fill a full row or column to clear it.",
-                "pieces never rotate — use the NEXT row to plan ahead; the run ends when nothing fits."
+                "pieces never rotate. use the NEXT row to plan ahead; the run ends when nothing fits."
             ]
         case .fuse:
             [
-                "swipe in any direction — every cell slides as far as it can.",
+                "swipe in any direction. every cell slides as far as it can.",
                 "matching numbers fuse into one and double.",
-                "keep the board open and build the biggest cell you can — the run ends when nothing can move."
+                "keep the board open and build the biggest cell you can. the run ends when nothing can move."
             ]
         case .snake:
             [
-                "swipe to steer — the snake never stops moving.",
+                "swipe to steer. the snake never stops moving.",
                 "eat the apples: every one adds a segment and speeds you up.",
-                "don't hit the walls or your own body — one clip ends the run."
+                "don't hit the walls or your own body. one clip ends the run."
             ]
         case .tower:
             [
                 "tap to drop the sliding block onto the stack.",
-                "the overhang is sliced off — what's left is your new top.",
+                "the overhang is sliced off. what's left is your new top.",
                 "land dead-center to keep the block whole; miss the stack entirely and the run ends."
             ]
         }
