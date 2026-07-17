@@ -192,11 +192,15 @@ private struct CrosswordDemo: View {
                 continue
             }
 
-            let fill: Color
-            if index == selected { fill = world.accent.opacity(0.45) }
-            else if active.contains(index) { fill = world.accent.opacity(0.16) }
-            else { fill = world.surface }
-            context.fill(Path(rect), with: .color(fill))
+            // Match the gameplay cell stack: opaque paper first, then the
+            // translucent selection tint. Drawing the tint directly over the
+            // board's black backing makes both highlight states far too dark.
+            context.fill(Path(rect), with: .color(world.surface))
+            if index == selected {
+                context.fill(Path(rect), with: .color(world.accent.opacity(0.45)))
+            } else if active.contains(index) {
+                context.fill(Path(rect), with: .color(world.accent.opacity(0.16)))
+            }
             context.stroke(Path(rect), with: .color(world.ink.opacity(0.25)), lineWidth: 0.7)
 
             if [2, 6, 10, 12].contains(index) {
