@@ -365,6 +365,9 @@ struct NumberNestsScreen: View {
     @State private var message = ""
     @State private var finished = false
     @State private var shakeBoard = 0
+    @State private var freeHintsRemaining = 2
+    @State private var hintAdBusy = false
+    @State private var ads = AdManager.shared
 
     private let startedAt = Date()
     private let level: Double
@@ -415,6 +418,7 @@ struct NumberNestsScreen: View {
             }
         }
         .task { await setUpAndRun() }
+        .onAppear { ads.loadRewardedIfNeeded() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Number Nests")
     }
@@ -441,16 +445,16 @@ struct NumberNestsScreen: View {
             .frame(height: 42)
             .background(world.surface.opacity(0.9), in: Capsule())
 
-            Button(action: reveal) {
-                Image(systemName: "lightbulb.fill")
-                    .font(.system(size: 15, weight: .heavy))
-                    .foregroundStyle(world.ink)
-                    .frame(width: 42, height: 42)
-                    .background(world.surface.opacity(0.9), in: Circle())
+            Button(action: requestReveal) {
+                LimitedHintButtonLabel(world: world,
+                                       freeHintsRemaining: freeHintsRemaining,
+                                       background: world.surface.opacity(0.9))
             }
             .buttonStyle(.plain)
-            .disabled(finished)
-            .accessibilityLabel("Reveal one square")
+            .disabled(finished || hintAdBusy ||
+                      (freeHintsRemaining == 0 && !ads.rewardedReady))
+            .opacity(hintAdBusy || (freeHintsRemaining == 0 && !ads.rewardedReady) ? 0.6 : 1)
+            .accessibilityLabel(hintAccessibilityLabel)
 
             Button(action: showHelp) {
                 Image(systemName: "questionmark")
@@ -687,11 +691,32 @@ struct NumberNestsScreen: View {
         message = ""
     }
 
-    private func reveal() {
-        guard let puzzle, !finished else { return }
+    private func requestReveal() {
+        guard !finished, !hintAdBusy else { return }
+        if freeHintsRemaining > 0 {
+            if reveal() { freeHintsRemaining -= 1 }
+            return
+        }
+        guard ads.rewardedReady else {
+            ads.loadRewardedIfNeeded()
+            return
+        }
+        hintAdBusy = true
+        cfg.pause()
+        ads.showRewarded { earned in
+            cfg.resume()
+            hintAdBusy = false
+            guard earned else { return }
+            _ = reveal()
+        }
+    }
+
+    @discardableResult
+    private func reveal() -> Bool {
+        guard let puzzle, !finished else { return false }
         let position = selected.flatMap { entries[$0.r][$0.c] == puzzle.solution[$0.r][$0.c] ? nil : $0 }
             ?? firstUnsolved(in: puzzle)
-        guard let position else { return }
+        guard let position else { return false }
         hints += 1
         selected = position
         entries[position.r][position.c] = puzzle.solution[position.r][position.c]
@@ -701,6 +726,13 @@ struct NumberNestsScreen: View {
         message = "one square revealed"
         GameFeel.shared.play(.nearMiss)
         if isFull(puzzle), firstUnsolved(in: puzzle) == nil { check(puzzle) }
+        return true
+    }
+
+    private var hintAccessibilityLabel: String {
+        freeHintsRemaining > 0
+            ? "Reveal one square, \(freeHintsRemaining) free hints remaining"
+            : "Reveal one square with a rewarded ad"
     }
 
     private func check(_ puzzle: NumberNestsPuzzle) {

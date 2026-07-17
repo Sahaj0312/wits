@@ -26,6 +26,9 @@ struct CrosswordScreen: View {
     @State private var finished = false
     @State private var hint = ""
     @State private var shakeBoard = 0
+    @State private var freeHintsRemaining = 2
+    @State private var hintAdBusy = false
+    @State private var ads = AdManager.shared
 
     private let startedAt = Date()
     private let level: Double
@@ -86,6 +89,7 @@ struct CrosswordScreen: View {
             }
         }
         .task { await setUpAndRun() }
+        .onAppear { ads.loadRewardedIfNeeded() }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Crossword")
     }
@@ -115,18 +119,16 @@ struct CrosswordScreen: View {
             .frame(height: 42)
             .background(world.ink.opacity(0.07), in: Capsule())
 
-            Button {
-                reveal()
-            } label: {
-                Image(systemName: "lightbulb.fill")
-                    .font(.system(size: 15, weight: .heavy))
-                    .foregroundStyle(world.ink)
-                    .frame(width: 42, height: 42)
-                    .background(world.ink.opacity(0.07), in: Circle())
+            Button(action: requestReveal) {
+                LimitedHintButtonLabel(world: world,
+                                       freeHintsRemaining: freeHintsRemaining,
+                                       background: world.ink.opacity(0.07))
             }
             .buttonStyle(.plain)
-            .disabled(finished)
-            .accessibilityLabel("Reveal the selected square")
+            .disabled(finished || hintAdBusy ||
+                      (freeHintsRemaining == 0 && !ads.rewardedReady))
+            .opacity(hintAdBusy || (freeHintsRemaining == 0 && !ads.rewardedReady) ? 0.6 : 1)
+            .accessibilityLabel(hintAccessibilityLabel)
 
             Button {
                 showHelp()
@@ -380,17 +382,45 @@ struct CrosswordScreen: View {
         entries[selected.r][selected.c] = ""
     }
 
-    private func reveal() {
-        guard let puzzle, !finished, !puzzle.isBlock[selected.r][selected.c] else { return }
+    private func requestReveal() {
+        guard !finished, !hintAdBusy else { return }
+        if freeHintsRemaining > 0 {
+            if reveal() { freeHintsRemaining -= 1 }
+            return
+        }
+        guard ads.rewardedReady else {
+            ads.loadRewardedIfNeeded()
+            return
+        }
+        hintAdBusy = true
+        cfg.pause()
+        ads.showRewarded { earned in
+            cfg.resume()
+            hintAdBusy = false
+            guard earned else { return }
+            _ = reveal()
+        }
+    }
+
+    @discardableResult
+    private func reveal() -> Bool {
+        guard let puzzle, !finished, !puzzle.isBlock[selected.r][selected.c] else { return false }
         if entries[selected.r][selected.c] == puzzle.solution[selected.r][selected.c] {
             advance(puzzle)
-            return
+            return false
         }
         hints += 1
         entries[selected.r][selected.c] = puzzle.solution[selected.r][selected.c]
         GameFeel.shared.play(.nearMiss)
         advance(puzzle)
         checkCompletion(puzzle)
+        return true
+    }
+
+    private var hintAccessibilityLabel: String {
+        freeHintsRemaining > 0
+            ? "Reveal the selected square, \(freeHintsRemaining) free hints remaining"
+            : "Reveal the selected square with a rewarded ad"
     }
 
     // MARK: Flow

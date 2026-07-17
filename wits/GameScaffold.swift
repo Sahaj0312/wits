@@ -307,6 +307,39 @@ private struct TutorialStepRow: View {
     }
 }
 
+/// Shared label for the two puzzle reveal buttons. Two free reveals count
+/// down in the badge; once spent, the badge becomes the rewarded-ad play
+/// mark without changing the lightbulb's position or tap target.
+struct LimitedHintButtonLabel: View {
+    let world: GameWorld
+    let freeHintsRemaining: Int
+    let background: Color
+
+    var body: some View {
+        Image(systemName: "lightbulb.fill")
+            .font(.system(size: 15, weight: .heavy))
+            .foregroundStyle(world.ink)
+            .frame(width: 42, height: 42)
+            .background(background, in: Circle())
+            .overlay(alignment: .bottomTrailing) {
+                Group {
+                    if freeHintsRemaining > 0 {
+                        Text(String(freeHintsRemaining))
+                            .font(.system(size: 10, weight: .black, design: .rounded))
+                    } else {
+                        Image(systemName: "play.rectangle.fill")
+                            .font(.system(size: 9, weight: .black))
+                    }
+                }
+                .foregroundStyle(world.background)
+                .frame(width: 18, height: 18)
+                .background(world.accent, in: Circle())
+                .overlay(Circle().strokeBorder(world.raised, lineWidth: 2))
+                .offset(x: 3, y: 3)
+            }
+    }
+}
+
 extension GameID {
     var tutorialHint: String {
         "the next screen is scored. \(tagline)"
