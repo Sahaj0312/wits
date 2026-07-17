@@ -13,6 +13,8 @@ struct GamesLibraryView: View {
     @Environment(AppModel.self) private var app
     @State private var launch: GameID?
     @State private var showSettings = false
+    @State private var showPaywall = false
+    @State private var purchases = PurchasesManager.shared
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
@@ -43,6 +45,11 @@ struct GamesLibraryView: View {
 
                 communityRow
                     .padding(.top, 4)
+
+                if !purchases.isAdFree {
+                    lifetimeAdFreeTile
+                        .padding(.top, 4)
+                }
             }
             .padding(.horizontal, WitsMetrics.screenPadding)
             .padding(.bottom, 24)
@@ -51,6 +58,7 @@ struct GamesLibraryView: View {
         .fullScreenCover(item: $launch) { g in
             GameLauncher(game: g)
         }
+        .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
         .sheet(isPresented: $showSettings) { SettingsView() }
     }
 
@@ -151,6 +159,61 @@ struct GamesLibraryView: View {
         let difficulty = app.levels.selectedDifficulty(for: g)
         let level = app.levels.currentLevel(for: g, difficulty: difficulty)
         return "\(difficulty.title) · level \(level)"
+    }
+
+    /// A single two-column-width offer below the community cards. It disappears
+    /// as soon as StoreKit confirms the lifetime entitlement.
+    private var lifetimeAdFreeTile: some View {
+        GeometryReader { geometry in
+            Button {
+                showPaywall = true
+            } label: {
+                HStack(spacing: 13) {
+                    Image(systemName: "lock.open.fill")
+                        .font(.system(size: 20, weight: .black))
+                        .foregroundStyle(Color.witsWarm)
+                        .frame(width: 30)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("LIFETIME AD-FREE WITS")
+                            .font(.system(size: 15, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.68)
+
+                        Text("one payment · no interstitial ads · ever")
+                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                            .foregroundStyle(.white.opacity(0.52))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.62)
+                    }
+                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+
+                    HStack(spacing: 5) {
+                        Text("UNLOCK")
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.system(size: 11, weight: .black, design: .monospaced))
+                    .foregroundStyle(Color.witsWarm)
+                    .fixedSize(horizontal: true, vertical: false)
+                }
+                .padding(.horizontal, 14)
+                .frame(width: geometry.size.width, height: 68)
+                .background(
+                    Color.white.opacity(0.035),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(.white.opacity(0.13), lineWidth: 1)
+                )
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(TactilePressScale(feedback: .primary))
+            .accessibilityLabel("Unlock lifetime ad-free Wits")
+            .accessibilityHint("Opens the one-time purchase screen")
+        }
+        .frame(height: 68)
     }
 
     /// A small community footer after the game grid. It deliberately uses the
