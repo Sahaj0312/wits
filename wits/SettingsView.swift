@@ -7,6 +7,7 @@
 
 import SwiftUI
 import StoreKit
+import SafariServices
 import UIKit
 
 struct SettingsView: View {
@@ -19,6 +20,7 @@ struct SettingsView: View {
     @State private var notifications = NotificationManager.shared
     @State private var showPaywall = false
     @State private var showNotificationSettingsAlert = false
+    @State private var supportPage: SupportPage?
     @State private var restoreMessage: String?
     @State private var restoring = false
 
@@ -92,27 +94,42 @@ struct SettingsView: View {
                 }
 
                 settingsSection("about") {
-                    settingsValueRow(icon: "questionmark.circle.fill",
-                                     tint: .witsAccent,
-                                     title: "FAQ",
-                                     value: "coming soon",
-                                     isDimmed: true)
+                    Button {
+                        supportPage = .faq
+                    } label: {
+                        settingsValueRow(icon: "questionmark.circle.fill",
+                                         tint: .witsAccent,
+                                         title: "FAQ",
+                                         value: "",
+                                         showsChevron: true)
+                    }
+                    .buttonStyle(TactilePressScale(feedback: .selection))
 
                     settingsDivider
 
-                    settingsValueRow(icon: "hand.raised.fill",
-                                     tint: .witsPink,
-                                     title: "privacy policy",
-                                     value: "coming soon",
-                                     isDimmed: true)
+                    Button {
+                        supportPage = .privacy
+                    } label: {
+                        settingsValueRow(icon: "hand.raised.fill",
+                                         tint: .witsPink,
+                                         title: "privacy policy",
+                                         value: "",
+                                         showsChevron: true)
+                    }
+                    .buttonStyle(TactilePressScale(feedback: .selection))
 
                     settingsDivider
 
-                    settingsValueRow(icon: "doc.text.fill",
-                                     tint: .witsWarm,
-                                     title: "terms of service",
-                                     value: "coming soon",
-                                     isDimmed: true)
+                    Button {
+                        supportPage = .terms
+                    } label: {
+                        settingsValueRow(icon: "doc.text.fill",
+                                         tint: .witsWarm,
+                                         title: "terms of service",
+                                         value: "",
+                                         showsChevron: true)
+                    }
+                    .buttonStyle(TactilePressScale(feedback: .selection))
                 }
 
                 settingsSection("ad-free") {
@@ -166,6 +183,10 @@ struct SettingsView: View {
         }
         .background(pageBg.ignoresSafeArea())
         .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
+        .sheet(item: $supportPage) { page in
+            SupportBrowser(url: page.url)
+                .ignoresSafeArea()
+        }
         .alert("notifications are off", isPresented: $showNotificationSettingsAlert) {
             Button("not now", role: .cancel) {}
             Button("open settings") { openSystemSettings() }
@@ -234,7 +255,7 @@ struct SettingsView: View {
     private func emailSupport() {
         var components = URLComponents()
         components.scheme = "mailto"
-        components.path = "sahaj0091@gmail.com"
+        components.path = "sahajchhabra03@gmail.com"
         components.queryItems = [
             URLQueryItem(name: "subject", value: "Wits Support"),
             URLQueryItem(name: "body", value: supportEmailDetails)
@@ -379,5 +400,49 @@ struct SettingsView: View {
     private func openSystemSettings() {
         guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
         UIApplication.shared.open(url)
+    }
+}
+
+private enum SupportPage: String, Identifiable {
+    case faq
+    case privacy
+    case terms
+
+    var id: String { rawValue }
+
+    var url: URL {
+        URL(string: "https://sahaj0312.github.io/wits-support/\(rawValue)/")!
+    }
+}
+
+private struct SupportBrowser: UIViewControllerRepresentable {
+    let url: URL
+    @Environment(\.dismiss) private var dismiss
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator { dismiss() }
+    }
+
+    func makeUIViewController(context: Context) -> SFSafariViewController {
+        let configuration = SFSafariViewController.Configuration()
+        configuration.barCollapsingEnabled = true
+        let controller = SFSafariViewController(url: url, configuration: configuration)
+        controller.delegate = context.coordinator
+        controller.dismissButtonStyle = .done
+        return controller
+    }
+
+    func updateUIViewController(_ controller: SFSafariViewController, context: Context) {}
+
+    final class Coordinator: NSObject, SFSafariViewControllerDelegate {
+        private let onDone: () -> Void
+
+        init(onDone: @escaping () -> Void) {
+            self.onDone = onDone
+        }
+
+        func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
+            onDone()
+        }
     }
 }
