@@ -181,7 +181,7 @@ struct GamesLibraryView: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.68)
 
-                        Text("one payment · no interstitial ads · ever")
+                        Text("one payment · lifetime ad-free access")
                             .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                             .foregroundStyle(.white.opacity(0.52))
                             .lineLimit(1)
