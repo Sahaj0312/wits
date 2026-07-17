@@ -4,6 +4,8 @@
 <dict>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-9813826155312094~3588304483</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSUserTrackingUsageDescription</key>
 	<string>This lets us show ads that are more relevant to you, which keeps wits free.</string>
 	<!-- SKAdNetwork IDs for ad attribution. Refresh from
@@ -20,19 +22,11 @@
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
-			<string>4pfyvq9l8r.skadnetwork</string>
-		</dict>
-		<dict>
-			<key>SKAdNetworkIdentifier</key>
 			<string>2fnua5tdw4.skadnetwork</string>
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
 			<string>ydx93a7ass.skadnetwork</string>
-		</dict>
-		<dict>
-			<key>SKAdNetworkIdentifier</key>
-			<string>5a6flpkh64.skadnetwork</string>
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
@@ -64,7 +58,15 @@
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
+			<string>wg4vff78zm.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
 			<string>3qy4746246.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>f38h382jlk.skadnetwork</string>
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
@@ -160,15 +162,19 @@
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
+			<string>klf5c3l5u5.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
 			<string>ppxm28t8ap.skadnetwork</string>
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
-			<string>uw77j35x4d.skadnetwork</string>
+			<string>kbmxgpxpgc.skadnetwork</string>
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
-			<string>pwa73g5rt2.skadnetwork</string>
+			<string>uw77j35x4d.skadnetwork</string>
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
@@ -184,6 +190,10 @@
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
+			<string>c3frkrj4fj.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
 			<string>e5fvkxwrpn.skadnetwork</string>
 		</dict>
 		<dict>
@@ -193,6 +203,10 @@
 		<dict>
 			<key>SKAdNetworkIdentifier</key>
 			<string>3rd42ekr43.skadnetwork</string>
+		</dict>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>97r2b46745.skadnetwork</string>
 		</dict>
 		<dict>
 			<key>SKAdNetworkIdentifier</key>

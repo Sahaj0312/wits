@@ -118,6 +118,22 @@ struct SettingsView: View {
                     }
                     .buttonStyle(TactilePressScale(feedback: .selection))
 
+                    if AdManager.shared.isPrivacyOptionsRequired {
+                        settingsDivider
+
+                        Button {
+                            GameFeel.shared.uiTap()
+                            Task { try? await AdManager.shared.presentPrivacyOptions() }
+                        } label: {
+                            settingsValueRow(icon: "slider.horizontal.3",
+                                             tint: .witsSky,
+                                             title: "privacy choices",
+                                             value: "",
+                                             showsChevron: true)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
                     settingsDivider
 
                     Button {

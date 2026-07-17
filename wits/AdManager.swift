@@ -14,6 +14,7 @@
 
 import SwiftUI
 import GoogleMobileAds
+import UserMessagingPlatform
 import AppTrackingTransparency
 
 @Observable
@@ -27,7 +28,7 @@ final class AdManager {
     static let rewardedUnitID = "ca-app-pub-3940256099942544/1712485313"
     #else
     private static let interstitialUnitID = "ca-app-pub-9813826155312094/4859812107"
-    static let rewardedUnitID = "ca-app-pub-9813826155312094/2153757716"   // not wired up yet
+    static let rewardedUnitID = "ca-app-pub-9813826155312094/2153757716"
     #endif
 
     /// Frequency cap: one ad per `gamesPerAd` completed games, never more
@@ -38,6 +39,8 @@ final class AdManager {
     /// Wired at startup so paid subscribers never see ads.
     var adFreeProvider: () -> Bool = { false }
 
+    private(set) var isPrivacyOptionsRequired = false
+    private var startAttempted = false
     private var started = false
     private var interstitial: InterstitialAd?
     private var isLoading = false
@@ -51,16 +54,62 @@ final class AdManager {
 
     private init() {}
 
-    /// Idempotent. Asks for tracking consent first so the SDK knows whether
-    /// it may use the IDFA, then warms rewarded inventory for the optional
-    /// Save Me flow. Paid users skip interstitial loading entirely.
+    /// Idempotent. Refreshes Google's consent state on every process launch,
+    /// presents a required privacy form, and never starts or requests ads
+    /// until UMP says ad requests are allowed. ATT remains Apple's separate
+    /// system-level tracking choice.
     func startIfNeeded() async {
+        guard !startAttempted else { return }
+        startAttempted = true
+
+        await updateConsentInformation()
+        do {
+            try await ConsentForm.loadAndPresentIfRequired(from: nil)
+        } catch {
+#if DEBUG
+            print("[UMP] Consent form failed: \(error.localizedDescription)")
+#endif
+        }
+        refreshPrivacyOptionsRequirement()
+
+        guard ConsentInformation.shared.canRequestAds else { return }
+
+        if ATTrackingManager.trackingAuthorizationStatus == .notDetermined {
+            _ = await ATTrackingManager.requestTrackingAuthorization()
+        }
+
         guard !started else { return }
         started = true
-        _ = await ATTrackingManager.requestTrackingAuthorization()
         await MobileAds.shared.start()
         if !adFreeProvider() { loadInterstitial() }
         loadRewardedIfNeeded()
+    }
+
+    /// Opens Google's publisher-rendered privacy controls. Settings only
+    /// exposes this action when UMP reports that an entry point is required.
+    func presentPrivacyOptions() async throws {
+        try await ConsentForm.presentPrivacyOptionsForm(from: nil)
+        refreshPrivacyOptionsRequirement()
+    }
+
+    private func updateConsentInformation() async {
+        let parameters = RequestParameters()
+        await withCheckedContinuation { continuation in
+            ConsentInformation.shared.requestConsentInfoUpdate(with: parameters) { error in
+#if DEBUG
+                if let error {
+                    print("[UMP] Consent update failed: \(error.localizedDescription)")
+                }
+#endif
+                continuation.resume()
+            }
+        }
+        refreshPrivacyOptionsRequirement()
+    }
+
+    private func refreshPrivacyOptionsRequirement() {
+        isPrivacyOptionsRequired =
+            ConsentInformation.shared.privacyOptionsRequirementStatus == .required
     }
 
     // MARK: Rewarded (opt-in "watch to continue", not gated by ad-free)
