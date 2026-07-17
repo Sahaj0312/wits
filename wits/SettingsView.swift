@@ -6,11 +6,14 @@
 //
 
 import SwiftUI
+import StoreKit
 import UIKit
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(AppModel.self) private var app
+    @Environment(\.openURL) private var openURL
+    @Environment(\.requestReview) private var requestReview
     @AppStorage("wits.soundEffectsEnabled") private var soundEffectsEnabled = true
     @AppStorage("wits.hapticsEnabled") private var hapticsEnabled = true
     @State private var notifications = NotificationManager.shared
@@ -80,6 +83,69 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(restoring)
+                }
+
+                settingsSection("support") {
+                    ShareLink(item: shareMessage) {
+                        settingsValueRow(icon: "square.and.arrow.up",
+                                         tint: .witsViolet,
+                                         title: "share Wits",
+                                         value: "",
+                                         showsChevron: true)
+                    }
+                    .buttonStyle(TactilePressScale(feedback: .selection))
+
+                    settingsDivider
+
+                    Button {
+                        GameFeel.shared.uiPrimary()
+                        requestReview()
+                    } label: {
+                        settingsValueRow(icon: "star.fill",
+                                         tint: .witsGold,
+                                         title: "rate us",
+                                         value: "",
+                                         showsChevron: true)
+                    }
+                    .buttonStyle(.plain)
+
+                    settingsDivider
+
+                    Button {
+                        GameFeel.shared.uiTap()
+                        emailSupport()
+                    } label: {
+                        settingsValueRow(icon: "envelope.fill",
+                                         tint: .witsSky,
+                                         title: "email support",
+                                         value: "",
+                                         showsChevron: true)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                settingsSection("about") {
+                    settingsValueRow(icon: "questionmark.circle.fill",
+                                     tint: .witsAccent,
+                                     title: "FAQ",
+                                     value: "coming soon",
+                                     isDimmed: true)
+
+                    settingsDivider
+
+                    settingsValueRow(icon: "hand.raised.fill",
+                                     tint: .witsPink,
+                                     title: "privacy policy",
+                                     value: "coming soon",
+                                     isDimmed: true)
+
+                    settingsDivider
+
+                    settingsValueRow(icon: "doc.text.fill",
+                                     tint: .witsWarm,
+                                     title: "terms of service",
+                                     value: "coming soon",
+                                     isDimmed: true)
                 }
 
                 if let restoreMessage {
@@ -159,6 +225,28 @@ struct SettingsView: View {
                 restoreMessage = "restore failed. try again later."
             }
         }
+    }
+
+    private var shareMessage: String {
+        "I’ve been playing Wits, a collection of quick brain games for memory, logic, words, maths, and focus. Give it a try!"
+    }
+
+    private func emailSupport() {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = "sahaj0091@gmail.com"
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: "Wits Support"),
+            URLQueryItem(name: "body", value: supportEmailDetails)
+        ]
+        guard let url = components.url else { return }
+        openURL(url)
+    }
+
+    private var supportEmailDetails: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+        return "\n\nWits version \(version) (\(build))\niOS \(UIDevice.current.systemVersion)"
     }
 
     private func settingsSection<Content: View>(_ title: String,
