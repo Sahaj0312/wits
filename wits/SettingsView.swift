@@ -6,12 +6,16 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var app
     @AppStorage("wits.soundEffectsEnabled") private var soundEffectsEnabled = true
     @AppStorage("wits.hapticsEnabled") private var hapticsEnabled = true
+    @State private var notifications = NotificationManager.shared
     @State private var showPaywall = false
+    @State private var showNotificationSettingsAlert = false
     @State private var restoreMessage: String?
     @State private var restoring = false
 
@@ -36,6 +40,13 @@ struct SettingsView: View {
                                       tint: .witsWarm,
                                       title: "haptics",
                                       isOn: $hapticsEnabled)
+                }
+
+                settingsSection("notifications") {
+                    settingsToggleRow(icon: "bell.fill",
+                                      tint: .witsSky,
+                                      title: "daily reminders",
+                                      isOn: notificationToggle)
                 }
 
                 settingsSection("ad-free") {
@@ -85,8 +96,15 @@ struct SettingsView: View {
         }
         .background(pageBg.ignoresSafeArea())
         .fullScreenCover(isPresented: $showPaywall) { PaywallView() }
+        .alert("notifications are off", isPresented: $showNotificationSettingsAlert) {
+            Button("not now", role: .cancel) {}
+            Button("open settings") { openSystemSettings() }
+        } message: {
+            Text("allow notifications in iOS Settings to turn on your daily Wits reminder.")
+        }
         .onAppear {
             syncGameFeelSettings()
+            Task { await notifications.appBecameActive(streak: app.streak) }
         }
         .onChange(of: soundEffectsEnabled) { _, _ in
             syncGameFeelSettings()
@@ -242,6 +260,18 @@ struct SettingsView: View {
         .contentShape(Rectangle())
     }
 
+    private var notificationToggle: Binding<Bool> {
+        Binding(get: { notifications.isEnabled },
+                set: { requested in
+                    Task {
+                        let enabled = await notifications.setEnabled(requested, streak: app.streak)
+                        if requested, !enabled, notifications.authorizationStatus == .denied {
+                            showNotificationSettingsAlert = true
+                        }
+                    }
+                })
+    }
+
     private var settingsDivider: some View {
         Rectangle()
             .fill(Color.white.opacity(0.08))
@@ -252,5 +282,10 @@ struct SettingsView: View {
     private func syncGameFeelSettings() {
         GameFeel.shared.soundEnabled = soundEffectsEnabled
         GameFeel.shared.hapticsEnabled = hapticsEnabled
+    }
+
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 }

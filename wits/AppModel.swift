@@ -100,6 +100,7 @@ final class AppModel {
 
         streak = StreakEngine.recordActivity(streak, today: Date())
         saveCache()
+        NotificationManager.shared.activityCompleted(streak: streak)
         return r
     }
 
@@ -112,6 +113,7 @@ final class AppModel {
         recordStats(for: r)
         streak = StreakEngine.recordActivity(streak, today: Date())
         saveCache()
+        NotificationManager.shared.activityCompleted(streak: streak)
         return r
     }
 

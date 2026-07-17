@@ -91,7 +91,12 @@ struct witsApp: App {
                 .environment(app)
                 .background(PortraitLockInstaller())
                 .onChange(of: scenePhase) { _, phase in
-                    if phase == .active { app.startOfDayRollover() }
+                    if phase == .active {
+                        app.startOfDayRollover()
+                        Task {
+                            await NotificationManager.shared.appBecameActive(streak: app.streak)
+                        }
+                    }
                 }
         }
     }

@@ -10,6 +10,7 @@ import SwiftUI
 struct ContentView: View {
     @Environment(AppModel.self) private var app
     @AppStorage("wits.hasSeenWelcome") private var hasSeenWelcome = false
+    @State private var isStarting = false
 
     var body: some View {
         if let g = ProcessInfo.processInfo.environment["WITS_GAME"], let id = GameID(rawValue: g) {
@@ -25,8 +26,16 @@ struct ContentView: View {
                             await AdManager.shared.startIfNeeded()
                         }
                 } else {
-                    WelcomeView {
-                        withAnimation(.easeInOut(duration: 0.35)) { hasSeenWelcome = true }
+                    WelcomeView(isStarting: isStarting) {
+                        guard !isStarting else { return }
+                        isStarting = true
+                        Task { @MainActor in
+                            // Finish this system prompt before mounting the
+                            // library, whose startup may request ATT consent.
+                            await NotificationManager.shared.requestAfterWelcome(streak: app.streak)
+                            withAnimation(.easeInOut(duration: 0.35)) { hasSeenWelcome = true }
+                            isStarting = false
+                        }
                     }
                     .transition(.opacity)
                     .zIndex(1)

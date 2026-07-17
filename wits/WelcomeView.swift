@@ -13,6 +13,7 @@
 import SwiftUI
 
 struct WelcomeView: View {
+    var isStarting = false
     var onDone: () -> Void
 
     var body: some View {
@@ -41,6 +42,8 @@ struct WelcomeView: View {
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
                 .buttonStyle(PressScale())
+                .disabled(isStarting)
+                .opacity(isStarting ? 0.7 : 1)
                 .padding(.horizontal, WitsMetrics.screenPadding)
                 .padding(.bottom, 10)
             }
