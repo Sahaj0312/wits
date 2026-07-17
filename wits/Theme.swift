@@ -253,6 +253,46 @@ struct PressScale: ButtonStyle {
     }
 }
 
+enum TactileFeedback {
+    case tap
+    case selection
+    case primary
+
+    @MainActor
+    fileprivate func play() {
+        switch self {
+        case .tap: GameFeel.shared.uiTap()
+        case .selection: GameFeel.shared.uiSelection()
+        case .primary: GameFeel.shared.uiPrimary()
+        }
+    }
+}
+
+/// Opt-in tactile button treatment for meaningful UI controls. Keeping this
+/// separate from `PressScale` prevents every routine gameplay tap from buzzing.
+struct TactilePressScale: ButtonStyle {
+    var feedback: TactileFeedback = .tap
+
+    func makeBody(configuration: Configuration) -> some View {
+        TactilePressScaleBody(configuration: configuration, feedback: feedback)
+    }
+}
+
+private struct TactilePressScaleBody: View {
+    let configuration: ButtonStyle.Configuration
+    let feedback: TactileFeedback
+
+    var body: some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .animation(.spring(response: 0.28, dampingFraction: 0.6),
+                       value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, isPressed in
+                if isPressed { feedback.play() }
+            }
+    }
+}
+
 struct Cta: View {
     var title: String
     var dimmed = false
@@ -275,7 +315,7 @@ struct Cta: View {
                     Capsule().strokeBorder(.white.opacity(0.18), lineWidth: 1)
                 )
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale(feedback: .primary))
         .shadow(color: tint.opacity(dimmed ? 0 : 0.35), radius: 9, y: 6)
         .opacity(dimmed ? 0.4 : 1)
         .animation(.easeOut(duration: 0.2), value: dimmed)
@@ -364,7 +404,7 @@ struct AnswerRow: View {
             )
             .shadow(color: .witsShadow, radius: 10, y: 6)
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale(feedback: .selection))
         .animation(.easeOut(duration: 0.12), value: picked)
     }
 }

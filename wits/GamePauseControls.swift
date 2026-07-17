@@ -12,7 +12,10 @@ struct GamePauseButton: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            GameFeel.shared.uiTap()
+            action()
+        } label: {
             Image(systemName: "pause.fill")
                 .font(.system(size: 17, weight: .heavy))
                 .foregroundStyle(game.world.ink)
@@ -90,8 +93,11 @@ struct GamePausedOverlay: View {
                                 .frame(height: 52)
                                 .background(world.accent, in: RoundedRectangle(cornerRadius: 7))
                         }
-                        .buttonStyle(PressScale())
-                        Button(action: onQuit) {
+                        .buttonStyle(TactilePressScale(feedback: .primary))
+                        Button {
+                            GameFeel.shared.uiTap()
+                            onQuit()
+                        } label: {
                             Text(quitTitle.uppercased())
                                 .font(.system(size: 11.5, weight: .black, design: world.bodyDesign))
                                 .foregroundStyle(world.muted)

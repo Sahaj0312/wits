@@ -394,6 +394,7 @@ struct MahjongScreen: View {
     /// to the board. Making another move re-arms the button.
     private func undo() {
         guard !finished, popping.isEmpty, !outOfSpace, let last = lastMove else { return }
+        GameFeel.shared.uiTap()
         lastMove = nil
         undos += 1
         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
@@ -486,6 +487,7 @@ struct MahjongScreen: View {
     }
 
     private func showHelp() {
+        GameFeel.shared.uiTap()
         hint = "free tiles have an open side and nothing on top — bank them, twins pair off. drag any tile aside to peek underneath"
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.6) {
             if !finished {

@@ -41,7 +41,7 @@ struct WelcomeView: View {
                         .background(Color(hexAny: 0x232327),
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                 }
-                .buttonStyle(PressScale())
+                .buttonStyle(TactilePressScale(feedback: .primary))
                 .disabled(isStarting)
                 .opacity(isStarting ? 0.7 : 1)
                 .padding(.horizontal, WitsMetrics.screenPadding)

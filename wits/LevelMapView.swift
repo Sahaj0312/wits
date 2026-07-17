@@ -145,7 +145,7 @@ struct DifficultySelectView: View {
                 Rectangle().fill(world.secondary).frame(height: 4)
             }
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale(feedback: .primary))
         .shadow(color: difficultyColor.opacity(0.25), radius: 12, y: 6)
     }
 
@@ -168,7 +168,7 @@ struct DifficultySelectView: View {
                 .background(world.surface, in: Circle())
                 .overlay(Circle().strokeBorder(world.accent.opacity(0.42), lineWidth: 1))
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale())
         .accessibilityLabel(label)
     }
 }
@@ -268,7 +268,7 @@ struct StandaloneModeSelectView: View {
             .frame(height: 70)
             .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale(feedback: .primary))
     }
 
     private func iconButton(_ symbol: String,
@@ -281,7 +281,7 @@ struct StandaloneModeSelectView: View {
                 .frame(width: 44, height: 44)
                 .background(world.surface, in: Circle())
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale())
         .accessibilityLabel(label)
     }
 }
@@ -396,6 +396,7 @@ private struct DifficultySlider: View {
                         let ordinal = Int((raw * CGFloat(ChallengeDifficulty.allCases.count - 1)).rounded())
                         let clamped = min(ChallengeDifficulty.allCases.count - 1, max(0, ordinal))
                         guard let next = ChallengeDifficulty(ordinal: clamped), next != selection else { return }
+                        GameFeel.shared.uiSelection()
                         withAnimation(.spring(response: 0.2, dampingFraction: 0.8)) { selection = next }
                     }
             )
@@ -407,7 +408,10 @@ private struct DifficultySlider: View {
         .accessibilityAdjustableAction { direction in
             let delta = direction == .increment ? 1 : -1
             let ordinal = min(ChallengeDifficulty.allCases.count - 1, max(0, selection.ordinal + delta))
-            if let next = ChallengeDifficulty(ordinal: ordinal) { selection = next }
+            if let next = ChallengeDifficulty(ordinal: ordinal), next != selection {
+                GameFeel.shared.uiSelection()
+                selection = next
+            }
         }
     }
 }
@@ -447,7 +451,10 @@ private struct GameHelpSheet: View {
                         .font(.system(size: 25, weight: .black, design: world.titleDesign))
                         .foregroundStyle(world.ink)
                     Spacer()
-                    Button { dismiss() } label: {
+                    Button {
+                        GameFeel.shared.uiTap()
+                        dismiss()
+                    } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 15, weight: .black))
                             .foregroundStyle(world.ink)

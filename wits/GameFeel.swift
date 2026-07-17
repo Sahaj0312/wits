@@ -78,6 +78,26 @@ final class GameFeel {
         haptics.impact(.light, intensity: intensity)
     }
 
+    /// Quiet feedback for navigation and secondary controls.
+    func uiTap() {
+        haptics.impact(.light, intensity: 0.55)
+    }
+
+    /// A crisp detent for changing a discrete option or tutorial page.
+    func uiSelection() {
+        haptics.select()
+    }
+
+    /// Slightly firmer feedback reserved for primary actions such as Play.
+    func uiPrimary() {
+        haptics.impact(.medium, intensity: 0.68)
+    }
+
+    /// Prime UI feedback without starting the audio engine.
+    func prepareUIHaptics() {
+        haptics.prepare()
+    }
+
     /// Success haptic for UI celebrations that already have an outcome cue.
     func uiSuccess() {
         haptics.notify(.success)
@@ -130,21 +150,32 @@ final class HapticBox {
     private let heavy = UIImpactFeedbackGenerator(style: .heavy)
     private let rigid = UIImpactFeedbackGenerator(style: .rigid)
     private let soft = UIImpactFeedbackGenerator(style: .soft)
+    private let selection = UISelectionFeedbackGenerator()
     private let note = UINotificationFeedbackGenerator()
 
     func prepare() {
         [light, medium, heavy, rigid, soft].forEach { $0.prepare() }
+        selection.prepare()
         note.prepare()
     }
 
     func impact(_ s: UIImpactFeedbackGenerator.FeedbackStyle, intensity: CGFloat = 1) {
         guard GameFeel.shared.hapticsEnabled else { return }
-        gen(for: s).impactOccurred(intensity: intensity)
+        let generator = gen(for: s)
+        generator.impactOccurred(intensity: intensity)
+        generator.prepare()
     }
 
     func notify(_ t: UINotificationFeedbackGenerator.FeedbackType) {
         guard GameFeel.shared.hapticsEnabled else { return }
         note.notificationOccurred(t)
+        note.prepare()
+    }
+
+    func select() {
+        guard GameFeel.shared.hapticsEnabled else { return }
+        selection.selectionChanged()
+        selection.prepare()
     }
 
     private func gen(for s: UIImpactFeedbackGenerator.FeedbackStyle) -> UIImpactFeedbackGenerator {

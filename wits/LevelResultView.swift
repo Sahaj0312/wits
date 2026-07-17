@@ -130,7 +130,7 @@ struct DifficultyLevelResultView: View {
                     .background(difficultyColor,
                                 in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
-                .buttonStyle(PressScale())
+                .buttonStyle(TactilePressScale(feedback: .primary))
             }
 
             Button(action: onRetry) {
@@ -146,7 +146,7 @@ struct DifficultyLevelResultView: View {
                             .strokeBorder(world.accent.opacity(0.42), lineWidth: 1)
                     )
             }
-            .buttonStyle(PressScale())
+            .buttonStyle(TactilePressScale())
 
             HStack(spacing: 10) {
                 secondaryAction(title: "CHANGE DIFFICULTY",
@@ -177,7 +177,7 @@ struct DifficultyLevelResultView: View {
                         .strokeBorder(world.accent.opacity(0.26), lineWidth: 1)
                 )
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale())
     }
 
     private var headline: String {

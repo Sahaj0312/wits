@@ -660,6 +660,7 @@ struct WaterSortScreen: View {
     /// snapshot prevents another rewind until the player makes a new pour.
     private func undo() {
         guard pour == nil, !finished, let last = undoSnapshot else { return }
+        GameFeel.shared.uiTap()
         undoSnapshot = nil
         positionRevision &+= 1
         undos += 1
@@ -675,6 +676,7 @@ struct WaterSortScreen: View {
     /// exactly as if the level had just loaded.
     private func restart() {
         guard pour == nil, !finished, let initialTubes else { return }
+        GameFeel.shared.uiPrimary()
         positionRevision &+= 1
         restarts += 1
         undoSnapshot = nil
@@ -753,6 +755,7 @@ struct WaterSortScreen: View {
     }
 
     private func showHelp() {
+        GameFeel.shared.uiTap()
         hint = "a pour lands only on the same colour or an empty tube. one colour per tube wins"
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             if !finished {

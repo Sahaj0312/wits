@@ -56,7 +56,10 @@ struct SettingsView: View {
                                          title: "ad-free",
                                          value: "active")
                     } else {
-                        Button { showPaywall = true } label: {
+                        Button {
+                            GameFeel.shared.uiTap()
+                            showPaywall = true
+                        } label: {
                             settingsValueRow(icon: "sparkles",
                                              tint: .witsAccent,
                                              title: "remove ads",
@@ -67,6 +70,7 @@ struct SettingsView: View {
                     }
                     settingsDivider
                     Button {
+                        GameFeel.shared.uiPrimary()
                         restorePurchases()
                     } label: {
                         settingsValueRow(icon: "arrow.clockwise",
@@ -135,7 +139,7 @@ struct SettingsView: View {
                     .background(cardFill, in: Circle())
                     .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 1))
             }
-            .buttonStyle(PressScale())
+            .buttonStyle(TactilePressScale())
             .accessibilityLabel("Close settings")
         }
         .padding(.horizontal, WitsMetrics.screenPadding)

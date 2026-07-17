@@ -276,7 +276,7 @@ struct SnakeModeSelectView: View {
             .frame(height: 68)
             .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale(feedback: .primary))
         .shadow(color: color.opacity(0.22), radius: 10, y: 5)
     }
 
@@ -289,7 +289,7 @@ struct SnakeModeSelectView: View {
                 .background(world.surface, in: Circle())
                 .overlay(Circle().strokeBorder(world.accent.opacity(0.42), lineWidth: 1))
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale())
         .accessibilityLabel(label)
     }
 }

@@ -100,7 +100,7 @@ struct AnimatedHowToPlay: View {
                         .frame(width: 44, height: 44)
                         .background(world.surface, in: Circle())
                 }
-                .buttonStyle(PressScale())
+                .buttonStyle(TactilePressScale())
                 .accessibilityLabel("Back")
             } else {
                 Color.clear.frame(width: 44, height: 44)
@@ -191,7 +191,7 @@ struct AnimatedHowToPlay: View {
                     .background(world.accent,
                                 in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             }
-            .buttonStyle(PressScale())
+            .buttonStyle(TactilePressScale(feedback: isLast ? .primary : .selection))
 
             iconButton("chevron.right", label: "Next step", enabled: !isLast) {
                 withAnimation(.snappy(duration: 0.3)) { page += 1 }
@@ -218,7 +218,7 @@ struct AnimatedHowToPlay: View {
                 .frame(width: 52, height: 56)
                 .background(world.raised, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale(feedback: .selection))
         .disabled(!enabled)
         .opacity(enabled ? 1 : 0.35)
         .accessibilityLabel(label)

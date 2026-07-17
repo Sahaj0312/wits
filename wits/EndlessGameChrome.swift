@@ -125,7 +125,7 @@ struct EndlessModeSelectView: View {
             .frame(height: 68)
             .background(color, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale(feedback: .primary))
         .shadow(color: color.opacity(0.22), radius: 10, y: 5)
     }
 
@@ -138,7 +138,7 @@ struct EndlessModeSelectView: View {
                 .background(world.surface, in: Circle())
                 .overlay(Circle().strokeBorder(world.accent.opacity(0.42), lineWidth: 1))
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale())
         .accessibilityLabel(label)
     }
 }
@@ -165,7 +165,7 @@ struct EndlessRunHUD: View {
                     .frame(width: 44, height: 44)
                     .background(world.surface.opacity(0.9), in: Circle())
             }
-            .buttonStyle(PressScale())
+            .buttonStyle(TactilePressScale())
             .accessibilityLabel("quit run")
 
             chip(title: "\(difficulty.shortTitle.uppercased()) MODE",
@@ -184,7 +184,7 @@ struct EndlessRunHUD: View {
                     .frame(width: 44, height: 44)
                     .background(world.surface.opacity(0.9), in: Circle())
             }
-            .buttonStyle(PressScale())
+            .buttonStyle(TactilePressScale())
             .accessibilityLabel("pause game")
         }
     }

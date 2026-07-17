@@ -325,6 +325,7 @@ struct CrosswordScreen: View {
     private func step(_ puzzle: CrosswordPuzzle, by delta: Int) {
         guard let word = currentWord(puzzle),
               let index = puzzle.words.firstIndex(where: { $0.id == word.id }) else { return }
+        GameFeel.shared.uiSelection()
         let next = puzzle.words[(index + delta + puzzle.words.count) % puzzle.words.count]
         acrossMode = next.isAcross
         selected = next.cells.first { entries[$0.r][$0.c].isEmpty } ?? next.cells[0]
@@ -332,6 +333,7 @@ struct CrosswordScreen: View {
 
     private func tap(_ pos: CrosswordCellPos) {
         guard !finished else { return }
+        GameFeel.shared.uiSelection()
         if pos == selected {
             acrossMode.toggle()
         } else {
@@ -533,6 +535,7 @@ struct CrosswordScreen: View {
     }
 
     private func showHelp() {
+        GameFeel.shared.uiTap()
         hint = "tap a square to aim, tap again to flip across/down"
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             if !finished { hint = "" }

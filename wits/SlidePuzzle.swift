@@ -244,6 +244,7 @@ struct SlidePuzzleScreen: View {
     }
 
     private func showHelp() {
+        GameFeel.shared.uiTap()
         hint = "put the tiles back in order, 1 to \(tileCount). tap any tile in line with the gap"
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             if !finished {

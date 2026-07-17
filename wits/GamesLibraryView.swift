@@ -67,7 +67,7 @@ struct GamesLibraryView: View {
                 .background(Color(hexAny: 0x1B1B20), in: Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 1))
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale(feedback: .selection))
         .accessibilityLabel("Open a random game")
     }
 
@@ -82,7 +82,7 @@ struct GamesLibraryView: View {
                 .background(Color(hexAny: 0x1B1B20), in: Circle())
                 .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 1))
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale())
         .accessibilityLabel("Settings")
     }
 
@@ -119,7 +119,7 @@ struct GamesLibraryView: View {
             )
             .shadow(color: g.world.accent.opacity(0.16), radius: 12, y: 6)
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale())
         .accessibilityLabel(Text("\(g.displayName). \(g.tagline)"))
     }
 
@@ -205,7 +205,7 @@ struct GamesLibraryView: View {
                     .strokeBorder(.white.opacity(0.18), lineWidth: 1))
                 .shadow(color: Color(hexAny: 0x6657F5).opacity(0.22), radius: 12, y: 6)
             }
-            .buttonStyle(PressScale())
+            .buttonStyle(TactilePressScale())
             .frame(maxWidth: .infinity)
             .accessibilityLabel("Share Wits with a friend")
 

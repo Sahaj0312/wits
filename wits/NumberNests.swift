@@ -848,6 +848,7 @@ struct NumberNestsScreen: View {
 
     private func showHelp() {
         guard let puzzle else { return }
+        GameFeel.shared.uiTap()
         message = "use 1–\(puzzle.size) once per row and column; every outlined nest must hit its target"
         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
             if !finished { message = "" }

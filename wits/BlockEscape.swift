@@ -827,6 +827,7 @@ struct BlockEscapeScreen: View {
     }
 
     private func showHelp() {
+        GameFeel.shared.uiTap()
         hint = "blocks slide along rows and columns. get the red block to the bottom exit"
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) {
             if !finished {

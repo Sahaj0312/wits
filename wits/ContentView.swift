@@ -41,6 +41,7 @@ struct ContentView: View {
                     .zIndex(1)
                 }
             }
+            .onAppear { GameFeel.shared.prepareUIHaptics() }
         }
     }
 }

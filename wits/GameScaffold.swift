@@ -205,7 +205,7 @@ struct FirstPlayTutorial: View {
                                     .frame(width: 44, height: 44)
                                     .background(world.surface, in: Circle())
                             }
-                            .buttonStyle(PressScale())
+                            .buttonStyle(TactilePressScale())
                             .accessibilityLabel("Back")
                         }
                         Spacer()
@@ -265,7 +265,7 @@ struct FirstPlayTutorial: View {
                         .background(world.accent,
                                     in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                     }
-                    .buttonStyle(PressScale())
+                    .buttonStyle(TactilePressScale(feedback: .primary))
                     .padding(.top, 16)
                     .padding(.bottom, 24)
                 }

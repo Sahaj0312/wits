@@ -587,6 +587,7 @@ struct PegSolitaireScreen: View {
 
     private func undo() {
         guard let last = undoSnapshot, !finished else { return }
+        GameFeel.shared.uiTap()
         undoSnapshot = nil
         undos += 1
         selected = nil
@@ -643,6 +644,7 @@ struct PegSolitaireScreen: View {
     }
 
     private func showHelp() {
+        GameFeel.shared.uiTap()
         hint = puzzle.target != nil
             ? "jump pegs to remove them. the last peg must land on the ringed hole"
             : "jump pegs to remove them until a single peg remains"

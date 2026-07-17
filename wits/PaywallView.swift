@@ -73,7 +73,7 @@ struct PaywallView: View {
                     .background(cardFill, in: Circle())
                     .overlay(Circle().strokeBorder(.white.opacity(0.12), lineWidth: 1))
             }
-            .buttonStyle(PressScale())
+            .buttonStyle(TactilePressScale())
             .accessibilityLabel("Close paywall")
 
             Spacer()
@@ -248,7 +248,7 @@ struct PaywallView: View {
                     .strokeBorder(.white.opacity(0.20), lineWidth: 1)
             )
         }
-        .buttonStyle(PressScale())
+        .buttonStyle(TactilePressScale(feedback: .primary))
         .disabled(purchasing || (!loaded && product == nil))
         .opacity((!loaded && product == nil) ? 0.58 : 1)
     }
@@ -274,7 +274,10 @@ struct PaywallView: View {
     }
 
     private func restoreButton(_ layout: PaywallLayout) -> some View {
-        Button { restore() } label: {
+        Button {
+            GameFeel.shared.uiTap()
+            restore()
+        } label: {
             Text("RESTORE PURCHASE")
                 .font(.system(size: layout.restoreSize, weight: .bold, design: .rounded))
                 .foregroundStyle(.white.opacity(0.44))

@@ -245,7 +245,7 @@ struct GameRunOverView: View {
                             .strokeBorder(world.ink.opacity(0.12), lineWidth: 1)
                     )
             }
-            .buttonStyle(PressScale())
+            .buttonStyle(TactilePressScale())
             .accessibilityLabel("Back to games")
 
             Button(action: onPlayAgain) {
@@ -258,7 +258,7 @@ struct GameRunOverView: View {
                                 in: RoundedRectangle(cornerRadius: 15, style: .continuous))
                     .shadow(color: world.accent.opacity(0.25), radius: 10, y: 5)
             }
-            .buttonStyle(PressScale())
+            .buttonStyle(TactilePressScale(feedback: .primary))
         }
     }
 }
@@ -304,7 +304,7 @@ struct RewardedReviveOffer: View {
                             .background(world.raised.opacity(0.96),
                                         in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .buttonStyle(PressScale())
+                    .buttonStyle(TactilePressScale())
 
                     Button(action: onSave) {
                         HStack(spacing: 10) {
@@ -320,7 +320,7 @@ struct RewardedReviveOffer: View {
                         .background(world.accent,
                                     in: RoundedRectangle(cornerRadius: 14, style: .continuous))
                     }
-                    .buttonStyle(PressScale())
+                    .buttonStyle(TactilePressScale(feedback: .primary))
                     .disabled(busy || !ads.rewardedReady)
                     .opacity(busy || !ads.rewardedReady ? 0.65 : 1)
                 }
