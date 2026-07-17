@@ -376,12 +376,14 @@ struct CrosswordScreen: View {
         guard let puzzle, !finished else { return }
         if !entries[selected.r][selected.c].isEmpty {
             entries[selected.r][selected.c] = ""
+            GameFeel.shared.uiTap()
             return
         }
         guard let word = currentWord(puzzle),
               let at = word.cells.firstIndex(of: selected), at > 0 else { return }
         selected = word.cells[at - 1]
         entries[selected.r][selected.c] = ""
+        GameFeel.shared.uiTap()
     }
 
     private func requestReveal() {

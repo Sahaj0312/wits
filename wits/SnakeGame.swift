@@ -95,11 +95,13 @@ final class SnakeEngine {
 
     enum StepOutcome { case moved, ate, died }
 
-    func steer(_ dir: SnakeDir) {
-        guard alive else { return }
+    @discardableResult
+    func steer(_ dir: SnakeDir) -> Bool {
+        guard alive else { return false }
         let reference = pending.last ?? direction
-        guard dir != reference, dir != reference.opposite, pending.count < 2 else { return }
+        guard dir != reference, dir != reference.opposite, pending.count < 2 else { return false }
         pending.append(dir)
+        return true
     }
 
     @discardableResult
@@ -437,7 +439,9 @@ struct SnakeScreen: View {
                 let dir: SnakeDir = abs(dx) > abs(dy)
                     ? (dx > 0 ? .right : .left)
                     : (dy > 0 ? .down : .up)
-                model.steer(dir)
+                if model.steer(dir) {
+                    GameFeel.shared.uiSelection()
+                }
                 model.dragAnchor = gesture.location
             }
             .onEnded { _ in model.dragAnchor = nil }

@@ -623,7 +623,10 @@ struct NumberNestsScreen: View {
             }
 
             HStack(spacing: 8) {
-                Button { noteMode.toggle() } label: {
+                Button {
+                    noteMode.toggle()
+                    GameFeel.shared.uiSelection()
+                } label: {
                     Label("NOTES", systemImage: "pencil")
                         .foregroundStyle(noteMode ? world.background : world.ink)
                         .frame(maxWidth: .infinity).frame(height: 46)
@@ -685,10 +688,12 @@ struct NumberNestsScreen: View {
 
     private func erase() {
         guard !finished, let selected, !revealed.contains(selected) else { return }
+        let hadContent = entries[selected.r][selected.c] != nil || !notes[selected.r][selected.c].isEmpty
         entries[selected.r][selected.c] = nil
         notes[selected.r][selected.c].removeAll()
         wrongCells.remove(selected)
         message = ""
+        if hadContent { GameFeel.shared.uiTap() }
     }
 
     private func requestReveal() {

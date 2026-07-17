@@ -563,6 +563,7 @@ struct PegSolitaireScreen: View {
         if puzzle.pegs.contains(hole) {
             selected = selected == hole ? nil : hole
             hint = ""
+            GameFeel.shared.uiSelection()
             return
         }
         guard let from = selected,

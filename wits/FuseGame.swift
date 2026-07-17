@@ -513,6 +513,8 @@ struct FuseScreen: View {
     private func react(to outcome: FuseEngine.MoveOutcome) {
         if outcome.fusions > 0 {
             GameFeel.shared.play(.correct(combo: outcome.fusions))
+        } else {
+            GameFeel.shared.uiMove(0.42)
         }
         if outcome.biggestFusion >= 128, outcome.biggestFusion == model.bestTile {
             GameFeel.shared.play(.comboMilestone(outcome.fusions))

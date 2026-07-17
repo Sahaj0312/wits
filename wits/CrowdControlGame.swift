@@ -282,7 +282,11 @@ struct CrowdControlScreen: View {
         }
         guard let hit, dist(dots[hit].pos, location) < 28, !dots[hit].picked else { return }
         dots[hit].picked = true
-        if dots.filter(\.picked).count == roundConfig.targets { finishPicks() }
+        if dots.filter(\.picked).count == roundConfig.targets {
+            finishPicks()
+        } else {
+            GameFeel.shared.uiTick(0.38)
+        }
     }
 
     private func dist(_ a: CGPoint, _ b: CGPoint) -> Double {

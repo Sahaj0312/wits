@@ -88,6 +88,12 @@ final class GameFeel {
         haptics.select()
     }
 
+    /// A soft landing for a successful board move with no scored outcome.
+    /// Call once per committed move, never for continuous drag updates.
+    func uiMove(_ intensity: CGFloat = 0.5) {
+        haptics.impact(.soft, intensity: intensity)
+    }
+
     /// Slightly firmer feedback reserved for primary actions such as Play.
     func uiPrimary() {
         haptics.impact(.medium, intensity: 0.68)

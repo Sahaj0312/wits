@@ -553,6 +553,7 @@ struct WaterSortScreen: View {
         if let source = selected {
             if source == index {
                 selected = nil
+                GameFeel.shared.uiSelection()
                 return
             }
             if WaterSortEngine.canPour(current, from: source, to: index, capacity: capacity) {
@@ -564,8 +565,10 @@ struct WaterSortScreen: View {
         // Nothing poured: treat the tap as picking (or re-picking) a source.
         if !current[index].isEmpty && !WaterSortEngine.isComplete(current[index], capacity: capacity) {
             selected = index
+            GameFeel.shared.uiSelection()
         } else if selected != nil {
             selected = nil
+            GameFeel.shared.uiSelection()
         }
     }
 
@@ -577,6 +580,7 @@ struct WaterSortScreen: View {
         let snapshot = current
         let moved = WaterSortEngine.pour(&current, from: source, to: dest, capacity: capacity)
         guard moved > 0 else { return }
+        GameFeel.shared.uiMove(0.55)
         tubes = current
         positionRevision &+= 1
         moves += 1

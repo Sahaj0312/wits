@@ -694,6 +694,8 @@ struct BlockFitScreen: View {
 
         if placement.lines > 0 {
             GameFeel.shared.play(.correct(combo: placement.comboAfter))
+        } else {
+            GameFeel.shared.uiMove(0.46)
         }
         if placement.lines >= 2 {
             GameFeel.shared.play(.comboMilestone(placement.lines))
