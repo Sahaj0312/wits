@@ -336,7 +336,7 @@ struct GamesLibraryView: View {
     }
 
     private var shareMessage: String {
-        "I’ve been playing Wits, a collection of quick brain games for memory, logic, words, maths, and focus. Give it a try!"
+        "I’ve been playing Wits, a collection of quick brain games for memory, logic, words, maths, and focus. Give it a try!\n\nhttps://apps.apple.com/us/app/wits-free-brain-games/id6789398193"
     }
 
 }
