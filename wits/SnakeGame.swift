@@ -64,6 +64,23 @@ final class SnakeEngine {
     static let rows = 22
     static let foodCount = 2
 
+    /// A board-spanning cycle used to respawn any snake length without
+    /// overlapping itself. The cycle leaves the cell to the right of the
+    /// revival head free until the board is completely full.
+    private static let revivalRoute: [SnakeCell] = {
+        var route = (0..<cols).map { SnakeCell(x: $0, y: 0) }
+        for y in 1..<rows {
+            let xs: [Int] = y.isMultiple(of: 2)
+                ? Array(1..<cols)
+                : Array(stride(from: cols - 1, through: 1, by: -1))
+            route.append(contentsOf: xs.map { SnakeCell(x: $0, y: y) })
+        }
+        route.append(SnakeCell(x: 0, y: rows - 1))
+        route.append(contentsOf: stride(from: rows - 2, through: 1, by: -1)
+            .map { SnakeCell(x: 0, y: $0) })
+        return route
+    }()
+
     /// Head first.
     private(set) var body: [SnakeCell] = []
     private(set) var foods: [SnakeCell] = []
@@ -139,7 +156,8 @@ final class SnakeEngine {
         return .moved
     }
 
-    private func spawnFood() {
+    @discardableResult
+    private func spawnFood() -> Bool {
         var empty: [SnakeCell] = []
         for x in 0..<Self.cols {
             for y in 0..<Self.rows {
@@ -147,22 +165,45 @@ final class SnakeEngine {
                 if !body.contains(cell), !foods.contains(cell) { empty.append(cell) }
             }
         }
-        guard let cell = empty.randomElement(using: &rng) else { return }
+        guard let cell = empty.randomElement(using: &rng) else { return false }
         foods.append(cell)
+        return true
     }
 
-    /// One final chance respawns the snake in a safe lane while preserving
-    /// the run's score. The shorter body is the life reward; the next crash
-    /// still ends the run immediately.
+    /// Test seam: install an exact run state before exercising death/revive.
+    func load(body: [SnakeCell], foods: [SnakeCell], score: Int,
+              direction: SnakeDir, alive: Bool) {
+        precondition(!body.isEmpty && body.count <= Self.cols * Self.rows)
+        precondition(Set(body).count == body.count)
+        self.body = body
+        prevBody = body
+        self.foods = foods
+        self.score = score
+        self.direction = direction
+        pending.removeAll()
+        dragAnchor = nil
+        sparkles.removeAll()
+        self.alive = alive
+    }
+
+    private static func revivalBody(length: Int) -> [SnakeCell] {
+        precondition((1...revivalRoute.count).contains(length))
+        let head = SnakeCell(x: cols / 2, y: rows * 2 / 3)
+        let headIndex = revivalRoute.firstIndex(of: head)!
+        return (0..<length).map { offset in
+            revivalRoute[(headIndex - offset + revivalRoute.count) % revivalRoute.count]
+        }
+    }
+
+    /// One final chance respawns the complete snake on a safe contiguous path,
+    /// preserving both the run's score and its earned length.
     func revive() {
         guard !alive else { return }
-        let x = Self.cols / 2
-        let y = Self.rows * 2 / 3
-        body = (0..<4).map { SnakeCell(x: x, y: y + $0) }
+        body = Self.revivalBody(length: body.count)
         prevBody = body
         foods.removeAll { body.contains($0) }
-        while foods.count < Self.foodCount { spawnFood() }
-        direction = .up
+        while foods.count < Self.foodCount, spawnFood() {}
+        direction = .right
         pending.removeAll()
         dragAnchor = nil
         sparkles.removeAll()
