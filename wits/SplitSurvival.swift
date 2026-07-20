@@ -57,6 +57,10 @@ final class SplitGame {
     private(set) var level = 1
     private(set) var levelElapsed: Double = 0
     private(set) var totalElapsed: Double = 0
+    /// Furthest elapsed time reached in this level before a rewarded restart.
+    /// The live HUD still uses `levelElapsed`, while run recording uses the
+    /// maximum so accepting a continue can never erase earned progress.
+    private var furthestLevelElapsed: Double = 0
     private(set) var alive = true
     private(set) var started = false        // bird hovers until the first flap
     private(set) var deathReason = ""
@@ -94,10 +98,17 @@ final class SplitGame {
     /// the domain score uses to break ties between equal levels reached.
     var depthIntoLevel: Double { min(1, levelElapsed / timeForLevel(level)) }
 
+    /// Best depth reached in the current level across both sides of a rewarded
+    /// restart. Reaching a higher level resets this because the level itself is
+    /// already the primary progress signal.
+    var furthestDepthIntoLevel: Double {
+        min(1, max(levelElapsed, furthestLevelElapsed) / timeForLevel(level))
+    }
+
     func reset() {
         birdY = 0.42; birdV = 0; displayPitch = 0
         pipes = []; emojis = []
-        level = 1; levelElapsed = 0; totalElapsed = 0
+        level = 1; levelElapsed = 0; totalElapsed = 0; furthestLevelElapsed = 0
         alive = true; started = false; deathReason = ""; trials = 0
         sincePipe = .greatestFiniteMagnitude
         sinceEmoji = 0.5
@@ -118,6 +129,7 @@ final class SplitGame {
     func revive() {
         birdY = 0.42; birdV = 0; displayPitch = 0
         pipes = []; emojis = []
+        furthestLevelElapsed = max(furthestLevelElapsed, levelElapsed)
         levelElapsed = 0
         alive = true; started = false; deathReason = ""
         sincePipe = 0
@@ -147,7 +159,11 @@ final class SplitGame {
 
         totalElapsed += dt
         levelElapsed += dt
-        if levelElapsed >= timeForLevel(level) { levelElapsed -= timeForLevel(level); level += 1 }
+        if levelElapsed >= timeForLevel(level) {
+            levelElapsed -= timeForLevel(level)
+            level += 1
+            furthestLevelElapsed = 0
+        }
 
         stepFlyer(dt)
         stepEmojis(dt)
@@ -556,7 +572,7 @@ struct SplitSurvivalScreen: View {
             runRecorded = false
         } else {
             runRecorded = true
-            onRunComplete(model.level, model.depthIntoLevel, model.trials)
+            onRunComplete(model.level, model.furthestDepthIntoLevel, model.trials)
         }
         withAnimation(.easeOut(duration: 0.25)) { phase = .over }
     }
@@ -564,11 +580,11 @@ struct SplitSurvivalScreen: View {
     private func finalizeRun() {
         guard !runRecorded else { return }
         runRecorded = true
-        onRunComplete(model.level, model.depthIntoLevel, model.trials)
+        onRunComplete(model.level, model.furthestDepthIntoLevel, model.trials)
     }
 
     private var currentProgressValue: Int {
-        SplitProgress.value(level: endLevel, depth: model.depthIntoLevel)
+        SplitProgress.value(level: endLevel, depth: model.furthestDepthIntoLevel)
     }
 
     private var comparisonBestValue: Int {
