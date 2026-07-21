@@ -449,7 +449,7 @@ struct CrowdControlScreen: View {
         sessionBest = max(sessionBest, score)
         // A continue offer defers recording, the run isn't over until the
         // player passes on it. No offer → record right away.
-        canContinue = !usedContinue
+        canContinue = !usedContinue && AdManager.shared.rewardedReady
         runRecorded = false
         if !canContinue { finalizeRun() }
         GameFeel.shared.play(.gameOver)

@@ -712,7 +712,7 @@ struct BlockFitScreen: View {
     private func endRun() {
         if referenceBest == 0 && model.score > 0 { newBest = true }
         sessionBest = max(sessionBest, model.score)
-        canContinue = !usedContinue
+        canContinue = !usedContinue && AdManager.shared.rewardedReady
         runRecorded = false
         if !canContinue { finalizeRun() }
         GameFeel.shared.play(.gameOver)

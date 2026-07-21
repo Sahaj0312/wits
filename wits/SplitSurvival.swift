@@ -567,7 +567,7 @@ struct SplitSurvivalScreen: View {
         GameFeel.shared.play(newBest ? .newBest : .gameOver)
         // A continue offer defers recording, the run isn't over until the
         // player passes on it. No offer → record right away, as before.
-        canContinue = !usedContinue
+        canContinue = !usedContinue && AdManager.shared.rewardedReady
         if canContinue {
             runRecorded = false
         } else {

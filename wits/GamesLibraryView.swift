@@ -759,7 +759,8 @@ private struct GameLauncher: View {
     private func handle(_ result: GameResult) {
         pauseController.reset()
         let previous = app.difficultyState(for: game, difficulty: playDifficulty)
-        if RewardedReviveEligibility.shouldOffer(for: result,
+        if AdManager.shared.rewardedReady,
+           RewardedReviveEligibility.shouldOffer(for: result,
                                                  previous: previous,
                                                  alreadyUsed: reviveUsed) {
             withAnimation(.easeOut(duration: 0.2)) {

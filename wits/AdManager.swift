@@ -26,6 +26,7 @@ final class AdManager {
     #if DEBUG
     private static let interstitialUnitID = "ca-app-pub-3940256099942544/4411468910"
     static let rewardedUnitID = "ca-app-pub-3940256099942544/1712485313"
+    private static let testDeviceIdentifiers = ["1abe544cd0b8e5c53fef71abc13b71d1"]
     #else
     private static let interstitialUnitID = "ca-app-pub-9813826155312094/4859812107"
     static let rewardedUnitID = "ca-app-pub-9813826155312094/2153757716"
@@ -61,6 +62,10 @@ final class AdManager {
     func startIfNeeded() async {
         guard !startAttempted else { return }
         startAttempted = true
+
+#if DEBUG
+        MobileAds.shared.requestConfiguration.testDeviceIdentifiers = Self.testDeviceIdentifiers
+#endif
 
         await updateConsentInformation()
         do {

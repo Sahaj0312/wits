@@ -532,7 +532,7 @@ struct SnakeScreen: View {
             newAllTimeBest = true
         }
         sessionBest = max(sessionBest, model.score)
-        canContinue = !usedContinue
+        canContinue = !usedContinue && AdManager.shared.rewardedReady
         runRecorded = false
         if !canContinue { finalizeRun() }
         GameFeel.shared.play(.gameOver)
