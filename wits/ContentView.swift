@@ -30,9 +30,11 @@ struct ContentView: View {
                         guard !isStarting else { return }
                         isStarting = true
                         Task { @MainActor in
-                            // Finish this system prompt before mounting the
-                            // library, whose startup may request ATT consent.
+                            // Resolve system permissions serially. ATT must be
+                            // decided before mounting the library, whose task
+                            // begins Google's consent and ads startup.
                             await NotificationManager.shared.requestAfterWelcome(streak: app.streak)
+                            await AdManager.shared.requestTrackingAuthorizationIfNeeded()
                             withAnimation(.easeInOut(duration: 0.35)) { hasSeenWelcome = true }
                             isStarting = false
                         }

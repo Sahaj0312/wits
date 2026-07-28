@@ -47,6 +47,7 @@ final class AdManager {
     private var isLoading = false
     private var completedGames = 0
     private var lastAdShownAt: Date?
+    private var isRequestingTrackingAuthorization = false
 
     private var rewarded: RewardedAd?
     private var isLoadingRewarded = false
@@ -55,10 +56,9 @@ final class AdManager {
 
     private init() {}
 
-    /// Idempotent. Refreshes Google's consent state on every process launch,
-    /// presents a required privacy form, and never starts or requests ads
-    /// until UMP says ad requests are allowed. ATT remains Apple's separate
-    /// system-level tracking choice.
+    /// Idempotent. Resolves Apple's system-level tracking choice before any
+    /// Google consent or ads work, then refreshes UMP and never starts or
+    /// requests ads until UMP says ad requests are allowed.
     func startIfNeeded() async {
         guard !startAttempted else { return }
         startAttempted = true
@@ -66,6 +66,10 @@ final class AdManager {
 #if DEBUG
         MobileAds.shared.requestConfiguration.testDeviceIdentifiers = Self.testDeviceIdentifiers
 #endif
+
+        // ATT is intentionally independent of UMP and AdMob readiness. A UMP
+        // network or configuration error must never prevent Apple's prompt.
+        _ = await requestTrackingAuthorizationIfNeeded()
 
         await updateConsentInformation()
         do {
@@ -79,15 +83,74 @@ final class AdManager {
 
         guard ConsentInformation.shared.canRequestAds else { return }
 
-        if ATTrackingManager.trackingAuthorizationStatus == .notDetermined {
-            _ = await ATTrackingManager.requestTrackingAuthorization()
-        }
-
         guard !started else { return }
         started = true
         await MobileAds.shared.start()
         if !adFreeProvider() { loadInterstitial() }
         loadRewardedIfNeeded()
+    }
+
+    /// Requests ATT only while the app is active and after any preceding
+    /// system sheet has had time to dismiss. iOS drops authorization requests
+    /// made while another permission prompt is pending, so retry a small
+    /// number of times if the status unexpectedly remains undetermined.
+    ///
+    /// The returned choice never gates gameplay or ad loading. UMP decides
+    /// whether ads may be requested; when ATT is denied Google receives no
+    /// IDFA and can still serve eligible non-personalized/contextual ads.
+    @discardableResult
+    func requestTrackingAuthorizationIfNeeded() async -> ATTrackingManager.AuthorizationStatus {
+        var status = ATTrackingManager.trackingAuthorizationStatus
+        guard status == .notDetermined else { return status }
+
+        if isRequestingTrackingAuthorization {
+            while isRequestingTrackingAuthorization {
+                do {
+                    try await Task.sleep(for: .milliseconds(100))
+                } catch {
+                    return ATTrackingManager.trackingAuthorizationStatus
+                }
+            }
+            return ATTrackingManager.trackingAuthorizationStatus
+        }
+
+        isRequestingTrackingAuthorization = true
+        defer { isRequestingTrackingAuthorization = false }
+
+        for _ in 0..<3 {
+            guard await waitForActivePermissionWindow() else {
+                return ATTrackingManager.trackingAuthorizationStatus
+            }
+
+            status = ATTrackingManager.trackingAuthorizationStatus
+            guard status == .notDetermined else { return status }
+
+            status = await ATTrackingManager.requestTrackingAuthorization()
+            if status != .notDetermined { return status }
+        }
+
+        return status
+    }
+
+    private func waitForActivePermissionWindow() async -> Bool {
+        while UIApplication.shared.applicationState != .active {
+            guard !Task.isCancelled else { return false }
+            do {
+                try await Task.sleep(for: .milliseconds(100))
+            } catch {
+                return false
+            }
+        }
+
+        // The notification/UMP completion handler can run before its system
+        // sheet has visually finished dismissing. Give that transition a
+        // deterministic gap before presenting the next system permission.
+        do {
+            try await Task.sleep(for: .milliseconds(600))
+        } catch {
+            return false
+        }
+        return UIApplication.shared.applicationState == .active
     }
 
     /// Opens Google's publisher-rendered privacy controls. Settings only

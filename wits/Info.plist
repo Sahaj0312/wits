@@ -7,7 +7,7 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSUserTrackingUsageDescription</key>
-	<string>This lets us show ads that are more relevant to you, which keeps wits free.</string>
+	<string>Wits uses your device’s advertising identifier to show more relevant ads and measure ad performance.</string>
 	<!-- SKAdNetwork IDs for ad attribution. Refresh from
 	     https://developers.google.com/admob/ios/quick-start before release. -->
 	<key>SKAdNetworkItems</key>
