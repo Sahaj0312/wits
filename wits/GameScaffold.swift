@@ -445,7 +445,7 @@ extension GameID {
             ]
         case .snake:
             [
-                "swipe to steer. the snake never stops moving.",
+                "use the arrow buttons to steer. swiping on the board also works.",
                 "eat the apples: every one adds a segment and speeds you up.",
                 "don't hit the walls or your own body. one clip ends the run."
             ]

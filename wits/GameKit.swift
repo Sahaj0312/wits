@@ -221,7 +221,7 @@ extension GameID {
         case .split: "keep the flyer alive at the bottom while you tap the right targets up top and never tap the look-alike. one mistake ends the run, so see how many levels you can clear."
         case .blockFit: "drag the three pieces onto the board. fill a full row or column to clear it. pieces never rotate, but the next hand is always shown. the run ends the moment nothing in your hand fits."
         case .fuse: "every swipe slides the whole board. matching cells fuse and double, and each fusion pays its new value. keep space open and build the biggest cell you can. the run ends when no swipe can move anything."
-        case .snake: "swipe to steer a snake that never stops. every apple adds a segment and quickens the pace. the run ends the moment you clip a wall or your own body."
+        case .snake: "use the arrow controls to steer a snake that never stops. every apple adds a segment and quickens the pace. the run ends the moment you clip a wall or your own body."
         case .tower: "a block glides across the top of the tower. tap to drop it. whatever hangs over the edge is sliced away, so every miss leaves less to land on. the run ends when a block misses the stack completely."
         }
     }

@@ -11,8 +11,9 @@
 //  Rendering follows the Split playbook: the engine is a plain class stepped
 //  by an async loop, and a TimelineView-driven Canvas interpolates segment
 //  positions between ticks so the snake glides instead of hopping cells.
-//  Steering works mid-drag, every ~22pt of travel in a new direction queues
-//  a turn, so a held finger can whip through corners without lifting.
+//  Steering uses an explicit arrow pad below the board, with continuous swipe
+//  steering retained as a secondary shortcut. Both inputs share the same
+//  two-turn queue so quick corners land without allowing reversals.
 //
 
 import SwiftUI
@@ -339,6 +340,32 @@ struct SnakeModeSelectView: View {
 
 // MARK: - Screen
 
+nonisolated struct SnakePlayLayout {
+    let directionButtonSide: CGFloat
+    let directionButtonSpacing: CGFloat
+    let boardHorizontalPadding: CGFloat
+    let boardSize: CGSize
+
+    init(availableSize: CGSize) {
+        // Width keeps the three-button row inside compact screens; height
+        // prevents the pad from squeezing the tall board on short phones.
+        let availableControlSide = min(availableSize.width * 0.23,
+                                       availableSize.height * 0.12)
+        directionButtonSide = min(104, max(68, availableControlSide))
+        directionButtonSpacing = min(11, max(8, directionButtonSide * 0.13))
+        boardHorizontalPadding = min(44, max(22, availableSize.width * 0.075))
+
+        let controlsHeight = directionButtonSide * 2 + directionButtonSpacing
+        let fixedVerticalSpace: CGFloat = 10 + 44 + 10 + 7 + controlsHeight + 10
+        let availableBoardWidth = max(0, availableSize.width - boardHorizontalPadding * 2)
+        let availableBoardHeight = max(0, availableSize.height - fixedVerticalSpace)
+        let cell = min(availableBoardWidth / CGFloat(SnakeEngine.cols),
+                       availableBoardHeight / CGFloat(SnakeEngine.rows))
+        boardSize = CGSize(width: cell * CGFloat(SnakeEngine.cols),
+                           height: cell * CGFloat(SnakeEngine.rows))
+    }
+}
+
 struct SnakeScreen: View {
     let difficulty: ChallengeDifficulty
     let modeBest: Int
@@ -405,15 +432,24 @@ struct SnakeScreen: View {
     // MARK: Playing
 
     private var playing: some View {
-        VStack(spacing: 0) {
-            hud
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
+        GeometryReader { geo in
+            let layout = SnakePlayLayout(availableSize: geo.size)
+            VStack(spacing: 0) {
+                hud
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
 
-            boardView
-                .padding(.horizontal, 30)
-                .padding(.top, 14)
-                .padding(.bottom, 16)
+                boardView
+                    .frame(width: layout.boardSize.width,
+                           height: layout.boardSize.height)
+                    .padding(.top, 10)
+
+                directionPad(layout: layout)
+                    .padding(.top, 7)
+                    .padding(.bottom, 10)
+
+                Spacer(minLength: 0)
+            }
         }
         .allowsHitTesting(phase == .playing && !pauseController.isPaused)
         .task(id: runID) { await runLoop() }
@@ -462,11 +498,66 @@ struct SnakeScreen: View {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(world.ink.opacity(0.10), lineWidth: 1)
             )
-            .position(x: geo.size.width / 2, y: geo.size.height / 2)
+            .position(x: geo.size.width / 2, y: boardH / 2)
         }
     }
 
     // MARK: Input
+
+    private func directionPad(layout: SnakePlayLayout) -> some View {
+        VStack(spacing: layout.directionButtonSpacing) {
+            directionButton(.up,
+                            symbol: "arrowtriangle.up.fill",
+                            label: "Move up",
+                            side: layout.directionButtonSide)
+            HStack(spacing: layout.directionButtonSpacing) {
+                directionButton(.left,
+                                symbol: "arrowtriangle.left.fill",
+                                label: "Move left",
+                                side: layout.directionButtonSide)
+                directionButton(.down,
+                                symbol: "arrowtriangle.down.fill",
+                                label: "Move down",
+                                side: layout.directionButtonSide)
+                directionButton(.right,
+                                symbol: "arrowtriangle.right.fill",
+                                label: "Move right",
+                                side: layout.directionButtonSide)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Snake direction controls")
+    }
+
+    private func directionButton(_ direction: SnakeDir,
+                                 symbol: String,
+                                 label: String,
+                                 side: CGFloat) -> some View {
+        Button {
+            steer(direction)
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: side * 0.33, weight: .black))
+                .foregroundStyle(world.ink)
+                .frame(width: side, height: side)
+                .background(world.surface.opacity(0.94),
+                            in: RoundedRectangle(cornerRadius: side * 0.16,
+                                                 style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: side * 0.16, style: .continuous)
+                        .strokeBorder(world.accent.opacity(0.34), lineWidth: 1)
+                )
+                .shadow(color: world.ink.opacity(0.12), radius: 5, y: 3)
+        }
+        .buttonStyle(PressScale())
+        .accessibilityLabel(label)
+    }
+
+    private func steer(_ direction: SnakeDir) {
+        guard model.steer(direction) else { return }
+        GameFeel.shared.uiSelection()
+    }
 
     /// Continuous steering: every ~22pt of drag in a fresh direction queues a
     /// turn and re-anchors, so a held finger can chain corners without lifting.
@@ -480,9 +571,7 @@ struct SnakeScreen: View {
                 let dir: SnakeDir = abs(dx) > abs(dy)
                     ? (dx > 0 ? .right : .left)
                     : (dy > 0 ? .down : .up)
-                if model.steer(dir) {
-                    GameFeel.shared.uiSelection()
-                }
+                steer(dir)
                 model.dragAnchor = gesture.location
             }
             .onEnded { _ in model.dragAnchor = nil }

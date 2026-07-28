@@ -2,7 +2,7 @@
 //  SnakeTutorial.swift
 //  wits
 //
-//  Animated how-to-play demos for Snake Snack: swipe through a corner, eat an
+//  Animated how-to-play demos for Snake Snack: steer through a corner, eat an
 //  apple and grow, then see a wall collision end the run. The mini board uses
 //  the real night-garden checker, striped green body, googly head, and apple.
 //
@@ -11,7 +11,7 @@ import SwiftUI
 
 enum SnakeTutorial {
     static let slides: [TutorialSlide] = [
-        TutorialSlide(caption: "swipe to steer. the snake keeps moving between every turn") {
+        TutorialSlide(caption: "use the arrow buttons to steer. swiping on the board also works") {
             SnakeDemo(page: .steer)
         },
         TutorialSlide(caption: "eat apples to score and grow. every apple also quickens the pace") {

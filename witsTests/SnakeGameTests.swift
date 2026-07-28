@@ -10,6 +10,33 @@ import XCTest
 
 @MainActor
 final class SnakeGameTests: XCTestCase {
+    func testDirectionControlsScaleAcrossScreenSizes() {
+        let compact = SnakePlayLayout(availableSize: CGSize(width: 320, height: 568))
+        let standard = SnakePlayLayout(availableSize: CGSize(width: 393, height: 852))
+        let tablet = SnakePlayLayout(availableSize: CGSize(width: 820, height: 1_180))
+
+        XCTAssertEqual(compact.directionButtonSide, 68.16, accuracy: 0.01)
+        XCTAssertGreaterThan(standard.directionButtonSide, compact.directionButtonSide)
+        XCTAssertLessThan(standard.directionButtonSide, tablet.directionButtonSide)
+        XCTAssertEqual(tablet.directionButtonSide, 104, accuracy: 0.01)
+        XCTAssertLessThanOrEqual(3 * compact.directionButtonSide
+                                 + 2 * compact.directionButtonSpacing,
+                                 320)
+        XCTAssertEqual(standard.boardSize.width / standard.boardSize.height,
+                       CGFloat(SnakeEngine.cols) / CGFloat(SnakeEngine.rows),
+                       accuracy: 0.001)
+
+        for (layout, availableHeight) in [(compact, CGFloat(568)),
+                                          (standard, CGFloat(852)),
+                                          (tablet, CGFloat(1_180))] {
+            let controlsHeight = layout.directionButtonSide * 2
+                + layout.directionButtonSpacing
+            let occupiedHeight = 10 + 44 + 10 + layout.boardSize.height
+                + 7 + controlsHeight + 10
+            XCTAssertLessThanOrEqual(occupiedHeight, availableHeight + 0.01)
+        }
+    }
+
     func testRevivePreservesEarnedLengthAndScoreOnSafePath() {
         let game = SnakeEngine()
         let crashedBody = (0..<12).map { SnakeCell(x: 11 - $0, y: 10) }
