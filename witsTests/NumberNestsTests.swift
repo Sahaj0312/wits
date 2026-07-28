@@ -38,6 +38,20 @@ final class NumberNestsTests: XCTestCase {
         }
     }
 
+    func testGeneratedPuzzlesKeepExactCagesSparse() {
+        let formerlyClueHeavyHardSeeds: [UInt64] = [6, 8, 74, 84, 98]
+        for seed in formerlyClueHeavyHardSeeds {
+            let puzzle = NumberNestsEngine.generate(mapLevel: 30, seed: seed)
+            let exactCount = puzzle.cages.filter { $0.cells.count == 1 }.count
+
+            XCTAssertLessThanOrEqual(exactCount,
+                                     NumberNestsEngine.maximumExactCageCount(boardSize: puzzle.size),
+                                     "hard board exposes too many answers for seed \(seed)")
+            XCTAssertEqual(NumberNestsEngine.solutionCount(for: puzzle), 1,
+                           "quality retries must preserve uniqueness for seed \(seed)")
+        }
+    }
+
     private func assertCompleteConnectedCoverage(_ puzzle: NumberNestsPuzzle,
                                                  file: StaticString = #filePath,
                                                  line: UInt = #line) {

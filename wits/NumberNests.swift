@@ -108,34 +108,38 @@ nonisolated enum NumberNestsEngine {
         let size = boardSize(mapLevel: level)
         var rng = SeededRandomNumberGenerator(seed: seed)
         let solution = latinSquare(size: size, using: &rng)
-        let groups = partition(size: size, level: level, using: &rng)
-        var cages = groups.enumerated().map { index, cells in
-            makeCage(id: index, cells: cells, solution: solution,
-                     level: level, using: &rng)
-        }
-        var puzzle = makePuzzle(size: size, cages: cages, solution: solution, level: level)
+        let preferredExactLimit = max(2, size - 2)
+        let maximumExactLimit = maximumExactCageCount(boardSize: size)
+        var exactLimit = preferredExactLimit
+        var attempts = 0
 
-        // Arithmetic regions can occasionally describe more than one Latin
-        // square. Split a large ambiguous nest into givens until only the
-        // intended grid survives. In the worst case every cell becomes a
-        // given, so generation always terminates with a valid unique puzzle.
-        var guardCount = size * size
-        while solutionCount(for: puzzle, limit: 2) != 1, guardCount > 0 {
-            guardCount -= 1
-            guard let split = cages.indices
-                .filter({ cages[$0].cells.count > 1 })
-                .max(by: { cages[$0].cells.count < cages[$1].cells.count }) else { break }
-            let cells = cages.remove(at: split).cells
-            for cell in cells {
-                cages.append(NumberNestCage(id: 0,
-                                            cells: [cell],
-                                            target: solution[cell.r][cell.c],
-                                            operation: .exact))
+        // Reject ambiguous or clue-heavy layouts instead of making them unique
+        // by exploding whole cages into exact-value cells. Most seeds settle
+        // within a handful of layouts. After a generous retry window, allow at
+        // most one row's worth of exact cages while continuing to require a
+        // genuinely unique puzzle.
+        while true {
+            let groups = partition(size: size, level: level, using: &rng)
+            let cages = groups.enumerated().map { index, cells in
+                makeCage(id: index, cells: cells, solution: solution,
+                         level: level, using: &rng)
             }
-            cages = renumber(cages)
-            puzzle = makePuzzle(size: size, cages: cages, solution: solution, level: level)
+            let exactCount = cages.lazy.filter { $0.cells.count == 1 }.count
+            if exactCount <= exactLimit {
+                let puzzle = makePuzzle(size: size,
+                                        cages: cages,
+                                        solution: solution,
+                                        level: level)
+                if solutionCount(for: puzzle, limit: 2) == 1 { return puzzle }
+            }
+
+            attempts += 1
+            if attempts == 128 { exactLimit = maximumExactLimit }
         }
-        return puzzle
+    }
+
+    static func maximumExactCageCount(boardSize: Int) -> Int {
+        max(1, boardSize)
     }
 
     static func solutionCount(for puzzle: NumberNestsPuzzle, limit: Int = 2) -> Int {
