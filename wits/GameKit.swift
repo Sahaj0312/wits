@@ -595,6 +595,7 @@ final class GamePauseController {
     @ObservationIgnored private var pauseStartedAt: Date?
     @ObservationIgnored private var spans: [GamePauseSpan] = []
     @ObservationIgnored private var resumeTask: Task<Void, Never>?
+    @ObservationIgnored private var resumeGeneration: UInt = 0
 
     func pause(now: Date = Date()) {
         guard !isPaused else { return }
@@ -602,37 +603,64 @@ final class GamePauseController {
         pauseStartedAt = now
     }
 
-    /// Count the player back in, then resume for real.
-    func beginResumeCountdown() {
-        guard isPaused, resumeTask == nil else { return }
-        // Set synchronously so hosts that pause purely to count in (ad
-        // continues) never flash the pause menu for a frame first.
+    /// Pause if needed, count the player back in, then resume for real.
+    /// The generation guard keeps an old cancelled countdown from mutating a
+    /// newer pause, while the deferred completion guarantees that an
+    /// interrupted countdown cannot leave input locked indefinitely.
+    func beginResumeCountdown(now: Date = Date()) {
+        guard resumeTask == nil else { return }
+        if !isPaused { pause(now: now) }
+
+        resumeGeneration &+= 1
+        let generation = resumeGeneration
         resumeCountdown = 3
-        resumeTask = Task { @MainActor in
+        resumeTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                if self.resumeGeneration == generation {
+                    self.completeResumeCountdown()
+                }
+            }
+
+            // Reward callbacks arrive as a full-screen UIKit presentation is
+            // finishing. Let SwiftUI mount the revived game and countdown
+            // overlay before advancing its first beat.
+            await Task.yield()
             for n in [3, 2, 1] {
-                resumeCountdown = n
-                try? await Task.sleep(for: .milliseconds(700))
+                guard self.resumeGeneration == generation else { return }
+                self.resumeCountdown = n
+                do {
+                    try await Task.sleep(for: .milliseconds(700))
+                } catch {
+                    return
+                }
                 guard !Task.isCancelled else { return }
             }
-            resumeCountdown = nil
-            resumeTask = nil
-            resume()
         }
     }
 
     func resume(now: Date = Date()) {
         guard isPaused else { return }
+        resumeGeneration &+= 1
         resumeTask?.cancel()
-        resumeTask = nil
-        resumeCountdown = nil
+        completeResumeCountdown(now: now)
+    }
+
+    private func completeResumeCountdown(now: Date = Date()) {
         if let pauseStartedAt {
             spans.append(GamePauseSpan(start: pauseStartedAt, end: now))
         }
         pauseStartedAt = nil
+        // Unlock gameplay before clearing the final numeral. The countdown
+        // overlay keys its own hit testing from these values, so there is no
+        // intermediate state in which an outgoing overlay can steal input.
         isPaused = false
+        resumeCountdown = nil
+        resumeTask = nil
     }
 
     func reset() {
+        resumeGeneration &+= 1
         resumeTask?.cancel()
         resumeTask = nil
         resumeCountdown = nil

@@ -487,9 +487,6 @@ struct CrowdControlScreen: View {
             canContinue = false
             pauseController.reset()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
-            // Count the player back in, the fresh round holds its mark phase
-            // until the 3…2…1 finishes.
-            pauseController.pause()
             pauseController.beginResumeCountdown()
             startRound()
         }

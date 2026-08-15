@@ -274,8 +274,6 @@ struct LastSeenScreen: View {
             // the next pick honest.
             reshuffle()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
-            // Count the player back in before input unlocks.
-            pauseController.pause()
             pauseController.beginResumeCountdown()
         }
     }

@@ -600,7 +600,9 @@ struct SnakeScreen: View {
             react(to: outcome)
             if outcome == .died {
                 endRun()
-                return
+                // Keep this screen-owned task parked on the guards above.
+                // A rewarded revive can then resume the same loop instead of
+                // depending on SwiftUI to replace a task that already exited.
             }
         }
     }
@@ -658,10 +660,8 @@ struct SnakeScreen: View {
             usedContinue = true
             canContinue = false
             model.revive()
-            runID += 1
             pauseController.reset()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
-            pauseController.pause()
             pauseController.beginResumeCountdown()
         }
     }

@@ -114,6 +114,11 @@ struct GamePausedOverlay: View {
             }
         }
         .animation(.spring(response: 0.28, dampingFraction: 0.7), value: controller.resumeCountdown)
-        .transition(.opacity)
+        // Gameplay already rejects input while `isPaused` is true. The
+        // countdown layer itself must not participate in hit testing: SwiftUI
+        // can retain a transitioning overlay briefly after its state changes,
+        // which otherwise steals the first taps while game clocks are live.
+        .allowsHitTesting(controller.isPaused && controller.resumeCountdown == nil)
+        .transition(.identity)
     }
 }

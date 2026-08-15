@@ -371,9 +371,6 @@ struct ColorClashScreen: View {
             pauseController.reset()
             nextTrial()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
-            // Count the player back in, the trial clock stays frozen until
-            // the 3…2…1 finishes.
-            pauseController.pause()
             pauseController.beginResumeCountdown()
         }
     }

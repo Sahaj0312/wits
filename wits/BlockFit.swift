@@ -751,7 +751,6 @@ struct BlockFitScreen: View {
             model.revive()
             pauseController.reset()
             withAnimation(.easeOut(duration: 0.2)) { phase = .playing }
-            pauseController.pause()
             pauseController.beginResumeCountdown()
         }
     }
